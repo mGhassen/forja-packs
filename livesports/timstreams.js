@@ -1,7 +1,11 @@
 // Unified live_sport plugin — catalog + resolve (timstreams)
 // Catalog half (top-level)
 var SPECS = {
-  "api": "https://timst.cfd/api/live-upcoming"
+  origin: 'https://timst.cfd',
+  api: 'https://timst.cfd/api/live-upcoming',
+  channelsApi: 'https://timst.cfd/api/channels',
+  // Channel genre id 2 = Sports (site Live TV).
+  sportsChannelGenre: 2,
 };
 
 function ua() {
@@ -36,17 +40,77 @@ function timstreamsCategory(ev) {
   return 'other';
 }
 
-function parseEventTime(ev) {
-  if (!ev.time) return 0;
-  var ms = Date.parse(String(ev.time));
-  if (isNaN(ms)) return 0;
-  return Math.floor(ms / 1000);
+function apiBase(cfg) {
+  var api = String((cfg && cfg.api) || SPECS.api).replace(/\/$/, '');
+  var cut = api.lastIndexOf('/api/');
+  if (cut > 0) return api.slice(0, cut + 4);
+  return String((cfg && cfg.origin) || SPECS.origin).replace(/\/$/, '') + '/api';
 }
 
-function isAiring(startTime) {
-  if (!startTime) return false;
-  var nowSec = Math.floor(Date.now() / 1000);
-  return startTime <= nowSec && startTime >= nowSec - 6 * 3600;
+function fetchHeaders() {
+  return {
+    'User-Agent': ua(),
+    Accept: 'application/json',
+    Referer: SPECS.origin + '/',
+    Origin: SPECS.origin,
+  };
+}
+
+/** Kickoff ms (host schedule). Accepts ISO `time` or `date` strings. */
+function parseEventTimeMs(ev) {
+  var raw = ev && (ev.time || ev.date);
+  if (!raw) return 0;
+  if (typeof raw === 'number' && isFinite(raw)) {
+    return raw > 1e12 ? raw : raw * 1000;
+  }
+  var ms = Date.parse(String(raw));
+  return isNaN(ms) ? 0 : ms;
+}
+
+function isAiringMs(startMs) {
+  if (!startMs) return false;
+  var now = Date.now();
+  return startMs <= now && startMs >= now - 6 * 3600000;
+}
+
+function rowFromEvent(ev, idx, pluginId, opts) {
+  var eventToken = String((ev && ev.url) || idx);
+  if (!eventToken) return null;
+  var startMs = parseEventTimeMs(ev);
+  var alwaysOn = !!(opts && opts.alwaysOn);
+  var viewers = Number((ev && ev.viewers) || 0);
+  var airing = alwaysOn || isAiringMs(startMs) || viewers > 0;
+  var row = {
+    id: 'ts_' + eventToken,
+    title: String((ev && ev.name) || 'TimStreams'),
+    category: alwaysOn ? 'other' : timstreamsCategory(ev || {}),
+    date: alwaysOn ? 0 : startMs > 0 ? startMs : Date.now(),
+    poster: String((ev && ev.logo) || ''),
+    popular:
+      (ev && ev.featured === true) ||
+      viewers > 100 ||
+      (alwaysOn && viewers > 0),
+    airing: airing,
+    viewers: viewers,
+    sources: [{ source: 'timstreams', id: eventToken }],
+    catalog: 'forja_live',
+    pluginId: pluginId,
+  };
+  if (alwaysOn) {
+    row.alwaysLive = true;
+    row.badge = '24/7';
+  }
+  return row;
+}
+
+async function fetchJson(ctx, url) {
+  var res = await ctx.fetch(url, { headers: fetchHeaders() });
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
 }
 
 async function catalogExtract(ctx) {
@@ -55,38 +119,59 @@ async function catalogExtract(ctx) {
 
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var pluginId = String(cfg.pluginId || cfg.providerId || 'timstreams');
-  var api = cfg.api;
-  var res = await ctx.fetch(api, { headers: { 'User-Agent': ua(), Accept: 'application/json' } });
-  if (!res.ok) return [];
-  var data = await res.json();
-  var rows = [];
-  (data.events || []).forEach(function (ev, idx) {
-    var eventToken = String(ev.url || idx);
-    if (!eventToken) return;
-    var startTime = parseEventTime(ev);
-    var airing = isAiring(startTime);
-    rows.push({
-      id: 'ts_' + eventToken,
-      title: String(ev.name || 'TimStreams event'),
-      category: timstreamsCategory(ev),
-      date: startTime > 0 ? startTime : Date.now(),
-      poster: String(ev.logo || ''),
-      popular: ev.featured === true || (ev.viewers ? Number(ev.viewers) > 100 : false),
-      airing: airing,
-      viewers: Number(ev.viewers || 0),
-      sources: [{ source: 'timstreams', id: eventToken }],
-      catalog: 'forja_live',
-      pluginId: pluginId,
+  var base = apiBase(cfg);
+  var byId = {};
+
+  function push(row) {
+    if (!row || !row.id || byId[row.id]) return;
+    byId[row.id] = row;
+  }
+
+  // Scheduled / live match board (often null when site has no fixtures).
+  var live = await fetchJson(ctx, String(cfg.api || base + '/live-upcoming'));
+  var events = live && Array.isArray(live.events) ? live.events : [];
+  for (var i = 0; i < events.length; i++) {
+    push(rowFromEvent(events[i], i, pluginId, null));
+  }
+
+  // Site still lists sports Live TV when Events is empty — catalog those.
+  var sportsGenre = Number(
+    cfg.sportsChannelGenre != null ? cfg.sportsChannelGenre : SPECS.sportsChannelGenre,
+  );
+  var chPayload = await fetchJson(
+    ctx,
+    String(cfg.channelsApi || base + '/channels'),
+  );
+  var channels =
+    chPayload && Array.isArray(chPayload.channels) ? chPayload.channels : [];
+  for (var j = 0; j < channels.length; j++) {
+    var ch = channels[j];
+    if (!ch || ch.vip === true) continue;
+    if (Number(ch.genre) !== sportsGenre) continue;
+    var streams = Array.isArray(ch.streams) ? ch.streams : [];
+    if (!streams.length) continue;
+    push(rowFromEvent(ch, j, pluginId, { alwaysOn: true }));
+  }
+
+  return Object.keys(byId)
+    .map(function (k) {
+      return liveCatalogStamp(byId[k], pluginId);
+    })
+    .sort(function (a, b) {
+      if (a.airing !== b.airing) return a.airing ? -1 : 1;
+      return Number(b.viewers || 0) - Number(a.viewers || 0);
     });
-  });
-  return rows.map(function (r) { return liveCatalogStamp(r, pluginId); });
 }
+
 
 // Resolve half (closed scope — no name collisions with catalog)
 var __resolveExtract = (function () {
 var SPECS = {
-  "api": "https://timst.cfd/api/live-upcoming",
-  "embedOrigin": "https://embed.st"
+  origin: 'https://timst.cfd',
+  api: 'https://timst.cfd/api/live-upcoming',
+  channelsApi: 'https://timst.cfd/api/channels',
+  replaysApi: 'https://timst.cfd/api/replays',
+  embedOrigin: 'https://embed.st',
 };
 
 function ua() {
@@ -101,12 +186,52 @@ function embedReferer(raw) {
   }
 }
 
+function apiBase(cfg) {
+  var api = String((cfg && cfg.api) || SPECS.api).replace(/\/$/, '');
+  var cut = api.lastIndexOf('/api/');
+  if (cut > 0) return api.slice(0, cut + 4);
+  return String((cfg && cfg.origin) || SPECS.origin).replace(/\/$/, '') + '/api';
+}
+
 async function fetchEvents(ctx, cfg) {
-  var api = cfg.api;
-  var res = await ctx.fetch(api, { headers: { 'User-Agent': ua(), Accept: 'application/json' } });
-  if (!res.ok) return [];
-  var data = await res.json();
-  return data.events || [];
+  var base = apiBase(cfg);
+  var headers = {
+    'User-Agent': ua(),
+    Accept: 'application/json',
+    Referer: 'https://timst.cfd/',
+    Origin: 'https://timst.cfd',
+  };
+  var out = [];
+  var seen = {};
+
+  async function pull(url, key) {
+    try {
+      var res = await ctx.fetch(url, { headers: headers });
+      if (!res.ok) return;
+      var data = await res.json();
+      var list = [];
+      if (key === 'events') {
+        list = Array.isArray(data && data.events) ? data.events : [];
+      } else if (key === 'channels') {
+        list = Array.isArray(data && data.channels) ? data.channels : [];
+      } else if (key === 'replays') {
+        list = Array.isArray(data && data.replays) ? data.replays : [];
+      }
+      for (var i = 0; i < list.length; i++) {
+        var ev = list[i];
+        if (!ev) continue;
+        var token = String(ev.url || '');
+        if (!token || seen[token]) continue;
+        seen[token] = 1;
+        out.push(ev);
+      }
+    } catch (_) {}
+  }
+
+  await pull(String(cfg.api || base + '/live-upcoming'), 'events');
+  await pull(String(cfg.channelsApi || base + '/channels'), 'channels');
+  await pull(String(cfg.replaysApi || base + '/replays'), 'replays');
+  return out;
 }
 
 function findEvent(events, eventToken) {
@@ -219,13 +344,21 @@ async function resolveByEvent(ctx, cfg) {
     : null;
   if (!ev) {
     var mapped = (events || []).map(function (e) {
+      var t = e && (e.time || e.date || e.starts_at);
+      var dateMs = 0;
+      if (typeof t === 'number' && isFinite(t)) {
+        dateMs = t > 1e12 ? t : t * 1000;
+      } else if (t) {
+        dateMs = Date.parse(String(t));
+        if (isNaN(dateMs)) dateMs = 0;
+      }
       return {
-        id: String(e.id || e.event_id || ''),
-        matchId: String(e.id || e.event_id || ''),
+        id: String(e.id || e.event_id || e.url || ''),
+        matchId: String(e.url || e.id || e.event_id || ''),
         title: String(e.title || e.name || ''),
         homeTeam: String(e.home || e.homeTeam || ''),
         awayTeam: String(e.away || e.awayTeam || ''),
-        dateMs: Number(e.date || e.starts_at || 0) || 0,
+        dateMs: dateMs,
         _raw: e,
       };
     });

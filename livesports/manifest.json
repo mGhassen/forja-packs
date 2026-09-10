@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -140,6 +140,9 @@
       "config": {
         "origin": "https://timst.cfd",
         "api": "https://timst.cfd/api/live-upcoming",
+        "channelsApi": "https://timst.cfd/api/channels",
+        "replaysApi": "https://timst.cfd/api/replays",
+        "sportsChannelGenre": 2,
         "embedOrigin": "https://embed.st"
       }
     },
