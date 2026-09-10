@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -267,6 +267,7 @@
       },
       "config": {
         "scheduleHorizon": "fullDay",
+        "daysAhead": 7,
         "catalogTimeoutSec": 90,
         "leagues": [
           "NBA",

@@ -128,6 +128,40 @@ function parseIsoMs(raw) {
   return isNaN(t) ? 0 : t;
 }
 
+function ymdLocal(d) {
+  var m = d.getMonth() + 1;
+  var day = d.getDate();
+  return (
+    String(d.getFullYear()) +
+    (m < 10 ? '0' : '') +
+    m +
+    (day < 10 ? '0' : '') +
+    day
+  );
+}
+
+function addDaysLocal(d, n) {
+  var x = new Date(d.getTime());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+/** ESPN `dates=` — single YYYYMMDD or START-END range. */
+function espnDatesQuery(cfg) {
+  var explicit = String((cfg && cfg.date) || '').trim();
+  if (/^\d{8}$/.test(explicit)) return explicit;
+  if (/^\d{8}-\d{8}$/.test(explicit)) return explicit;
+  // Pinning to "today" only empties most soccer boards on off-days.
+  // Default: local today → today+N (fullDay scoreboard window).
+  var daysAhead = Number((cfg && cfg.daysAhead) || 7);
+  if (!(daysAhead >= 0)) daysAhead = 7;
+  var start = new Date();
+  var end = addDaysLocal(start, daysAhead);
+  var a = ymdLocal(start);
+  var b = ymdLocal(end);
+  return a === b ? a : a + '-' + b;
+}
+
 function teamField(team, keys) {
   if (!team) return '';
   for (var i = 0; i < keys.length; i++) {
@@ -202,13 +236,15 @@ function mapGame(league, event, pluginId) {
   };
 }
 
-async function fetchLeague(ctx, league, date, pluginId) {
+async function fetchLeague(ctx, league, datesQuery, pluginId) {
   var url = LEAGUE_ENDPOINTS[String(league || '').toUpperCase()];
   if (!url) return [];
   var fetchUrl = url;
-  if (date) fetchUrl += (url.indexOf('?') >= 0 ? '&' : '?') + 'dates=' + date;
+  if (datesQuery) {
+    fetchUrl += (url.indexOf('?') >= 0 ? '&' : '?') + 'dates=' + datesQuery;
+  }
   if (NCAA_LEAGUES[String(league || '').toUpperCase()]) {
-    fetchUrl += '&groups=50&limit=500';
+    fetchUrl += (fetchUrl.indexOf('?') >= 0 ? '&' : '?') + 'groups=50&limit=500';
   }
   var res = await ctx.fetch(fetchUrl, {
     headers: { 'User-Agent': ua(), Accept: 'application/json' },
@@ -234,17 +270,9 @@ async function extract(ctx) {
   var leagues = leaguesRaw && leaguesRaw.length
     ? leaguesRaw
     : Object.keys(LEAGUE_ENDPOINTS);
-  var date = String(cfg.date || '').trim();
-  if (!date) {
-    var now = new Date();
-    var m = now.getMonth() + 1;
-    var d = now.getDate();
-    date = String(now.getFullYear()) +
-      (m < 10 ? '0' : '') + m +
-      (d < 10 ? '0' : '') + d;
-  }
+  var datesQuery = espnDatesQuery(cfg);
   var chunks = await Promise.all(leagues.map(function (lg) {
-    return fetchLeague(ctx, lg, date, pluginId);
+    return fetchLeague(ctx, lg, datesQuery, pluginId);
   }));
   return chunks.reduce(function (a, b) { return a.concat(b); }, []);
 }
