@@ -1,0 +1,42 @@
+name: Validate manifests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check every installable pack has manifest.json
+        run: |
+          set -euo pipefail
+          missing=0
+          for dir in providers catalog live torrent iptv/vod \
+            hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
+            hubs/cartoon hubs/kids hubs/shahid hubs/live_sports \
+            hubs/live_sports_cards hubs/my_list; do
+            f="$dir/manifest.json"
+            if [[ ! -f "$f" ]]; then
+              echo "missing: $f"
+              missing=1
+            else
+              node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f"
+              echo "ok: $f"
+            fi
+          done
+          test "$missing" -eq 0
+      - name: SDK contract index exists
+        run: |
+          test -f sdk/contract.json
+          node -e "JSON.parse(require('fs').readFileSync('sdk/contract.json','utf8'))"
+          for s in schema/manifest.schema.json schema/catalog-envelope.schema.json \
+            schema/vod-stream.schema.json schema/torrent-search.schema.json \
+            schema/torrent-row.schema.json; do
+            test -f "sdk/$s"
+          done
