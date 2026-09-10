@@ -54,7 +54,7 @@ function matchRow(m, pluginId, origin) {
     id: String(m.id || ''),
     title: String(m.title || ''),
     category: String(m.category || 'other'),
-    date: date > 1e12 ? date : date * 1000,
+    date: date > 1e12 ? date : date > 0 ? date * 1000 : 0,
     poster: poster,
     popular: m.popular === true,
     airing: m.airing === true,
@@ -70,6 +70,68 @@ function matchRow(m, pluginId, origin) {
   if (homeBadge) row.homeBadge = homeBadge;
   if (awayBadge) row.awayBadge = awayBadge;
   return row;
+}
+
+function isGoatSourceToken(source) {
+  switch (String(source || '')
+    .trim()
+    .toLowerCase()) {
+    case 'admin':
+    case 'delta':
+    case 'golf':
+    case 'ppv':
+    case 'bravo':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Match `/api/matches/*` often omits viewers — mirrors carry them on `/api/stream/…`. */
+async function sumStreamViewers(ctx, cfg, m) {
+  var fromMatch = Number(m && m.viewers) || 0;
+  if (fromMatch > 0) return fromMatch;
+  var sources = m && Array.isArray(m.sources) ? m.sources : [];
+  var total = 0;
+  var seen = {};
+  for (var i = 0; i < sources.length; i++) {
+    var s = sources[i];
+    if (!s || !isGoatSourceToken(s.source)) continue;
+    var src = String(s.source || '').trim();
+    var mid = String(s.id || (m && m.id) || '').trim();
+    if (!src || !mid) continue;
+    var key = src.toLowerCase() + '|' + mid;
+    if (seen[key]) continue;
+    seen[key] = 1;
+    try {
+      var list = await fetchJson(
+        ctx,
+        '/api/stream/' +
+          encodeURIComponent(src) +
+          '/' +
+          encodeURIComponent(mid),
+        cfg,
+      );
+      if (!Array.isArray(list)) continue;
+      for (var j = 0; j < list.length; j++) {
+        total += Number(list[j] && list[j].viewers) || 0;
+      }
+    } catch (_) {}
+  }
+  return total;
+}
+
+function shouldEnrichStreamViewers(m) {
+  if (!m) return false;
+  if (Number(m.viewers) > 0) return false;
+  if (m.airing === true) return true;
+  var date = Number(m.date || 0);
+  // 24/7 / always-on cards (Willow, Tennis Channel, …).
+  if (m.popular === true && date <= 0) return true;
+  var ms = date > 1e12 ? date : date > 0 ? date * 1000 : 0;
+  if (!ms) return false;
+  var now = Date.now();
+  return ms <= now && ms >= now - 6 * 3600000;
 }
 
 async function catalogExtract(ctx) {
@@ -90,9 +152,21 @@ async function catalogExtract(ctx) {
     byId[m.id] = m;
   });
   var origin = streamedOrigin(cfg);
-  return Object.keys(byId).map(function (k) {
-    return liveCatalogStamp(matchRow(byId[k], pluginId, origin), pluginId);
-  });
+  var ids = Object.keys(byId);
+  var rows = [];
+  for (var i = 0; i < ids.length; i++) {
+    var raw = byId[ids[i]];
+    var row = matchRow(raw, pluginId, origin);
+    if (shouldEnrichStreamViewers(raw)) {
+      var viewers = await sumStreamViewers(ctx, cfg, raw);
+      if (viewers > 0) {
+        row.viewers = viewers;
+        if (!row.popular) row.popular = viewers > 50;
+      }
+    }
+    rows.push(liveCatalogStamp(row, pluginId));
+  }
+  return rows;
 }
 
 // Resolve half (closed scope — no name collisions with catalog)

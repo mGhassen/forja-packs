@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "prelude": "_wire.js",
   "tags": [
     "sports",
