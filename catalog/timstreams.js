@@ -1,5 +1,5 @@
 var SPECS = {
-  "api": "https://timstreams.st/api/live-upcoming"
+  "api": "https://timst.cfd/api/live-upcoming"
 };
 
 function ua() {

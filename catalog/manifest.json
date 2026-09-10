@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports Catalog",
   "description": "Live Sports schedule catalogs (Streamed, PPV, ESPN, …).",
   "author": "ForjaHQ",
-  "version": "1.9.7",
+  "version": "1.9.8",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -74,7 +74,7 @@
     {
       "id": "catalog-timstreams",
       "name": "TimStreams",
-      "description": "timstreams.st schedule catalog",
+      "description": "timst.cfd schedule catalog",
       "entry": "timstreams.js",
       "types": [
         "catalog"
@@ -82,8 +82,8 @@
       "kind": "http",
       "config": {
         "providerId": "live-timstreams",
-        "origin": "https://timstreams.st",
-        "api": "https://timstreams.st/api/live-upcoming",
+        "origin": "https://timst.cfd",
+        "api": "https://timst.cfd/api/live-upcoming",
         "embedOrigin": "https://embed.st"
       }
     },

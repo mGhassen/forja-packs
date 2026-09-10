@@ -1,5 +1,5 @@
 var SPECS = {
-  "api": "https://timstreams.st/api/live-upcoming",
+  "api": "https://timst.cfd/api/live-upcoming",
   "embedOrigin": "https://embed.st"
 };
 
@@ -11,7 +11,7 @@ function embedReferer(raw) {
   try {
     return new URL(String(raw || '').trim()).origin + '/';
   } catch (_) {
-    return 'https://timstreams.st/';
+    return 'https://timst.cfd/';
   }
 }
 
@@ -41,7 +41,7 @@ async function unlockEmbed(ctx, url, cfg) {
   var raw = String(url || '').trim();
   if (!raw) return null;
 
-  if (isEmbedIndiaUrl(raw)) {
+  if (isGasmJwEmbedUrl(raw)) {
     try {
       var india = await resolveEmbedIndia(ctx, raw, cfg);
       if (india && india.length) return india[0];

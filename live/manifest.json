@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports Streams",
   "description": "Live Sports per-site stream resolve (Forja Live).",
   "author": "ForjaHQ",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "tags": [
     "live",
     "sports"
@@ -71,7 +71,7 @@
     {
       "id": "live-timstreams",
       "name": "TimStreams",
-      "description": "timstreams.st stream resolve",
+      "description": "timst.cfd stream resolve",
       "entry": "timstreams.js",
       "types": [
         "live"
@@ -79,7 +79,8 @@
       "kind": "http",
       "prelude": "embed-st.js",
       "config": {
-        "origin": "https://timstreams.st",
+        "origin": "https://timst.cfd",
+        "api": "https://timst.cfd/api/live-upcoming",
         "embedOrigin": "https://embed.st"
       }
     },
