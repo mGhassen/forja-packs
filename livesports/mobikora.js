@@ -25,6 +25,17 @@ function absUrl(origin, href) {
   return origin + h;
 }
 
+/** True when href is a real channel/match page (not home / empty). */
+function isChannelHref(origin, href) {
+  var url = absUrl(origin, href);
+  if (!url) return false;
+  var root = String(origin || '').replace(/\/$/, '');
+  if (!root) return /^https?:\/\//i.test(url);
+  var normalized = url.replace(/\/$/, '');
+  if (normalized === root) return false;
+  return true;
+}
+
 function decodeEntities(s) {
   return String(s || '')
     .replace(/&#(\d+);/g, function (_, n) {
@@ -100,7 +111,11 @@ function parseKickoffMs(title, timeHm, tzOffset) {
 
 function isAiringClass(cls, stat) {
   var c = String(cls || '').toLowerCase();
-  if (/\blive\b/.test(c) || /\bgools\b/.test(c) || /\bstarted\b/.test(c)) return true;
+  // `not-started` contains the substring "started" — exclude it first.
+  if (/\bnot-started\b/.test(c) || /\bfinished\b/.test(c)) return false;
+  if (/\blive\b/.test(c) || /\bgools\b/.test(c) || /(^|\s)started(\s|$)/.test(c)) {
+    return true;
+  }
   var s = String(stat || '');
   return /جارية|مباشر|live/i.test(s);
 }
@@ -141,10 +156,14 @@ function parseMatchBlock(block, origin, tzOffset) {
   var tour = tourM ? stripTags(tourM[1]) : '';
 
   var linkM = block.match(/<a\s+href=["']([^"']*)["'][^>]*title=["']([^"']*)["']/i);
+  if (!linkM) {
+    linkM = block.match(/title=["']([^"']*)["'][^>]*href=["']([^"']*)["']/i);
+    if (linkM) linkM = [linkM[0], linkM[2], linkM[1]];
+  }
   var href = linkM ? decodeEntities(linkM[1]) : '';
   var titleAttr = linkM ? decodeEntities(linkM[2]) : '';
-  var channelUrl = absUrl(origin, href);
-  if (!channelUrl) return null;
+  // Site currently ships href="/" on every card — still keep the fixture.
+  var channelUrl = isChannelHref(origin, href) ? absUrl(origin, href) : '';
 
   var badges = [];
   var badgeRe = /(?:data-src|src)="(https?:\/\/[^"]+\.(?:png|jpe?g|webp|gif)[^"]*)"/gi;
@@ -154,12 +173,34 @@ function parseMatchBlock(block, origin, tzOffset) {
   }
 
   var dateMs = parseKickoffMs(titleAttr, timeHm, tzOffset);
+  if (!dateMs && timeHm) {
+    // Title missing date — assume today in Cairo offset when only HH:MM is present.
+    var now = new Date();
+    var y = now.getFullYear();
+    var mo = now.getMonth() + 1;
+    var da = now.getDate();
+    var day =
+      String(y) +
+      '-' +
+      (mo < 10 ? '0' : '') +
+      mo +
+      '-' +
+      (da < 10 ? '0' : '') +
+      da;
+    dateMs = parseKickoffMs('بتاريخ ' + day, timeHm, tzOffset);
+  }
   if (!inCatalogWindow(dateMs)) return null;
 
   var airing = isAiringClass(cls, stat);
-  var mid = b64url(channelUrl);
   var title =
     home && away ? home + ' vs ' + away : home || away || channelLabel(channelUrl);
+  // Stable opaque id: prefer channel page; else fixture fingerprint.
+  var mid = channelUrl
+    ? b64url(channelUrl)
+    : b64url(
+        ['mkfx', home, away, String(dateMs || 0), timeHm, tour].join('|'),
+      );
+  if (!mid) return null;
 
   var row = {
     id: 'mk_' + mid,
@@ -323,13 +364,27 @@ async function resolveExtract(ctx) {
   var action = String(ctx.action || 'resolve');
   if (action !== 'resolve') return [];
 
-  var channelUrl =
+  function usableChannel(url) {
+    var raw = String(url || '').trim();
+    if (!raw || !/^https?:\/\//i.test(raw)) return '';
+    try {
+      var u = new URL(raw);
+      if (u.pathname === '/' || u.pathname === '') return '';
+      return raw;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  var channelUrl = usableChannel(
     channelUrlFromMatchId(ctx.matchId) ||
-    String(ctx.embedUrl || ctx.url || '').trim();
+      String(ctx.embedUrl || ctx.url || '').trim(),
+  );
+  // Site often leaves match cards pointing at "/" — nothing to unlock.
   if (!channelUrl) return [];
 
-  // Unlock-on-play only when an embed/channel URL is set as play target.
-  var playUrl = String(ctx.embedUrl || ctx.url || '').trim();
+  // Unlock-on-play when an embed/channel URL is set as play target.
+  var playUrl = usableChannel(ctx.embedUrl || ctx.url || '');
   if (playUrl) {
     var rows = await nestUnlockChannel(ctx, playUrl, {
       brand: 'MobiKora',

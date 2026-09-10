@@ -29,14 +29,33 @@ async function fetchJson(ctx, path, cfg) {
   return res.json();
 }
 
-function matchRow(m, pluginId) {
+function absStreamedUrl(origin, path) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return String(origin || '').replace(/\/$/, '') + p;
+}
+
+function matchRow(m, pluginId, origin) {
   var date = Number(m.date || 0);
-  return {
+  var teams = m && m.teams && typeof m.teams === 'object' ? m.teams : null;
+  var home = teams && teams.home && typeof teams.home === 'object' ? teams.home : null;
+  var away = teams && teams.away && typeof teams.away === 'object' ? teams.away : null;
+  var homeBadge = home ? String(home.badge || '').trim() : '';
+  var awayBadge = away ? String(away.badge || '').trim() : '';
+  // API posters are relative `/api/images/proxy/…`; badges are opaque tokens
+  // (host expands via kitEventImageUrl → /api/images/badge/{token}.webp).
+  var poster = absStreamedUrl(origin, m.poster);
+  if (!poster && homeBadge) {
+    poster = absStreamedUrl(origin, '/api/images/badge/' + homeBadge + '.webp');
+  }
+  var row = {
     id: String(m.id || ''),
     title: String(m.title || ''),
     category: String(m.category || 'other'),
     date: date > 1e12 ? date : date * 1000,
-    poster: String(m.poster || ''),
+    poster: poster,
     popular: m.popular === true,
     airing: m.airing === true,
     viewers: Number(m.viewers || 0),
@@ -46,6 +65,11 @@ function matchRow(m, pluginId) {
     catalog: 'forja_live',
     pluginId: pluginId,
   };
+  if (home && home.name) row.homeTeam = String(home.name);
+  if (away && away.name) row.awayTeam = String(away.name);
+  if (homeBadge) row.homeBadge = homeBadge;
+  if (awayBadge) row.awayBadge = awayBadge;
+  return row;
 }
 
 async function catalogExtract(ctx) {
@@ -65,8 +89,9 @@ async function catalogExtract(ctx) {
     m.airing = true;
     byId[m.id] = m;
   });
+  var origin = streamedOrigin(cfg);
   return Object.keys(byId).map(function (k) {
-    return liveCatalogStamp(matchRow(byId[k], pluginId), pluginId);
+    return liveCatalogStamp(matchRow(byId[k], pluginId, origin), pluginId);
   });
 }
 
