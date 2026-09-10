@@ -263,7 +263,6 @@ function kidsFilters() {
 
 function kidsLayout() {
   return {
-    dir: 'rtl',
     pages: {
       kids: {
         feed: true,
@@ -596,7 +595,7 @@ function kidsParseSeasonUrls(params) {
     try {
       var parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return kidsParseSeasonUrls({ seasonUrls: parsed });
-    } catch (e) {}
+    } catch (e) { }
   }
   return [];
 }
@@ -761,8 +760,8 @@ function kidsDetails(ctx, cfg, params) {
     var badge =
       videos.length > 0
         ? videos.length +
-          ' حلقة' +
-          (seasonCount > 1 ? ' · ' + seasonCount + ' مواسم' : '')
+        ' حلقة' +
+        (seasonCount > 1 ? ' · ' + seasonCount + ' مواسم' : '')
         : '';
     var meta = kidsMeta('series', 'series:' + seriesKey, seriesTitle, poster, {
       url: seasonUrls[0],
@@ -871,17 +870,17 @@ function kidsFeed(ctx, cfg, params) {
     letter
       ? Promise.resolve([])
       : kidsLoadMovies(ctx, cfg, base, limit).catch(function () {
-          return [];
-        }),
+        return [];
+      }),
     letter
       ? Promise.resolve([])
       : kidsLoadHome(ctx, cfg, base)
-          .then(function (h) {
-            return h.episodes || [];
-          })
-          .catch(function () {
-            return [];
-          }),
+        .then(function (h) {
+          return h.episodes || [];
+        })
+        .catch(function () {
+          return [];
+        }),
   ]).then(function (parts) {
     var series = parts[0] || [];
     var movies = kind === 'series' ? [] : parts[1] || [];

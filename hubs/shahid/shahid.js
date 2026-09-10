@@ -241,10 +241,10 @@ function authLoginFromSession(ctx, sessionId, labelHint) {
         _shahidJwt = jwt || '';
         var label = String(
           user.email ||
-            user.userName ||
-            user.communicationEmail ||
-            labelHint ||
-            '',
+          user.userName ||
+          user.communicationEmail ||
+          labelHint ||
+          '',
         ).trim();
         return hubOk('auth_login', {
           connected: true,
@@ -402,7 +402,7 @@ function formatImg(url, kind) {
       .replace(/\{height\}/g, String(h))
       .replace(/\{width\}/g, String(w))
       .replace(/\{croppingPoint\}/g, 'mc');
-  } catch (e) {}
+  } catch (e) { }
   if (url.indexOf('/mediaObject') < 0) {
     url = url.replace('mediaObject', '/mediaObject');
   }
@@ -469,8 +469,8 @@ function fetchTopRanking(ctx, cfg, pageSize) {
     return ctx
       .fetch(
         SHAHID_PROXY +
-          '/v2.1/product/top-ranking-by-type?' +
-          apiQs({ productType: 'SERIES', country: country, pageSize: size }, country),
+        '/v2.1/product/top-ranking-by-type?' +
+        apiQs({ productType: 'SERIES', country: country, pageSize: size }, country),
         { headers: shahidHeaders(auth.sessionId, auth.jwt, cfg.language) },
       )
       .then(function (res) {
@@ -494,16 +494,16 @@ function fetchRelated(ctx, cfg, seedId, productType, pageSize) {
     return ctx
       .fetch(
         SHAHID_PROXY +
-          '/v2.1/product/related?' +
-          apiQs(
-            {
-              id: Number(seedId) || seedId,
-              productType: productType || 'SHOW',
-              pageNumber: 0,
-              pageSize: pageSize || 30,
-            },
-            country,
-          ),
+        '/v2.1/product/related?' +
+        apiQs(
+          {
+            id: Number(seedId) || seedId,
+            productType: productType || 'SHOW',
+            pageNumber: 0,
+            pageSize: pageSize || 30,
+          },
+          country,
+        ),
         { headers: shahidHeaders(auth.sessionId, auth.jwt, cfg.language) },
       )
       .then(function (res) {
@@ -625,10 +625,10 @@ function searchTab(ctx, auth, country, language, tab, q) {
   return ctx
     .fetch(
       SHAHID_PROXY +
-        '/v2.1/search/' +
-        tab +
-        '?' +
-        apiQs(body, country),
+      '/v2.1/search/' +
+      tab +
+      '?' +
+      apiQs(body, country),
       { headers: shahidHeaders(auth.sessionId, auth.jwt, language) },
     )
     .then(function (res) {
@@ -709,8 +709,8 @@ function details(ctx) {
         return ctx
           .fetch(
             SHAHID_PROXY +
-              '/v2.1/product/id?' +
-              apiQs({ id: Number(id) || id }, country),
+            '/v2.1/product/id?' +
+            apiQs({ id: Number(id) || id }, country),
             { headers: hdrs },
           )
           .then(function (r2) {
@@ -734,10 +734,10 @@ function details(ctx) {
           poster: formatImg(img.posterImage || '', 'poster'),
           background: formatImg(
             img.thumbnailImage ||
-              img.posterImage ||
-              show.mainImage ||
-              model.mainImage ||
-              '',
+            img.posterImage ||
+            show.mainImage ||
+            model.mainImage ||
+            '',
             'background',
           ),
           logo: formatImg(
@@ -763,16 +763,16 @@ function details(ctx) {
         return ctx
           .fetch(
             SHAHID_PROXY +
-              '/v2.1/product/playlist?' +
-              apiQs(
-                {
-                  playListId: playlist.id,
-                  pageNumber: 0,
-                  pageSize: 100,
-                  sorts: [{ order: 'ASC', type: 'SORTDATE' }],
-                },
-                country,
-              ),
+            '/v2.1/product/playlist?' +
+            apiQs(
+              {
+                playListId: playlist.id,
+                pageNumber: 0,
+                pageSize: 100,
+                sorts: [{ order: 'ASC', type: 'SORTDATE' }],
+              },
+              country,
+            ),
             { headers: hdrs },
           )
           .then(function (res) {
@@ -791,12 +791,12 @@ function details(ctx) {
                   p.title ||
                   p.episodeTitle ||
                   'Episode ' +
-                    (Number(p.number || p.episodeNumber) || i + 1),
+                  (Number(p.number || p.episodeNumber) || i + 1),
                 season: Number(p.seasonNumber) || 1,
                 episode: Number(p.number || p.episodeNumber) || i + 1,
                 thumbnail: formatImg(
                   (p.image && (p.image.thumbnailImage || p.image.posterImage)) ||
-                    '',
+                  '',
                   'thumb',
                 ),
               });

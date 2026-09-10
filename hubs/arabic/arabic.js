@@ -289,8 +289,7 @@ function arabicHeaders(referer) {
 }
 
 function arabicLayout() {
-  return {
-    dir: 'rtl',
+  return { 
     pages: {
       arabic: {
         feed: true,

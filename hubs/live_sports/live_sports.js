@@ -27,6 +27,24 @@ function liveSportsCatalogActions() {
       icon: 'refresh',
       action: 'refresh',
     },
+    {
+      id: 'search',
+      label: 'Search',
+      action: 'eventSearch',
+      trailing: true,
+    },
+    {
+      id: 'view',
+      label: 'View',
+      action: 'scheduleView',
+      trailing: true,
+    },
+    {
+      id: 'portals',
+      label: 'Portals',
+      action: 'portals',
+      trailing: true,
+    },
   ];
 }
 

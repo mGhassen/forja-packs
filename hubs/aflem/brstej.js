@@ -338,7 +338,6 @@ function brstejMeta(id, title, poster, opts) {
 
 function brstejLayout() {
   return {
-    dir: 'rtl',
     pages: {
       aflem: {
         feed: true,
@@ -749,9 +748,9 @@ function brstejRailItems(ctx, cfg, params) {
   var load = brstejChromeFiltered(params)
     ? brstejExploreList(ctx, cfg, params)
     : brstejBrowseSeries(ctx, cfg, {
-        page: brstejPageOf(params),
-        limit: brstejLimitOf(params, 24),
-      });
+      page: brstejPageOf(params),
+      limit: brstejLimitOf(params, 24),
+    });
   return load
     .then(function (page) {
       return hubItems(
