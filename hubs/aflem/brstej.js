@@ -338,6 +338,7 @@ function brstejMeta(id, title, poster, opts) {
 
 function brstejLayout() {
   return {
+    dir: 'rtl',
     pages: {
       aflem: {
         feed: true,

@@ -229,6 +229,7 @@ function cartoonMeta(seriesId, title, poster, opts) {
 
 function cartoonLayout() {
   return {
+    dir: 'rtl',
     pages: {
       cartoon: {
         feed: true,

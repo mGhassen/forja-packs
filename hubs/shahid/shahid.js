@@ -561,6 +561,7 @@ function layout() {
   return hubOk(
     'layout',
     {
+      dir: 'rtl',
       pages: {
         shahid: {
           feed: true,
