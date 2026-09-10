@@ -1,5 +1,5 @@
 // Unified live_sport plugin — catalog + resolve (streamfree)
-// Catalog half
+// Catalog half (top-level)
 var SPECS = {
   "origin": "https://streamfree.top"
 };
@@ -61,7 +61,8 @@ async function catalogExtract(ctx) {
   return rows.map(function (r) { return liveCatalogStamp(r, pluginId); });
 }
 
-// Resolve half
+// Resolve half (closed scope — no name collisions with catalog)
+var __resolveExtract = (function () {
 var SPECS = {
   origin: 'https://streamfree.top',
   embedOrigin: 'https://embed.st',
@@ -305,14 +306,15 @@ async function resolveExtract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   return resolveStream(ctx, cfg);
 }
+  return resolveExtract;
+})();
 
 async function extract(ctx) {
   var action = String(ctx.action || '').trim().toLowerCase();
   if (action === 'catalog') return catalogExtract(ctx);
-  if (action === 'resolve') return resolveExtract(ctx);
-  // Default: prefer resolve when match/embed context is present.
+  if (action === 'resolve') return __resolveExtract(ctx);
   if (ctx.matchId || ctx.embedUrl || ctx.url || ctx.stream || ctx.fixtureSearch) {
-    return resolveExtract(ctx);
+    return __resolveExtract(ctx);
   }
   return catalogExtract(ctx);
 }

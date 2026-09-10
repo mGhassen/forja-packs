@@ -1,5 +1,5 @@
 // Unified live_sport plugin — catalog + resolve (watchfooty)
-// Catalog half
+// Catalog half (top-level)
 function ua() {
   return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 }
@@ -186,7 +186,8 @@ async function catalogExtract(ctx) {
     .slice(0, CATALOG_MAX);
 }
 
-// Resolve half
+// Resolve half (closed scope — no name collisions with catalog)
+var __resolveExtract = (function () {
 var WATCHFOOTY_REFERER = 'https://watchfooty.st/';
 var WATCHFOOTY_SOURCE_PRIORITY = {
   delta: 0,
@@ -367,14 +368,15 @@ async function resolveExtract(ctx) {
   }
   return resolveWatchfootyByFixture(ctx);
 }
+  return resolveExtract;
+})();
 
 async function extract(ctx) {
   var action = String(ctx.action || '').trim().toLowerCase();
   if (action === 'catalog') return catalogExtract(ctx);
-  if (action === 'resolve') return resolveExtract(ctx);
-  // Default: prefer resolve when match/embed context is present.
+  if (action === 'resolve') return __resolveExtract(ctx);
   if (ctx.matchId || ctx.embedUrl || ctx.url || ctx.stream || ctx.fixtureSearch) {
-    return resolveExtract(ctx);
+    return __resolveExtract(ctx);
   }
   return catalogExtract(ctx);
 }

@@ -1,5 +1,5 @@
 // Unified live_sport plugin — catalog + resolve (timstreams)
-// Catalog half
+// Catalog half (top-level)
 var SPECS = {
   "api": "https://timst.cfd/api/live-upcoming"
 };
@@ -82,7 +82,8 @@ async function catalogExtract(ctx) {
   return rows.map(function (r) { return liveCatalogStamp(r, pluginId); });
 }
 
-// Resolve half
+// Resolve half (closed scope — no name collisions with catalog)
+var __resolveExtract = (function () {
 var SPECS = {
   "api": "https://timst.cfd/api/live-upcoming",
   "embedOrigin": "https://embed.st"
@@ -281,14 +282,15 @@ async function resolveExtract(ctx) {
   }
   return resolveByEvent(ctx, cfg);
 }
+  return resolveExtract;
+})();
 
 async function extract(ctx) {
   var action = String(ctx.action || '').trim().toLowerCase();
   if (action === 'catalog') return catalogExtract(ctx);
-  if (action === 'resolve') return resolveExtract(ctx);
-  // Default: prefer resolve when match/embed context is present.
+  if (action === 'resolve') return __resolveExtract(ctx);
   if (ctx.matchId || ctx.embedUrl || ctx.url || ctx.stream || ctx.fixtureSearch) {
-    return resolveExtract(ctx);
+    return __resolveExtract(ctx);
   }
   return catalogExtract(ctx);
 }

@@ -1,5 +1,5 @@
 // Unified live_sport plugin — catalog + resolve (mobikora)
-// Catalog half
+// Catalog half (top-level)
 var SPECS = {
   origin: 'https://mobikora.live',
   pages: ['/', '/matches-today/', '/matches-tomorrow/'],
@@ -247,7 +247,8 @@ async function catalogExtract(ctx) {
     .slice(0, CATALOG_MAX);
 }
 
-// Resolve half
+// Resolve half (closed scope — no name collisions with catalog)
+var __resolveExtract = (function () {
 var SPECS = {
   origin: 'https://mobikora.live',
 };
@@ -334,14 +335,15 @@ async function resolveExtract(ctx) {
   });
   return withChannelLabel(rows, channelUrl);
 }
+  return resolveExtract;
+})();
 
 async function extract(ctx) {
   var action = String(ctx.action || '').trim().toLowerCase();
   if (action === 'catalog') return catalogExtract(ctx);
-  if (action === 'resolve') return resolveExtract(ctx);
-  // Default: prefer resolve when match/embed context is present.
+  if (action === 'resolve') return __resolveExtract(ctx);
   if (ctx.matchId || ctx.embedUrl || ctx.url || ctx.stream || ctx.fixtureSearch) {
-    return resolveExtract(ctx);
+    return __resolveExtract(ctx);
   }
   return catalogExtract(ctx);
 }
