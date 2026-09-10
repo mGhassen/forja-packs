@@ -127,9 +127,26 @@ async function resolveUrl(ctx, url, name, cfg) {
 
 async function resolveByEvent(ctx, cfg) {
   var eventToken = String(ctx.eventId || '').replace(/^ts_/, '');
-  if (!eventToken) return [];
   var events = await fetchEvents(ctx, cfg);
-  var ev = findEvent(events, eventToken);
+  var ev = eventToken && ctx.fixtureSearch !== true
+    ? findEvent(events, eventToken)
+    : null;
+  if (!ev) {
+    var mapped = (events || []).map(function (e) {
+      return {
+        id: String(e.id || e.event_id || ''),
+        matchId: String(e.id || e.event_id || ''),
+        title: String(e.title || e.name || ''),
+        homeTeam: String(e.home || e.homeTeam || ''),
+        awayTeam: String(e.away || e.awayTeam || ''),
+        dateMs: Number(e.date || e.starts_at || 0) || 0,
+        _raw: e,
+      };
+    });
+    var hit = liveFindFixtureInList(mapped, ctx);
+    if (!hit) return [];
+    ev = hit._raw || findEvent(events, String(hit.matchId || hit.id || ''));
+  }
   if (!ev) return [];
 
   var wanted = String(ctx.matchId || ctx.embedUrl || ctx.url || '').trim();
@@ -138,23 +155,21 @@ async function resolveByEvent(ctx, cfg) {
   });
   if (!streams.length) return [];
 
-  // Prefer the named source ref when Providers resolves one catalog row;
-  // otherwise list every non-VIP mirror for the event.
   var selected = streams;
-  if (wanted) {
-    var hit = null;
+  if (wanted && ctx.fixtureSearch !== true) {
+    var hitSt = null;
     for (var i = 0; i < streams.length; i++) {
       var st = streams[i];
       if (String(st.name || '') === wanted || String(i) === wanted) {
-        hit = st;
+        hitSt = st;
         break;
       }
       if (String(st.url || '').trim() === wanted) {
-        hit = st;
+        hitSt = st;
         break;
       }
     }
-    if (hit) selected = [hit];
+    if (hitSt) selected = [hitSt];
   }
 
   var out = [];

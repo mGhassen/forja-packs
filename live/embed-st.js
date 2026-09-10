@@ -141,7 +141,7 @@ function preferDirectPlayback(m3u8Url) {
     return true;
   }
   if (
-    host.indexOf('streamfree.top') >= 0 &&
+    (host.indexOf('streamfree.top') >= 0 || host.indexOf('strmfree.st') >= 0) &&
     (path.indexOf('/live/') >= 0 ||
       path.indexOf('/live-cdn/') >= 0 ||
       path.indexOf('/live-origin/') >= 0)
@@ -1061,4 +1061,132 @@ async function nestUnlockChannel(ctx, channelUrl, opts) {
     }
   }
   return out;
+}
+// Shared fixture soft-match for live resolve packs (RFC-105).
+// Packs search their own upstream — host only fans out fixture identity.
+
+function liveNormTeam(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function liveTeamTokens(s) {
+  var t = liveNormTeam(s);
+  if (!t) return [];
+  return t.split(' ').filter(function (w) {
+    return w.length >= 2;
+  });
+}
+
+function liveTeamSoftEqual(a, b) {
+  var na = liveNormTeam(a);
+  var nb = liveNormTeam(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.indexOf(nb) >= 0 || nb.indexOf(na) >= 0) return true;
+  var ta = liveTeamTokens(a);
+  var tb = liveTeamTokens(b);
+  if (!ta.length || !tb.length) return false;
+  var short = ta.length <= tb.length ? ta : tb;
+  var long = ta.length <= tb.length ? tb : ta;
+  var hits = 0;
+  for (var i = 0; i < short.length; i++) {
+    if (long.indexOf(short[i]) >= 0) hits++;
+  }
+  return hits >= Math.min(2, short.length);
+}
+
+function liveTeamPairSoftEqual(h1, a1, h2, a2) {
+  return (
+    (liveTeamSoftEqual(h1, h2) && liveTeamSoftEqual(a1, a2)) ||
+    (liveTeamSoftEqual(h1, a2) && liveTeamSoftEqual(a1, h2))
+  );
+}
+
+function liveDatesClose(msA, msB) {
+  var a = Number(msA) || 0;
+  var b = Number(msB) || 0;
+  if (!a || !b) return true;
+  if (a < 1e12) a *= 1000;
+  if (b < 1e12) b *= 1000;
+  return Math.abs(a - b) <= 6 * 3600000;
+}
+
+function liveParseTitleTeams(title) {
+  var t = String(title || '');
+  var m = t.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if (!m) m = t.match(/^(.+?)\s+v\s+(.+)$/i);
+  if (!m) return { home: '', away: '' };
+  return { home: m[1].trim(), away: m[2].trim() };
+}
+
+function liveFixtureFromCtx(ctx) {
+  var title = String(ctx.title || '');
+  var home = String(ctx.homeTeam || '');
+  var away = String(ctx.awayTeam || '');
+  if (!home || !away) {
+    var parsed = liveParseTitleTeams(title);
+    if (!home) home = parsed.home;
+    if (!away) away = parsed.away;
+  }
+  return {
+    title: title,
+    home: home,
+    away: away,
+    dateMs: Number(ctx.dateMs || 0) || 0,
+  };
+}
+
+function liveFixtureSoftMatch(row, want) {
+  if (!row || !want) return false;
+  var id = String(row.id || row.matchId || '');
+  var title = String(row.title || row.name || '');
+  var home = String(row.homeTeam || (row.teams && row.teams.home && row.teams.home.name) || '');
+  var away = String(row.awayTeam || (row.teams && row.teams.away && row.teams.away.name) || '');
+  if (!home || !away) {
+    var parsed = liveParseTitleTeams(title);
+    if (!home) home = parsed.home;
+    if (!away) away = parsed.away;
+  }
+  var date =
+    Number(row.dateMs || row.date || row.timestamp || row.starts_at || 0) || 0;
+  if (date > 0 && date < 1e12) date *= 1000;
+
+  if (want.home && want.away && home && away) {
+    return (
+      liveTeamPairSoftEqual(want.home, want.away, home, away) &&
+      liveDatesClose(want.dateMs, date)
+    );
+  }
+  if (want.title && title) {
+    var wt = liveNormTeam(want.title);
+    var rt = liveNormTeam(title);
+    if (wt && rt && (wt === rt || wt.indexOf(rt) >= 0 || rt.indexOf(wt) >= 0)) {
+      return liveDatesClose(want.dateMs, date);
+    }
+  }
+  return false;
+}
+
+function liveFindFixtureInList(list, ctx) {
+  if (!Array.isArray(list) || !list.length) return null;
+  var want = liveFixtureFromCtx(ctx);
+  var mid = String(ctx.matchId || '').trim();
+  if (mid) {
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i];
+      var id = String(row.id || row.matchId || '');
+      if (id === mid || id === 'wf_' + mid || id.replace(/^[^_]+_/, '') === mid) {
+        return row;
+      }
+    }
+  }
+  if (!want.home && !want.away && !want.title) return null;
+  for (var j = 0; j < list.length; j++) {
+    if (liveFixtureSoftMatch(list[j], want)) return list[j];
+  }
+  return null;
 }

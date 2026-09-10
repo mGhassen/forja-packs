@@ -347,15 +347,18 @@ async function fetchList(ctx, cfg) {
 
 async function resolveByEvent(ctx, cfg) {
   var eventKey = String(ctx.eventId || ctx.matchId || '').replace(/^sic_/, '');
-  if (!eventKey) return [];
   var list = await fetchList(ctx, cfg);
-  for (var i = 0; i < list.length; i++) {
-    var m = list[i];
-    if (String(m.id || i) === eventKey) {
-      return collectEmbeds(ctx, m, cfg);
+  if (eventKey && ctx.fixtureSearch !== true) {
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (String(m.id || i) === eventKey) {
+        return collectEmbeds(ctx, m, cfg);
+      }
     }
   }
-  return [];
+  var hit = liveFindFixtureInList(list, ctx);
+  if (!hit) return [];
+  return collectEmbeds(ctx, hit, cfg);
 }
 
 async function extract(ctx) {

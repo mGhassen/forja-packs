@@ -150,8 +150,52 @@ async function resolvePpv(ctx, cfg) {
   return out;
 }
 
+async function resolvePpvByFixture(ctx, cfg) {
+  var apis = (cfg && cfg.apis) || defaultPpvApis();
+  var list = [];
+  for (var i = 0; i < apis.length; i++) {
+    try {
+      var headers = ppvHeaders({
+        webOrigin: originForApi(apis[i], cfg && cfg.webOrigin),
+      });
+      var res = await ctx.fetch(apis[i], { headers: headers });
+      if (!res.ok) continue;
+      var data = await res.json();
+      if (!data || data.success !== true || !Array.isArray(data.streams)) continue;
+      data.streams.forEach(function (cat) {
+        (cat.streams || []).forEach(function (s) {
+          if (s.id == null) return;
+          list.push({
+            id: 'ppv_' + String(s.id),
+            matchId: String(s.id),
+            title: String(s.name || ''),
+            homeTeam: '',
+            awayTeam: '',
+            dateMs: Number(s.starts_at || 0) ? Number(s.starts_at) * 1000 : 0,
+          });
+        });
+      });
+      break;
+    } catch (_) {}
+  }
+  var hit = liveFindFixtureInList(list, ctx);
+  if (!hit) return [];
+  return resolvePpv(
+    Object.assign({}, ctx, {
+      matchId: String(hit.matchId || hit.id || '').replace(/^ppv_/, ''),
+      fixtureSearch: false,
+    }),
+    cfg,
+  );
+}
+
 async function extract(ctx) {
   var action = String(ctx.action || 'resolve');
   if (action !== 'resolve') return [];
-  return resolvePpv(ctx, Object.assign({}, SPECS, ctx.config || {}));
+  var cfg = Object.assign({}, SPECS, ctx.config || {});
+  var mid = String(ctx.matchId || '').replace(/^ppv_/, '');
+  if (!mid || ctx.fixtureSearch === true) {
+    return resolvePpvByFixture(ctx, cfg);
+  }
+  return resolvePpv(ctx, cfg);
 }

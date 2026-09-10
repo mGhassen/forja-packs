@@ -135,6 +135,33 @@ async function resolveWatchfootyMatch(ctx, mid) {
   return out;
 }
 
+async function resolveWatchfootyByFixture(ctx) {
+  var live = [];
+  var all = [];
+  try {
+    live = await (
+      await ctx.fetch('https://api.watchfooty.st/api/v1/matches/live', {
+        headers: { 'User-Agent': ua(), Accept: 'application/json' },
+      })
+    ).json();
+  } catch (_) {}
+  try {
+    all = await (
+      await ctx.fetch('https://api.watchfooty.st/api/v1/matches/all', {
+        headers: { 'User-Agent': ua(), Accept: 'application/json' },
+      })
+    ).json();
+  } catch (_) {}
+  var list = []
+    .concat(Array.isArray(live) ? live : [])
+    .concat(Array.isArray(all) ? all : []);
+  var hit = liveFindFixtureInList(list, ctx);
+  if (!hit) return [];
+  var mid = String(hit.matchId || hit.id || '').replace(/^wf_/, '');
+  if (!mid) return [];
+  return resolveWatchfootyMatch(ctx, mid);
+}
+
 async function extract(ctx) {
   var action = String(ctx.action || 'resolve');
   if (action !== 'resolve') return [];
@@ -146,6 +173,8 @@ async function extract(ctx) {
   }
 
   var mid = String(ctx.matchId || '').replace(/^wf_/, '');
-  if (!mid) return [];
-  return resolveWatchfootyMatch(ctx, mid);
+  if (mid && ctx.fixtureSearch !== true) {
+    return resolveWatchfootyMatch(ctx, mid);
+  }
+  return resolveWatchfootyByFixture(ctx);
 }
