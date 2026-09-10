@@ -81,7 +81,9 @@ function parseStreamicEventsBody(body) {
   return Array.isArray(data) ? data : data.events || data.streams || [];
 }
 
-async function readFetchBody(res) {
+// Unique name — never `async function readFetchBody` (JSC rejects a second
+// declaration in the same loader scope / older install caches).
+async function streamicReadBody(res) {
   if (!res) return '';
   if (res._bodyB64) {
     try {
@@ -172,7 +174,7 @@ async function fetchMainList(ctx, cfg) {
   try {
     var res = await ctx.fetch(api, { headers: streamicHeaders(cfg) });
     if (!res.ok) return [];
-    var body = await readFetchBody(res);
+    var body = await streamicReadBody(res);
     if (!body) return [];
     return parseStreamicEventsBody(body);
   } catch (_) {
@@ -466,7 +468,7 @@ async function fetchMainList(ctx, cfg) {
   try {
     var res = await ctx.fetch(api, { headers: streamicHeaders(cfg) });
     if (!res.ok) return [];
-    var body = await readFetchBody(res);
+    var body = await streamicReadBody(res);
     if (!body) return [];
     return parseStreamicEventsBody(body);
   } catch (_) {
