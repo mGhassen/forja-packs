@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for dir in providers catalog live torrent iptv/vod \
+          for dir in providers livesports torrent iptv/vod \
             hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
             hubs/cartoon hubs/kids hubs/shahid hubs/live_sports \
             hubs/my_list; do
