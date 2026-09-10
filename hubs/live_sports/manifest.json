@@ -2,9 +2,9 @@
   "schema": 1,
   "id": "forjahq-live-sports",
   "name": "ForjaHQ Live Sports Hub",
-  "description": "Live sports list with a streams panel.",
+  "description": "Live sports schedule and streams.",
   "author": "ForjaHQ",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "tags": [
     "sports",
     "live"
@@ -13,7 +13,7 @@
     {
       "id": "live-sports-hub",
       "name": "Live Sports",
-      "description": "Live sports list with a streams panel.",
+      "description": "Live sports schedule and streams.",
       "entry": "live_sports.js",
       "kind": "catalog",
       "protocol": 1,
@@ -57,6 +57,17 @@
             "label": "Merge matching events",
             "subtitle": "Combine the same game across catalogs into one card. Off keeps every catalog row separate.",
             "default": true
+          },
+          {
+            "id": "matchOpen",
+            "type": "select",
+            "label": "Open matches in",
+            "subtitle": "Side panel beside the schedule, or a full detail page",
+            "default": "panel",
+            "options": [
+              { "id": "panel", "label": "Side panel" },
+              { "id": "details", "label": "Detail page" }
+            ]
           }
         ]
       },

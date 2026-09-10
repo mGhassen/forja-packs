@@ -20,7 +20,7 @@ jobs:
           for dir in providers catalog live torrent iptv/vod \
             hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
             hubs/cartoon hubs/kids hubs/shahid hubs/live_sports \
-            hubs/live_sports_cards hubs/my_list; do
+            hubs/my_list; do
             f="$dir/manifest.json"
             if [[ ! -f "$f" ]]; then
               echo "missing: $f"

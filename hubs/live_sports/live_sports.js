@@ -1,4 +1,4 @@
-// Live Sports hub — list + right panel skin.
+// Live Sports hub — schedule browse; list/cards + panel/details via host prefs.
 // Schedule rows: MetaRuntime `feed` composes via ctx.host.liveFeed.load.
 
 function liveSportsCatalogActions() {
@@ -53,6 +53,7 @@ function liveSportsLayout() {
               source: 'live_schedule',
               style: 'list',
               open: 'panel',
+              openSetting: 'matchOpen',
               expand: true,
               kindMenu: 'kind',
               catalogMenu: 'catalog',

@@ -27,8 +27,7 @@ Packs are JavaScript plugins the Forja app installs by manifest URL, caches on d
 | **Cartoon** | [`hubs/cartoon/manifest.json`](hubs/cartoon/manifest.json) | كرتون / DimaToon hub |
 | **Kids** | [`hubs/kids/manifest.json`](hubs/kids/manifest.json) | Kids / Dimakids hub |
 | **Shahid** | [`hubs/shahid/manifest.json`](hubs/shahid/manifest.json) | Shahid movies and series |
-| **Live Sports** | [`hubs/live_sports/manifest.json`](hubs/live_sports/manifest.json) | Live sports schedule hub |
-| **Live Sports Cards** | [`hubs/live_sports_cards/manifest.json`](hubs/live_sports_cards/manifest.json) | Live sports cards hub |
+| **Live Sports** | [`hubs/live_sports/manifest.json`](hubs/live_sports/manifest.json) | Live sports schedule and streams |
 | **My List** | [`hubs/my_list/manifest.json`](hubs/my_list/manifest.json) | My List hub |
 | **IPTV VOD** | [`iptv/vod/manifest.json`](iptv/vod/manifest.json) | IPTV portal VOD details |
 
