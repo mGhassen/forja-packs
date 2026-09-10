@@ -11,8 +11,7 @@ Do **not** put Flutter / Rust host code here. That lives in [Forja](https://gith
 | Tree | Responsibility |
 |------|----------------|
 | `providers/` | VOD / anime / drama stream extract |
-| `live/` | Live Sports resolve + unlock modules |
-| `catalog/` | Match **schedule** only (no streams) |
+| `livesports/` | Live Sports schedule (`catalog` capability) + resolve (`resolve`) + unlock modules |
 | `torrent/` | Torrent indexer `search(ctx)` |
 | `hubs/` | Catalog hub UI (layout, open, enrich) |
 | `iptv/` | IPTV feature companions (e.g. VOD details) |
@@ -21,10 +20,11 @@ Do **not** put Flutter / Rust host code here. That lives in [Forja](https://gith
 ## Rules of thumb
 
 1. **Host stays generic** — packs own scrapers, upstream ids, and enrich. Emit opaque `open.surface` + ids; do not assume Dart allowlists.
-2. **Catalog ≠ streams** — `catalog/` never returns playable URLs or embed iframes as streams.
-3. **Live = native play** — resolve returns `{ url, headers? }` (m3u8/mp4). No WebView-only fallbacks for Forja Live.
-4. **User-facing copy** — `name` / `description` / `nav.label` describe what the pack does now. No migration notes.
-5. **Validate** — keep `manifest.json` aligned with [`sdk/schema/manifest.schema.json`](sdk/schema/manifest.schema.json).
+2. **Schedule ≠ play URL** — `catalog` capability returns fixtures only (no streams / embed iframes as playable rows).
+3. **Resolve = native play** — returns `{ url, headers? }` (m3u8/mp4). No WebView-only fallbacks for live resolve.
+4. **Capabilities** — one plugin per site; declare `types: ["live_sport"]` and `capabilities: ["catalog" and/or "resolve" and/or "broadcast"]`.
+5. **User-facing copy** — `name` / `description` / `nav.label` describe what the pack does now. No migration notes.
+6. **Validate** — keep `manifest.json` aligned with [`sdk/schema/manifest.schema.json`](sdk/schema/manifest.schema.json).
 
 ## Local install
 
@@ -38,7 +38,6 @@ Or set `FORJA_PACKS_ROOT` in the Forja `.env` (see [README](README.md)).
 
 ## PR checklist
 
-- [ ] Manifest `version` bumped when behavior changes
-- [ ] `bundle` lists every file the host must download (if used)
-- [ ] No secrets / cookies committed
-- [ ] Archived dead packs under `archived/` instead of leaving broken entries in live manifests
+- [ ] Manifest `id` / `version` bumped when behavior changes
+- [ ] `bundle` lists every file install needs
+- [ ] No host Dart changes required for pack-only work

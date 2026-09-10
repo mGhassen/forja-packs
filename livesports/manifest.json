@@ -1,0 +1,380 @@
+{
+  "schema": 1,
+  "id": "forjahq-livesports",
+  "name": "ForjaHQ Live Sports",
+  "description": "Live Sports schedule catalogs and stream resolve.",
+  "author": "ForjaHQ",
+  "version": "2.0.0",
+  "prelude": "_wire.js",
+  "tags": [
+    "sports",
+    "live"
+  ],
+  "plugins": [
+    {
+      "id": "streamed",
+      "name": "Streamed",
+      "description": "streamed.pk schedule and stream resolve",
+      "entry": "streamed.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-streamed",
+        "resolve": "live-streamed"
+      },
+      "config": {
+        "origin": "https://streamed.pk",
+        "embedOrigin": "https://embed.st",
+        "nativeUnlock": "streamed",
+        "catalogCap": false
+      }
+    },
+    {
+      "id": "ppv",
+      "name": "PPV",
+      "description": "ppv.st schedule and stream resolve",
+      "entry": "ppv.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-ppv",
+        "resolve": "live-ppv"
+      },
+      "config": {
+        "webOrigin": "https://ppv.st",
+        "nativeUnlock": "ppv",
+        "catalogLayout": "iframe",
+        "apis": [
+          "https://api.ppv.st/api/streams",
+          "https://api.ppv.cx/api/streams",
+          "https://api.ppv.is/api/streams",
+          "https://api.ppv.lc/api/streams",
+          "https://api.ppv.tj/api/streams",
+          "https://api.ppvs.pk/api/streams",
+          "https://api.ppv.rw/api/streams",
+          "https://api.ppv.ms/api/streams",
+          "https://api.ppv.bi/api/streams",
+          "https://api.ppv.ug/api/streams"
+        ]
+      }
+    },
+    {
+      "id": "streamfree",
+      "name": "StreamFree",
+      "description": "streamfree.top schedule and stream resolve",
+      "entry": "streamfree.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-streamfree",
+        "resolve": "live-streamfree"
+      },
+      "config": {
+        "matchIdPrefix": "sf_",
+        "origin": "https://streamfree.top",
+        "embedOrigin": "https://embed.st"
+      }
+    },
+    {
+      "id": "timstreams",
+      "name": "TimStreams",
+      "description": "timst.cfd schedule and stream resolve",
+      "entry": "timstreams.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-timstreams",
+        "resolve": "live-timstreams"
+      },
+      "config": {
+        "origin": "https://timst.cfd",
+        "api": "https://timst.cfd/api/live-upcoming",
+        "embedOrigin": "https://embed.st"
+      }
+    },
+    {
+      "id": "watchfooty",
+      "name": "WatchFooty",
+      "description": "watchfooty.st schedule and stream resolve",
+      "entry": "watchfooty.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-watchfooty",
+        "resolve": "live-watchfooty"
+      },
+      "config": {
+        "origin": "https://watchfooty.st",
+        "nativeUnlock": "watchfooty",
+        "airingOnlyLive": true
+      }
+    },
+    {
+      "id": "streamic",
+      "name": "Streamic",
+      "description": "streamic.live schedule and stream resolve",
+      "entry": "streamic.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-streamic",
+        "resolve": "live-streamic"
+      },
+      "config": {
+        "origin": "https://streamic.st",
+        "api": "https://streamic.st/api/getEvents.php",
+        "popularApi": "https://streamic.st/api/J.php",
+        "ssig": "bytmo8xialhem066",
+        "embedOrigin": "https://embed.st",
+        "ppvOrigin": "https://ppv.st",
+        "ppvApis": [
+          "https://api.ppv.st/api/streams",
+          "https://api.ppv.cx/api/streams",
+          "https://api.ppv.is/api/streams",
+          "https://api.ppv.lc/api/streams",
+          "https://api.ppv.tj/api/streams",
+          "https://api.ppvs.pk/api/streams",
+          "https://api.ppv.rw/api/streams",
+          "https://api.ppv.ms/api/streams",
+          "https://api.ppv.bi/api/streams",
+          "https://api.ppv.ug/api/streams"
+        ]
+      }
+    },
+    {
+      "id": "mobikora",
+      "name": "MobiKora",
+      "description": "mobikora.live Arabic football schedule and streams",
+      "entry": "mobikora.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-mobikora",
+        "resolve": "live-mobikora"
+      },
+      "config": {
+        "matchIdPrefix": "mk_",
+        "origin": "https://mobikora.live",
+        "pages": [
+          "/",
+          "/matches-today/",
+          "/matches-tomorrow/"
+        ],
+        "tzOffset": "+03:00"
+      }
+    },
+    {
+      "id": "espn",
+      "name": "ESPN",
+      "description": "ESPN scoreboard schedule catalog",
+      "entry": "espn.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "capabilities": [
+        "catalog"
+      ],
+      "defaultCapabilities": {
+        "catalog": true
+      },
+      "legacyIds": {
+        "catalog": "catalog-espn"
+      },
+      "config": {
+        "scheduleHorizon": "fullDay",
+        "catalogTimeoutSec": 90,
+        "leagues": [
+          "NBA",
+          "NFL",
+          "MLB",
+          "NHL",
+          "WNBA",
+          "NCAAMB",
+          "NCAAWB",
+          "NCAAFB",
+          "EPL",
+          "MLS",
+          "LALIGA",
+          "SERIEA",
+          "BUNDESLIGA",
+          "LIGUE1",
+          "UCL",
+          "EUROPA",
+          "EREDIVISIE",
+          "LIGAPORTUGAL",
+          "LIGAMX",
+          "WORLDCUP",
+          "UFC"
+        ]
+      }
+    },
+    {
+      "id": "liveonsat",
+      "name": "LiveOnSat",
+      "description": "LiveOnSat TV schedule + broadcast channel hints",
+      "entry": "liveonsat.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "capabilities": [
+        "catalog",
+        "broadcast"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "broadcast": false
+      },
+      "legacyIds": {
+        "catalog": "catalog-liveonsat"
+      },
+      "config": {
+        "base": "https://m.liveonsat.com",
+        "pages": [
+          "2day.php"
+        ],
+        "airingOnlyLive": true
+      }
+    },
+    {
+      "id": "livesoccertv",
+      "name": "Live Soccer TV",
+      "description": "Live Soccer TV schedule + broadcast channel hints",
+      "entry": "livesoccertv.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "capabilities": [
+        "catalog",
+        "broadcast"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "broadcast": false
+      },
+      "legacyIds": {
+        "catalog": "catalog-livesoccertv"
+      },
+      "config": {
+        "base": "https://www.livesoccertv.com",
+        "jinaPrefix": "https://r.jina.ai/",
+        "catalogTimeoutSec": 90,
+        "airingOnlyLive": true
+      }
+    }
+  ],
+  "bundle": [
+    "_prelude.js",
+    "_wire.js",
+    "embed-st.js",
+    "streamed.js",
+    "ppv.js",
+    "streamfree.js",
+    "timstreams.js",
+    "watchfooty.js",
+    "streamic.js",
+    "mobikora.js",
+    "espn.js",
+    "liveonsat.js",
+    "livesoccertv.js",
+    "goat/unlock.mjs",
+    "goat/package.json",
+    "goat/vendor/lock.wasm",
+    "goat/vendor/lock-esm.mjs",
+    "goat/vendor/big-integer.min.js",
+    "goat/webview/crack.js",
+    "goat/webview/unlock.html",
+    "goat/webview/proxy_fetch.js",
+    "gasm/unlock.mjs",
+    "gasm/sniff.mjs",
+    "gasm/package.json",
+    "gasm/vendor/gasm.wasm",
+    "gasm/vendor/gasm.js",
+    "gasm/vendor/gasm-live.wasm",
+    "gasm/vendor/gasm-live.js",
+    "gasm/vendor/gasm-esm.mjs",
+    "gasm/webview/crack.js",
+    "gasm/webview/unlock.html",
+    "sportsembed/unlock.mjs",
+    "sportsembed/vendor/stream-lock.wasm"
+  ]
+}
