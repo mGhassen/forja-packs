@@ -204,46 +204,50 @@ async function unlockPpvEmbed(ctx, iframe, cfg, headers) {
   return null;
 }
 
-async function resolvePpv(ctx, cfg) {
+async function listPpv(ctx, cfg) {
   var streamId = String(ctx.matchId || (cfg && cfg.streamId) || '').replace(/^ppv_/, '');
-  var iframe = String(ctx.embedUrl || ctx.iframe || (cfg && cfg.iframe) || '').trim();
   var headers = ppvHeaders(cfg);
-  var embeds = [];
-  if (iframe) embeds.push(iframe);
-
-  if (streamId) {
-    var apis = (cfg && cfg.apis) || defaultPpvApis();
-    for (var i = 0; i < apis.length; i++) {
-      try {
-        var apiHeaders = ppvHeaders({
-          webOrigin: originForApi(apis[i], cfg && cfg.webOrigin),
-        });
-        var base = apis[i].replace(/\/$/, '');
-        var detail = await ctx.fetch(base + '/' + streamId, { headers: apiHeaders });
-        if (!detail.ok) continue;
-        var body = await detail.json();
-        if (!body || body.success !== true || !body.data) continue;
-        headers = apiHeaders;
-        var source = ppvPlayableUrl(body.data);
-        if (source) {
-          return [{ url: source, headers: headers, directPlayback: true }];
-        }
-        var fromDetail = ppvIframesFromDetail(body.data);
-        for (var j = 0; j < fromDetail.length; j++) {
-          if (embeds.indexOf(fromDetail[j]) < 0) embeds.push(fromDetail[j]);
-        }
-        break;
-      } catch (_) {}
-    }
-  }
-
   var out = [];
   var seen = {};
-  for (var k = 0; k < embeds.length; k++) {
-    var row = await unlockPpvEmbed(ctx, embeds[k], cfg, headers);
-    if (!row || !row.url || seen[row.url]) continue;
-    seen[row.url] = 1;
-    out.push(row);
+
+  if (!streamId) return out;
+
+  var apis = (cfg && cfg.apis) || defaultPpvApis();
+  for (var i = 0; i < apis.length; i++) {
+    try {
+      var apiHeaders = ppvHeaders({
+        webOrigin: originForApi(apis[i], cfg && cfg.webOrigin),
+      });
+      var base = apis[i].replace(/\/$/, '');
+      var detail = await ctx.fetch(base + '/' + streamId, { headers: apiHeaders });
+      if (!detail.ok) continue;
+      var body = await detail.json();
+      if (!body || body.success !== true || !body.data) continue;
+      headers = apiHeaders;
+      var direct = ppvPlayableUrl(body.data);
+      if (direct && !seen[direct]) {
+        seen[direct] = 1;
+        out.push({
+          url: direct,
+          name: 'PPV',
+          headers: headers,
+          directPlayback: true,
+        });
+      }
+      var fromDetail = ppvIframesFromDetail(body.data);
+      for (var j = 0; j < fromDetail.length; j++) {
+        var embed = fromDetail[j];
+        if (!embed || seen[embed]) continue;
+        seen[embed] = 1;
+        out.push({
+          url: embed,
+          name: 'PPV',
+          headers: headers,
+          directPlayback: false,
+        });
+      }
+      break;
+    } catch (_) {}
   }
   return out;
 }
@@ -278,7 +282,7 @@ async function resolvePpvByFixture(ctx, cfg) {
   }
   var hit = liveFindFixtureInList(list, ctx);
   if (!hit) return [];
-  return resolvePpv(
+  return listPpv(
     Object.assign({}, ctx, {
       matchId: String(hit.matchId || hit.id || '').replace(/^ppv_/, ''),
       fixtureSearch: false,
@@ -291,11 +295,19 @@ async function resolveExtract(ctx) {
   var action = String(ctx.action || 'resolve');
   if (action !== 'resolve') return [];
   var cfg = Object.assign({}, SPECS, ctx.config || {});
+
+  // Unlock-on-play only when an embed URL is set. Providers discover lists.
+  var embed = String(ctx.embedUrl || ctx.iframe || ctx.url || '').trim();
+  if (embed) {
+    var row = await unlockPpvEmbed(ctx, embed, cfg, ppvHeaders(cfg));
+    return row && row.url ? [row] : [];
+  }
+
   var mid = String(ctx.matchId || '').replace(/^ppv_/, '');
   if (!mid || ctx.fixtureSearch === true) {
     return resolvePpvByFixture(ctx, cfg);
   }
-  return resolvePpv(ctx, cfg);
+  return listPpv(ctx, cfg);
 }
   return resolveExtract;
 })();

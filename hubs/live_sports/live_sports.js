@@ -1,5 +1,6 @@
 // Live Sports hub — schedule browse; list/cards + panel/details via host prefs.
 // Schedule rows: MetaRuntime `feed` composes via ctx.host.liveFeed.load.
+// Live TV: MetaRuntime `liveTv` → ctx.host.iptv.searchChannels (RFC-096 A09).
 
 function liveSportsCatalogActions() {
   return [
@@ -136,6 +137,51 @@ function liveSportsLoadFeed(ctx, params) {
   });
 }
 
+function liveSportsGameFromRow(row) {
+  var game =
+    row && row.sportMatchGame && typeof row.sportMatchGame === 'object'
+      ? Object.assign({}, row.sportMatchGame)
+      : {
+          id: String((row && row.id) || ''),
+          title: String((row && (row.title || row.name)) || ''),
+          homeTeam: String((row && row.homeTeam) || ''),
+          awayTeam: String((row && row.awayTeam) || ''),
+          sport: String((row && (row.category || row.sport)) || ''),
+          category: String((row && (row.category || row.sport)) || ''),
+          dateMs: Number(row && row.dateMs) || 0,
+        };
+  var broadcasts = (row && row.broadcastChannels) || game.broadcastChannels;
+  if (Array.isArray(broadcasts) && broadcasts.length) {
+    game.broadcastChannels = broadcasts.slice();
+  }
+  return game;
+}
+
+/// Live TV tab — pack owns Forja Sports gate + searchChannels trigger.
+function liveSportsLiveTv(ctx, params) {
+  var cfg = hubConfig(ctx, {});
+  if (cfg.forjaSportsEnabled === false) {
+    return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
+  }
+  var row = (params && params.row) || {};
+  var game = liveSportsGameFromRow(row);
+  var host = ctx && ctx.host;
+  var iptv = host && host.iptv;
+  if (!iptv || typeof iptv.searchChannels !== 'function') {
+    return Promise.reject(new Error('HOST_IPTV_SEARCH_REQUIRED'));
+  }
+  var force = !!(params && params.force);
+  return Promise.resolve(
+    iptv.searchChannels({ game: game, force: force }),
+  ).then(function (sources) {
+    return hubOk(
+      'liveTv',
+      { sources: Array.isArray(sources) ? sources : [] },
+      { maxAge: 60, swr: 120 },
+    );
+  });
+}
+
 function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
@@ -147,9 +193,12 @@ function extract(ctx) {
       return hubItems(action, items, { maxAge: 60, swr: 300 });
     });
   }
+  if (action === 'liveTv') {
+    return liveSportsLiveTv(ctx, params);
+  }
   return hubFail(
     action,
     'INVALID_ACTION',
-    'live-sports hub: layout + feed/rail only',
+    'live-sports hub: layout + feed/rail + liveTv only',
   );
 }

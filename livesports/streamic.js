@@ -241,106 +241,8 @@ async function catalogExtract(ctx) {
 
 // Resolve half (closed scope — no name collisions with catalog)
 var __resolveExtract = (function () {
-function ua() {
-  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-}
-
-function streamicOrigin(cfg) {
-  return String((cfg && cfg.origin) || 'https://streamic.st').replace(/\/$/, '');
-}
-
-function streamicHeaders(cfg) {
-  var origin = streamicOrigin(cfg);
-  var headers = {
-    Accept: '*/*',
-    Referer: origin + '/',
-    'User-Agent': ua(),
-  };
-  var ssig = String((cfg && cfg.ssig) || 'bytmo8xialhem066').trim();
-  if (ssig) headers['X-SSIG'] = ssig;
-  return headers;
-}
-
 function streamicReferer(cfg) {
   return streamicOrigin(cfg) + '/';
-}
-
-function hexByte(n) {
-  var hex = (n & 0xff).toString(16);
-  return hex.length < 2 ? '0' + hex : hex;
-}
-
-function utf8FromBinary(bin) {
-  if (!bin) return '';
-  if (typeof TextDecoder !== 'undefined') {
-    try {
-      var bytes = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
-      return new TextDecoder('utf-8').decode(bytes);
-    } catch (_) {}
-  }
-  try {
-    return decodeURIComponent(
-      bin
-        .split('')
-        .map(function (c) {
-          return '%' + hexByte(c.charCodeAt(0));
-        })
-        .join('')
-    );
-  } catch (_) {
-    try {
-      return decodeURIComponent(escape(bin));
-    } catch (e2) {
-      return bin;
-    }
-  }
-}
-
-function b64decodeUTF8(b64) {
-  var raw = String(b64 || '')
-    .replace(/^\uFEFF/, '')
-    .replace(/\s+/g, '');
-  if (!raw) return '';
-  try {
-    return utf8FromBinary(atob(raw));
-  } catch (_) {
-    return '';
-  }
-}
-
-function parseStreamicEventsBody(body) {
-  var trimmed = String(body || '')
-    .replace(/^\uFEFF/, '')
-    .trim();
-  if (!trimmed) return [];
-  if (trimmed.charAt(0) === '[' || trimmed.charAt(0) === '{') {
-    var direct = JSON.parse(trimmed);
-    return Array.isArray(direct) ? direct : direct.events || direct.streams || [];
-  }
-  var decoded = b64decodeUTF8(trimmed);
-  if (!decoded) return [];
-  var data = JSON.parse(decoded);
-  return Array.isArray(data) ? data : data.events || data.streams || [];
-}
-
-async function readFetchBody(res) {
-  if (!res) return '';
-  if (res._bodyB64) {
-    try {
-      var bin = atob(String(res._bodyB64 || ''));
-      var fromB64 = '';
-      for (var i = 0; i < bin.length; i++) fromB64 += bin.charAt(i);
-      if (fromB64) return fromB64.trim();
-    } catch (_) {}
-  }
-  if (typeof res.text === 'function') {
-    try {
-      var text = await res.text();
-      if (text) return String(text).trim();
-    } catch (_) {}
-  }
-  return '';
 }
 
 function m3u8FromEmbedUrl(url) {
@@ -490,24 +392,7 @@ async function resolveUrl(ctx, url, name, cfg) {
   return null;
 }
 
-async function mapWithConcurrency(items, limit, fn) {
-  if (!items.length) return [];
-  var out = new Array(items.length);
-  var index = 0;
-  async function worker() {
-    while (index < items.length) {
-      var i = index++;
-      out[i] = await fn(items[i], i);
-    }
-  }
-  var workers = [];
-  var count = Math.max(1, Math.min(limit, items.length));
-  for (var w = 0; w < count; w++) workers.push(worker());
-  await Promise.all(workers);
-  return out;
-}
-
-async function collectEmbeds(ctx, m, cfg) {
+function listEmbedRows(m, cfg) {
   var pending = [];
   var seen = {};
   (m._embeds || []).forEach(function (group) {
@@ -529,13 +414,35 @@ async function collectEmbeds(ctx, m, cfg) {
     return a.priority - b.priority;
   });
 
-  var resolved = await mapWithConcurrency(pending, 4, function (item) {
-    return resolveUrl(ctx, item.url, item.name, cfg);
-  });
+  var ref = streamicReferer(cfg);
   var out = [];
-  for (var i = 0; i < resolved.length; i++) {
-    var row = resolved[i];
-    if (row && row.url) out.push(row);
+  for (var i = 0; i < pending.length; i++) {
+    var item = pending[i];
+    var nested = m3u8FromEmbedUrl(item.url);
+    var playable = nested || (/\.m3u8|\.mp4/i.test(item.url) ? item.url : '');
+    if (playable) {
+      out.push({
+        url: playable,
+        name: item.name,
+        headers: {
+          Referer: ref,
+          Origin: streamicOrigin(cfg),
+          'User-Agent': ua(),
+        },
+        directPlayback: preferDirectPlayback(playable),
+      });
+      continue;
+    }
+    out.push({
+      url: item.url,
+      name: item.name,
+      headers: {
+        Referer: ref,
+        Origin: streamicOrigin(cfg),
+        'User-Agent': ua(),
+      },
+      directPlayback: false,
+    });
   }
   return out;
 }
@@ -595,13 +502,13 @@ async function resolveByEvent(ctx, cfg) {
     for (var i = 0; i < list.length; i++) {
       var m = list[i];
       if (String(m.id || i) === eventKey) {
-        return collectEmbeds(ctx, m, cfg);
+        return listEmbedRows(m, cfg);
       }
     }
   }
   var hit = liveFindFixtureInList(list, ctx);
   if (!hit) return [];
-  return collectEmbeds(ctx, hit, cfg);
+  return listEmbedRows(hit, cfg);
 }
 
 async function resolveExtract(ctx) {

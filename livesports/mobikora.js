@@ -323,17 +323,30 @@ async function resolveExtract(ctx) {
   var action = String(ctx.action || 'resolve');
   if (action !== 'resolve') return [];
 
-  // Prefer matchId (channel HTML) over a stale signed m3u8 in embedUrl.
   var channelUrl =
     channelUrlFromMatchId(ctx.matchId) ||
     String(ctx.embedUrl || ctx.url || '').trim();
   if (!channelUrl) return [];
 
-  var rows = await nestUnlockChannel(ctx, channelUrl, {
-    brand: 'MobiKora',
-    originReferer: SPECS.origin + '/',
-  });
-  return withChannelLabel(rows, channelUrl);
+  // Unlock-on-play only when an embed/channel URL is set as play target.
+  var playUrl = String(ctx.embedUrl || ctx.url || '').trim();
+  if (playUrl) {
+    var rows = await nestUnlockChannel(ctx, playUrl, {
+      brand: 'MobiKora',
+      originReferer: SPECS.origin + '/',
+    });
+    return withChannelLabel(rows, playUrl);
+  }
+
+  // Providers discover: list the channel page — unlock on tap.
+  return [
+    {
+      url: channelUrl,
+      name: 'MobiKora · ' + channelLabel(channelUrl),
+      headers: { Referer: SPECS.origin + '/', 'User-Agent': ua() },
+      directPlayback: false,
+    },
+  ];
 }
   return resolveExtract;
 })();

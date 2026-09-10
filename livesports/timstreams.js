@@ -258,15 +258,30 @@ async function resolveByEvent(ctx, cfg) {
     if (hitSt) selected = [hitSt];
   }
 
+  // Providers discover: list embeds only. Unlock on play when embedUrl is set.
   var out = [];
+  var seen = {};
   for (var j = 0; j < selected.length; j++) {
-    var row = await resolveUrl(
-      ctx,
-      String(selected[j].url),
-      String(selected[j].name || 'TimStreams'),
-      cfg,
-    );
-    if (row) out.push(row);
+    var raw = String(selected[j].url || '').trim();
+    if (!raw || seen[raw]) continue;
+    seen[raw] = 1;
+    var name = String(selected[j].name || 'TimStreams');
+    if (/\.m3u8|\.mp4/i.test(raw)) {
+      var ref = embedReferer(raw);
+      out.push({
+        url: raw,
+        name: name,
+        headers: { Referer: ref, Origin: ref.replace(/\/$/, ''), 'User-Agent': ua() },
+        directPlayback: preferDirectPlayback(raw),
+      });
+      continue;
+    }
+    out.push({
+      url: raw,
+      name: name,
+      headers: { Referer: embedReferer(raw), 'User-Agent': ua() },
+      directPlayback: false,
+    });
   }
   return out;
 }
