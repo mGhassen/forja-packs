@@ -55,7 +55,75 @@ function liveCatalogStamp(row, pluginId) {
   if (!row.title && row.event) row.title = String(row.event);
   return row;
 }
-/* Shared embed.st GOAT helpers — prepended for live/*.js plugins. */
+/* Shared embed.st unlock helpers — prepended for live_sport plugins. */
+
+function ensureLiveUnlockApi(ctx) {
+  var live = ctx && ctx.live;
+  if (!live || live.__forjaUnlockSugar) return;
+  live.__forjaUnlockSugar = 1;
+  var run = live.runUnlock;
+  if (typeof run !== 'function') return;
+
+  var goatFiles = [
+    { from: 'goat/unlock.mjs', to: 'unlock.mjs' },
+    { from: 'goat/vendor/lock.wasm', to: 'vendor/lock.wasm' },
+    { from: 'goat/vendor/lock-esm.mjs', to: 'vendor/lock-esm.mjs' },
+    { from: 'goat/package.json', to: 'package.json' },
+    { from: 'goat/webview/crack.js', to: 'webview/crack.js' },
+    { from: 'goat/vendor/big-integer.min.js', to: 'vendor/big-integer.min.js' },
+  ];
+  var gasmFiles = [
+    { from: 'gasm/unlock.mjs', to: 'unlock.mjs' },
+    { from: 'gasm/sniff.mjs', to: 'sniff.mjs' },
+    { from: 'gasm/vendor/gasm.wasm', to: 'vendor/gasm.wasm' },
+    { from: 'gasm/vendor/gasm.js', to: 'vendor/gasm.js' },
+    { from: 'gasm/vendor/gasm-live.wasm', to: 'vendor/gasm-live.wasm' },
+    { from: 'gasm/vendor/gasm-esm.mjs', to: 'vendor/gasm-esm.mjs' },
+    { from: 'gasm/package.json', to: 'package.json' },
+    { from: 'gasm/webview/crack.js', to: 'webview/crack.js' },
+    { from: 'gasm/webview/unlock.html', to: 'webview/unlock.html' },
+  ];
+  var sportsEmbedFiles = [
+    { from: 'sportsembed/unlock.mjs', to: 'unlock.mjs' },
+    { from: 'sportsembed/vendor/stream-lock.wasm', to: 'vendor/stream-lock.wasm' },
+  ];
+
+  live.goatUnlock = function (bodyHex, goat, slot) {
+    return run({
+      kind: 'goat',
+      bodyHex: String(bodyHex == null ? '' : bodyHex),
+      goat: String(goat == null ? '' : goat),
+      slot: slot || {},
+      files: goatFiles,
+    });
+  };
+  live.gasmUnlock = function (bodyHex, island, slot) {
+    return run({
+      kind: 'gasm',
+      bodyHex: String(bodyHex == null ? '' : bodyHex),
+      island: String(island == null ? '' : island),
+      slot: slot || {},
+      files: gasmFiles,
+    });
+  };
+  live.sportsEmbedUnlock = function (embedUrl) {
+    return run({
+      kind: 'sportsembed',
+      embedUrl: String(embedUrl == null ? '' : embedUrl),
+      files: sportsEmbedFiles,
+    });
+  };
+  live.sniffEmbed = function (url, referer) {
+    return run({
+      kind: 'sniff',
+      url: String(url == null ? '' : url),
+      referer: String(referer == null ? '' : referer),
+      files: gasmFiles,
+    });
+  };
+}
+
+globalThis.__forjaEnsureLiveUnlock = ensureLiveUnlockApi;
 
 function ua() {
   return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
