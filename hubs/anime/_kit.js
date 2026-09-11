@@ -231,12 +231,8 @@ function hubTmdbHitFromMultiRow(row) {
   var mt = String(row.media_type || '').toLowerCase();
   if (mt !== 'movie' && mt !== 'tv') return null;
   var name = hubTmdbMultiTitle(row);
-  var poster = row.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + row.poster_path
-    : '';
-  var backdrop = row.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + row.backdrop_path
-    : '';
+  var poster = hubTmdbAbsArt(row.poster_path, 'w500');
+  var backdrop = hubTmdbAbsArt(row.backdrop_path, 'w1280');
   var overview = String(row.overview || '').trim();
   var rating = Number(row.vote_average);
   var year = hubTmdbMultiYear(row);
@@ -378,6 +374,33 @@ function hubTmdbAttachImdb(ctx, meta, hit) {
   });
 }
 
+function hubTmdbAbsArt(path, size) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+}
+
+// Prefer English title logo, then lang-null, then first available.
+function hubTmdbPickTitleLogo(images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? hubTmdbAbsArt(chosen.file_path, 'w500') : '';
+}
+
 function hubApplyTmdbHit(meta, hit) {
   if (!meta || !hit || !hit.id) return meta;
   meta.ids = Object.assign({}, meta.ids || {}, { tmdb: String(hit.id) });
@@ -390,6 +413,9 @@ function hubApplyTmdbHit(meta, hit) {
     meta.bannerImage = '';
   } else if (hit.poster && !meta.poster) {
     meta.poster = String(hit.poster);
+  }
+  if (hit.logo && !String(meta.logo || '').trim()) {
+    meta.logo = String(hit.logo);
   }
   // Fill synopsis / score only when the pack left them empty (AniList keeps its own).
   if (hit.overview && !String(meta.description || '').trim()) {
@@ -439,12 +465,9 @@ function hubEnrichMetaTmdbId(meta) {
 
 function hubTmdbHitFromDetails(json, media) {
   if (!json || !json.id) return null;
-  var poster = json.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + json.poster_path
-    : '';
-  var backdrop = json.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + json.backdrop_path
-    : '';
+  var poster = hubTmdbAbsArt(json.poster_path, 'w500');
+  var backdrop = hubTmdbAbsArt(json.backdrop_path, 'w1280');
+  var logo = hubTmdbPickTitleLogo(json.images);
   var name = String(
     media === 'movie' ? json.title || '' : json.name || '',
   );
@@ -463,6 +486,7 @@ function hubTmdbHitFromDetails(json, media) {
     premiereDate: hubParseIsoDate(date),
     poster: poster || null,
     backdrop: backdrop || null,
+    logo: logo || null,
     overview: overview || null,
     rating: rating > 0 ? rating : null,
     imdb: imdb || null,
@@ -487,7 +511,7 @@ function hubTmdbById(ctx, id, preferType) {
       tid +
       '?api_key=' +
       encodeURIComponent(key) +
-      '&append_to_response=external_ids';
+      '&append_to_response=external_ids,images';
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -528,10 +552,7 @@ function hubIsFutureIsoDate(iso) {
 }
 
 function hubTmdbEpisodeStillUrl(path) {
-  var p = String(path || '').trim();
-  if (!p) return '';
-  if (p.indexOf('http') === 0) return p;
-  return 'https://image.tmdb.org/t/p/w300' + p;
+  return hubTmdbAbsArt(path, 'w300');
 }
 
 function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
@@ -671,7 +692,12 @@ function hubEnrichTmdb(ctx, items, limit) {
           year: year,
           type: prefer,
         }).then(function (matched) {
-          return finish(hubApplyTmdbHit(meta, matched), matched);
+          if (!matched || !matched.id) return finish(meta, null);
+          return hubTmdbById(ctx, matched.id, matched.mediaType || prefer).then(
+            function (full) {
+              return finish(hubApplyTmdbHit(meta, full || matched), full || matched);
+            },
+          );
         });
       });
     }),

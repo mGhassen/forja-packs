@@ -85,7 +85,13 @@ function kisskhLayout() {
 function kisskhCover(raw) {
   var url = String(raw || '').trim();
   if (!url) return '';
-  return url.replace('media.themoviedb.org/t/p', 'image.tmdb.org/t/p');
+  url = url.replace('media.themoviedb.org/t/p', 'image.tmdb.org/t/p');
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.indexOf('//') === 0) return 'https:' + url;
+  if (url.charAt(0) === '/') {
+    return 'https://image.tmdb.org/t/p/w500' + url;
+  }
+  return url;
 }
 
 function kisskhInferMediaType(row) {

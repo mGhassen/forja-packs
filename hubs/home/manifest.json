@@ -30,7 +30,8 @@
         "search",
         "host_search",
         "structured_search",
-        "filters"
+        "filters",
+        "details"
       ],
       "nav": {
         "label": "Home",

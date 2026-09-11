@@ -1,20 +1,48 @@
 // TMDB hydrate for My List legacy rows — companion to my-list-hub.
 // Host schedules this after MetaRuntime feed returns (background enrich cache).
 
+function myListTmdbAbs(path, size) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+}
+
+function myListPickTitleLogo(images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? myListTmdbAbs(chosen.file_path, 'w500') : '';
+}
+
 function myListNeedsEnrich(row) {
   if (!row || typeof row !== 'object') return false;
   var tmdbId = Number(row.tmdbId);
   if (!(tmdbId > 0)) return false;
   // Hydrate missing art/meta even when anilistId / kisskhId / catalogOpen
   // are set — those skip only blocked TMDB poster fill before.
-  var poster = String(row.posterPath || '').trim();
+  var poster = String(row.posterPath || row.poster || '').trim();
   var title = String(row.title || '').trim();
   var vote = row.voteAverage;
+  var logo = String(row.logo || '').trim();
   return (
     !poster ||
     !title ||
     vote == null ||
-    Number(vote) === 0
+    Number(vote) === 0 ||
+    !logo
   );
 }
 
@@ -42,13 +70,21 @@ function myListApplyTmdbDetails(row, data, mediaType) {
   if (!row || !data) return row;
   var next = Object.assign({}, row);
   var title = String(data.title || data.name || '').trim();
-  var poster = String(data.poster_path || '');
-  var backdrop = String(data.backdrop_path || '');
+  var poster = myListTmdbAbs(data.poster_path, 'w500');
+  var backdrop = myListTmdbAbs(data.backdrop_path, 'w1280');
+  var logo = myListPickTitleLogo(data.images);
   var vote = Number(data.vote_average);
   var date = String(data.release_date || data.first_air_date || '');
   if (title) next.title = title;
-  if (poster) next.posterPath = poster;
-  if (backdrop) next.backdropPath = backdrop;
+  if (poster) {
+    next.posterPath = poster;
+    next.poster = poster;
+  }
+  if (backdrop) {
+    next.backdropPath = backdrop;
+    next.background = backdrop;
+  }
+  if (logo) next.logo = logo;
   if (vote > 0) next.voteAverage = vote;
   if (date) next.releaseDate = date;
   // Never invent a tmdb open for hub bookmarks (anime/drama) — that would
@@ -92,7 +128,8 @@ function hubTmdbGetDetails(ctx, mediaType, id) {
     '/' +
     n +
     '?api_key=' +
-    encodeURIComponent(key);
+    encodeURIComponent(key) +
+    '&append_to_response=images';
   return ctx
     .fetch(url)
     .then(function (res) {

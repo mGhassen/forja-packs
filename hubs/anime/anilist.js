@@ -153,6 +153,14 @@ function anilistCardMeta(m) {
   return parts.join(' • ');
 }
 
+function anilistAbsUrl(raw) {
+  var u = String(raw || '').trim();
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  if (u.indexOf('//') === 0) return 'https:' + u;
+  return u;
+}
+
 function anilistMeta(m) {
   if (!m || !m.id) return null;
   var name = anilistTitle(m.title);
@@ -162,8 +170,8 @@ function anilistMeta(m) {
   if (m.idMal) ids.mal = String(m.idMal);
   var searchTitle = anilistTmdbSearchTitle(m);
   if (searchTitle) ids.tmdbSearch = searchTitle;
-  var banner = String(m.bannerImage || '');
-  var poster = String(cover.extraLarge || cover.large || '');
+  var banner = anilistAbsUrl(m.bannerImage || '');
+  var poster = anilistAbsUrl(cover.extraLarge || cover.large || '');
   var meta = {
     id: 'anilist:' + m.id,
     type: 'anime',
@@ -214,7 +222,7 @@ function anilistVideosFromMedia(m) {
         episode: num,
         season: 1,
         title: String(ep.title || '').trim() || 'Episode ' + num,
-        thumbnail: String(ep.thumbnail || '').trim(),
+        thumbnail: anilistAbsUrl(ep.thumbnail || ''),
       });
     }
     return out;

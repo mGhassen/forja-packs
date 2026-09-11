@@ -79,6 +79,10 @@ function myListShapeRow(row) {
   if (!row || typeof row !== 'object') return null;
   var out = Object.assign({}, row);
   if (!out.name && out.title) out.name = out.title;
+  if (!out.poster && out.posterPath) out.poster = String(out.posterPath);
+  if (!out.background && (out.backdropPath || out.posterPath)) {
+    out.background = String(out.backdropPath || out.posterPath);
+  }
   var kind = myListKindFromRow(out);
   out.kind = kind;
   if (!out.type) out.type = kind;

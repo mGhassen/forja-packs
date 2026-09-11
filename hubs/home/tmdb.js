@@ -346,11 +346,19 @@ function tmdbHomeFeed(ctx, cfg, params) {
   ).then(function (results) {
     var pools = {};
     for (var i = 0; i < ids.length; i++) pools[ids[i]] = results[i];
-    return hubOk(
-      'feed',
-      { rails: tmdbClaimRails(pools, TMDB_FEED_CLAIM) },
-      { maxAge: 900, swr: 3600 },
-    );
+    var rails = tmdbClaimRails(pools, TMDB_FEED_CLAIM);
+    return tmdbAttachLogos(
+      ctx,
+      cfg,
+      rails.spotlight || [],
+      TMDB_HOME_HERO_CAP,
+    ).then(function () {
+      return hubOk(
+        'feed',
+        { rails: rails },
+        { maxAge: 900, swr: 3600 },
+      );
+    });
   });
 }
 
@@ -607,7 +615,54 @@ function tmdbImage(cfg, path, size) {
   var p = String(path || '').trim();
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
   return String(cfg.imageBase).replace(/\/$/, '') + '/' + size + p;
+}
+
+// Prefer English title logo, then lang-null, then first.
+function tmdbPickTitleLogo(cfg, images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? tmdbImage(cfg, chosen.file_path, 'w500') : '';
+}
+
+function tmdbAttachLogos(ctx, cfg, items, limit) {
+  if (!Array.isArray(items) || !items.length) return Promise.resolve(items || []);
+  var n = Number(limit) > 0 ? Math.min(items.length, Number(limit)) : items.length;
+  var jobs = [];
+  for (var i = 0; i < n; i++) {
+    (function (idx) {
+      var meta = items[idx];
+      if (!meta || String(meta.logo || '').trim()) return;
+      var tid = meta.ids && meta.ids.tmdb;
+      if (!tid) return;
+      var type = String(meta.type || '') === 'tv' ? 'tv' : 'movie';
+      jobs.push(
+        tmdbGet(ctx, cfg, '/' + type + '/' + tid + '/images', {})
+          .then(function (json) {
+            var logo = tmdbPickTitleLogo(cfg, json);
+            if (logo) items[idx].logo = logo;
+          })
+          .catch(function () {}),
+      );
+    })(i);
+  }
+  if (!jobs.length) return Promise.resolve(items);
+  return Promise.all(jobs).then(function () {
+    return items;
+  });
 }
 
 var TMDB_MOVIE_GENRE_NAMES = {
@@ -696,6 +751,8 @@ function tmdbMeta(cfg, row, forcedType) {
   if (row.vote_average) meta.rating = Number(row.vote_average);
   var genreNames = tmdbGenreNames(type, row.genre_ids);
   if (genreNames.length) meta.genres = genreNames;
+  var logo = tmdbPickTitleLogo(cfg, row.images);
+  if (logo) meta.logo = logo;
   return meta;
 }
 
@@ -1143,8 +1200,8 @@ function tmdbDetails(ctx, cfg, params) {
   if (type !== 'movie' && type !== 'tv') type = 'movie';
   var append =
     type === 'tv'
-      ? 'external_ids,recommendations'
-      : 'external_ids,recommendations';
+      ? 'external_ids,recommendations,images'
+      : 'external_ids,recommendations,images';
   return tmdbGet(ctx, cfg, '/' + type + '/' + id, {
     append_to_response: append,
   }).then(function (json) {
@@ -1155,6 +1212,10 @@ function tmdbDetails(ctx, cfg, params) {
     if (ext.imdb_id) {
       meta.ids = meta.ids || {};
       meta.ids.imdb = String(ext.imdb_id);
+    }
+    if (!meta.logo) {
+      var logo = tmdbPickTitleLogo(cfg, json.images);
+      if (logo) meta.logo = logo;
     }
 
     var rails = {};
@@ -1873,15 +1934,22 @@ function extract(ctx) {
     tmdbList(ctx, cfg, params).then(function (items) {
       var pageSize =
         Number(params.limit) > 0 ? Number(params.limit) : TMDB_HOME_RAIL_CAP;
-      return hubItems(
-        'rail',
-        items,
-        { maxAge: 900, swr: 3600 },
-        {
-          pageSize: pageSize,
-          hasMore: items.length >= pageSize,
-        },
-      )[0];
+      var railId = String(params.rail || 'spotlight');
+      var attach =
+        railId === 'spotlight'
+          ? tmdbAttachLogos(ctx, cfg, items, TMDB_HOME_HERO_CAP)
+          : Promise.resolve(items);
+      return attach.then(function (withLogos) {
+        return hubItems(
+          'rail',
+          withLogos,
+          { maxAge: 900, swr: 3600 },
+          {
+            pageSize: pageSize,
+            hasMore: withLogos.length >= pageSize,
+          },
+        )[0];
+      });
     }),
   );
 }

@@ -236,12 +236,8 @@ function hubTmdbPick(results, media, year) {
   var name = String(
     media === 'movie' ? chosen.title || '' : chosen.name || '',
   );
-  var poster = chosen.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + chosen.poster_path
-    : '';
-  var backdrop = chosen.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + chosen.backdrop_path
-    : '';
+  var poster = hubTmdbAbsArt(chosen.poster_path, 'w500');
+  var backdrop = hubTmdbAbsArt(chosen.backdrop_path, 'w1280');
   var overview = String(chosen.overview || '').trim();
   var rating = Number(chosen.vote_average);
   return {
@@ -256,6 +252,33 @@ function hubTmdbPick(results, media, year) {
   };
 }
 
+function hubTmdbAbsArt(path, size) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+}
+
+// Prefer English title logo, then lang-null, then first available.
+function hubTmdbPickTitleLogo(images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? hubTmdbAbsArt(chosen.file_path, 'w500') : '';
+}
+
 function hubApplyTmdbHit(meta, hit) {
   if (!meta || !hit || !hit.id) return meta;
   meta.ids = Object.assign({}, meta.ids || {}, { tmdb: String(hit.id) });
@@ -265,6 +288,9 @@ function hubApplyTmdbHit(meta, hit) {
     meta.bannerImage = '';
   } else if (hit.poster && !meta.poster) {
     meta.poster = String(hit.poster);
+  }
+  if (hit.logo && !String(meta.logo || '').trim()) {
+    meta.logo = String(hit.logo);
   }
   // Fill synopsis / score only when the pack left them empty (AniList keeps its own).
   if (hit.overview && !String(meta.description || '').trim()) {
