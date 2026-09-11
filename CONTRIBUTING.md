@@ -2,9 +2,11 @@
 
 ## Scope
 
-This repo holds **EngineJS packs** only — manifests, JS extractors, hub kits, live unlock modules, and the pack SDK.
+This repo holds **EngineJS packs** only — manifests, JS extractors, hub kits, and live unlock modules.
 
 Do **not** put Flutter / Rust host code here. That lives in [Forja](https://github.com/mGhassen/Forja).
+
+Do **not** put SDK schemas / kits here. That lives in [forja-sdk](https://github.com/mGhassen/forja-sdk).
 
 ## Pack kinds
 
@@ -15,7 +17,6 @@ Do **not** put Flutter / Rust host code here. That lives in [Forja](https://gith
 | `torrent/` | Torrent indexer `search(ctx)` |
 | `hubs/` | Catalog hub UI (layout, open, enrich) |
 | `iptv/` | IPTV feature companions (e.g. VOD details) |
-| `sdk/` | Shared schemas + kits |
 
 ## Rules of thumb
 
@@ -24,7 +25,7 @@ Do **not** put Flutter / Rust host code here. That lives in [Forja](https://gith
 3. **Resolve = native play** — returns `{ url, headers? }` (m3u8/mp4). No WebView-only fallbacks for live resolve.
 4. **Capabilities** — one plugin per site; declare `types: ["live_sport"]` and `capabilities: ["catalog" and/or "resolve" and/or "broadcast"]`.
 5. **User-facing copy** — `name` / `description` / `nav.label` describe what the pack does now. No migration notes.
-6. **Validate** — keep `manifest.json` aligned with [`sdk/schema/manifest.schema.json`](sdk/schema/manifest.schema.json).
+6. **Validate** — keep `manifest.json` aligned with [forja-sdk `schema/manifest.schema.json`](https://github.com/mGhassen/forja-sdk/blob/main/schema/manifest.schema.json).
 
 ## Local install
 
@@ -41,3 +42,4 @@ Or set `FORJA_PACKS_ROOT` in the Forja `.env` (see [README](README.md)).
 - [ ] Manifest `id` / `version` bumped when behavior changes
 - [ ] `bundle` lists every file install needs
 - [ ] No host Dart changes required for pack-only work
+- [ ] Kit/schema changes go to [forja-sdk](https://github.com/mGhassen/forja-sdk), not this repo

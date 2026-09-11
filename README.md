@@ -7,8 +7,8 @@ Packs are JavaScript plugins the Forja app installs by manifest URL, caches on d
 | | |
 |--|--|
 | **Host app** | [mGhassen/Forja](https://github.com/mGhassen/Forja) |
-| **Install** | Settings → Sources → Forja → paste a `manifest.json` URL |
-| **Contracts** | [`sdk/`](sdk/) — schemas, kits, [DEVELOPING.md](sdk/DEVELOPING.md) |
+| **Install** | Settings → Forja Packs → paste a `manifest.json` URL |
+| **SDK (authors)** | [mGhassen/forja-sdk](https://github.com/mGhassen/forja-sdk) — schemas, kits, [DEVELOPING.md](https://github.com/mGhassen/forja-sdk/blob/main/DEVELOPING.md) |
 | **Raw manifests** | `https://raw.githubusercontent.com/mGhassen/forja-packs/main/<path>/manifest.json` |
 
 ## Pack inventory
@@ -42,9 +42,10 @@ forja-packs/
 ├── iptv/          IPTV feature packs (VOD details)
 ├── hubs/          Catalog hub packs (home, anime, …)
 ├── archived/      Retired packs (not installable)
-├── sdk/           JSON Schema contracts + catalog/torrent kits
 └── domains.json   Shared domain hints
 ```
+
+Author contracts live in **[forja-sdk](https://github.com/mGhassen/forja-sdk)**. Packs wrap kit helpers in local `_kit.js` / preludes — they do not vendor a sibling `sdk/` tree.
 
 Each pack is a `manifest.json` plus JS entries. Optional **`bundle`** lists every file the host downloads on install:
 

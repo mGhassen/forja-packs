@@ -31,12 +31,3 @@ jobs:
             fi
           done
           test "$missing" -eq 0
-      - name: SDK contract index exists
-        run: |
-          test -f sdk/contract.json
-          node -e "JSON.parse(require('fs').readFileSync('sdk/contract.json','utf8'))"
-          for s in schema/manifest.schema.json schema/catalog-envelope.schema.json \
-            schema/vod-stream.schema.json schema/torrent-search.schema.json \
-            schema/torrent-row.schema.json; do
-            test -f "sdk/$s"
-          done
