@@ -37,19 +37,23 @@ function absStreamedUrl(origin, path) {
   return String(origin || '').replace(/\/$/, '') + p;
 }
 
+function streamedBadgeUrl(origin, token) {
+  var t = String(token || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.charAt(0) === '/') return absStreamedUrl(origin, t);
+  return absStreamedUrl(origin, '/api/images/badge/' + t + '.webp');
+}
+
 function matchRow(m, pluginId, origin) {
   var date = Number(m.date || 0);
   var teams = m && m.teams && typeof m.teams === 'object' ? m.teams : null;
   var home = teams && teams.home && typeof teams.home === 'object' ? teams.home : null;
   var away = teams && teams.away && typeof teams.away === 'object' ? teams.away : null;
-  var homeBadge = home ? String(home.badge || '').trim() : '';
-  var awayBadge = away ? String(away.badge || '').trim() : '';
-  // API posters are relative `/api/images/proxy/…`; badges are opaque tokens
-  // (host expands via kitEventImageUrl → /api/images/badge/{token}.webp).
+  var homeBadge = streamedBadgeUrl(origin, home ? home.badge : '');
+  var awayBadge = streamedBadgeUrl(origin, away ? away.badge : '');
   var poster = absStreamedUrl(origin, m.poster);
-  if (!poster && homeBadge) {
-    poster = absStreamedUrl(origin, '/api/images/badge/' + homeBadge + '.webp');
-  }
+  if (!poster && homeBadge) poster = homeBadge;
   var row = {
     id: String(m.id || ''),
     title: String(m.title || ''),

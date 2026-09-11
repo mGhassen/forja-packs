@@ -452,9 +452,11 @@ Compose hub pages in **`layout`** with typed kit widgets. The host maps each `ty
 | Type | Role | Key fields |
 |------|------|------------|
 | `kit.stack` | Vertical column | `children[]`, `expand: true` (last child fills viewport) |
-| `kit.menu` | Underline filter menu | `items[]` (`id`, `label`), `toggle`, `focusUp` / `focusDown` |
-| `kit.tabs` | Status / segment strip | `tabs[]`, `default`, `focusUp` / `focusDown` |
-| `kit.list` | Host-backed grid | Optional opaque `source` id (feature-registered) and/or hub plugin id; `kindMenu`, `statusTab` |
+| `kit.menu` | Underline filter menu | `items[]` (`id`, `label`), `toggle`, `focusUp` / `focusDown` / `focusLeft` / `focusRight` |
+| `kit.tabs` | Status / segment strip | `tabs[]`, `default`, `focusUp` / `focusDown` / `focusLeft` / `focusRight` |
+| `kit.list` | Host-backed grid | Optional opaque `source` id; `kindMenu`, `statusTab`, `focusLeft` / `focusRight` |
+| `kit.topBar` | Pack-declared top chips | `actions[]`, `focusDown` / `focusLeft` / `focusRight` |
+| `kit.categoryBar` | Sport / kind circles | `items[]`, `focusUp` / `focusDown` / `focusLeft` / `focusRight` |
 | `kit.row` | Horizontal rail | Same as legacy `rail` / `ranked` |
 
 Legacy aliases still work: `stack` → `kit.stack`, `tabs` + `style: 'underline'` → `kit.menu`, `host.my_list` → `kit.list`.
@@ -474,6 +476,8 @@ Browse hubs keep `hero`, `mood`, `rail`, `host.continue`, etc. Use `kit.*` when 
 `kit.list` binds to a **host source backend** registered outside kit (RFC-085 · RFC-088): the pack declares layout + an opaque `source` id; foundation registers that id at boot (e.g. My List → `shared/foundation/services/follow/`). Kit never hardcodes product names. Optional `enrich` companion hydrates rows (e.g. TMDB details for Simkl stubs).
 
 Pack `kit.menu` / `kit.tabs` render in the **shell top bar** (same slot as Home Search / Films / Series) — not inside the page body.
+
+D-pad **←/→ inside a row** (chips, posters) is host-owned. **`focusLeft` / `focusRight`** fire only at the row edge (first / last item), or from a selected `kit.list` row when a side panel is open — same named-row jump as `focusUp` / `focusDown`. Example: `focusRight: 'sources-kind'` on a list lands on the generic sources panel tabs. Intra-row arrows stay index ± 1. OK / Back stay host (`open` / overlay pop).
 
 ### Host helpers (catalog)
 
