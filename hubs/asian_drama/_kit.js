@@ -173,6 +173,14 @@ function hubNormalizeTitle(raw) {
   return t.replace(/\s+/g, ' ').trim();
 }
 
+function hubTmdbSearchTitle(meta) {
+  if (!meta) return '';
+  var ids = meta.ids || {};
+  var fromIds = String(ids.tmdbSearch || '').trim();
+  if (fromIds) return hubNormalizeTitle(fromIds);
+  return hubNormalizeTitle(meta.name || '');
+}
+
 function hubTmdbMatch(ctx, query) {
   query = query || {};
   var title = hubNormalizeTitle(query.title);

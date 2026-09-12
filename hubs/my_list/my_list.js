@@ -156,6 +156,7 @@ function simklCardItem(item) {
   var mediaType =
     kind === 'anime' ? 'anime' : kind === 'movies' ? 'movie' : 'tv';
   var tmdbId = asInt(ids.tmdb);
+  var anilistId = asInt(ids.anilist);
   var row = {
     title: title,
     posterPath: posterUrl,
@@ -167,8 +168,22 @@ function simklCardItem(item) {
     voteAverage: 0,
     releaseDate: year,
   };
-  // Film/series Simkl stubs hand off to TMDB details via open — not My List.
-  if (mediaType !== 'anime' && tmdbId != null) {
+  if (anilistId != null) row.anilistId = anilistId;
+  // Hand off to the right hub details — never My List (feed-only).
+  if (mediaType === 'anime' && anilistId != null) {
+    var animeOpen = {
+      surface: 'anime',
+      id: String(anilistId),
+      extract: {
+        resolveType: 'anime',
+        panelCategory: 'anime',
+        ctx: { anilistId: anilistId },
+      },
+    };
+    row.open = animeOpen;
+    row.metaOpen = animeOpen;
+    row.catalogOpen = animeOpen;
+  } else if (mediaType !== 'anime' && tmdbId != null) {
     var open = myListTmdbOpen(
       tmdbId,
       mediaType === 'tv' || kind === 'shows' ? 'tv' : 'movie',
@@ -246,6 +261,11 @@ function filterSimklByLocal(simklItems, allLocal, status, hiddenKeys) {
       var localStatus =
         local.listStatus != null ? String(local.listStatus) : 'plantowatch';
       if (localStatus !== status) continue;
+      // Local hub bookmark wins over Simkl stub (anime / Asian Drama open).
+      if (myListIsHubRow(local)) {
+        out.push(local);
+        continue;
+      }
     }
     out.push(s);
   }
@@ -255,24 +275,47 @@ function filterSimklByLocal(simklItems, allLocal, status, hiddenKeys) {
 function mergeLocalHubs(simklItems, localForStatus) {
   var out = simklItems.slice();
   var seenTmdb = {};
+  var seenHub = {};
   for (var i = 0; i < simklItems.length; i++) {
     var t = asInt(simklItems[i].tmdbId);
     if (t != null) seenTmdb[t] = true;
+    if (myListIsHubRow(simklItems[i])) {
+      var hk = hideKeys(simklItems[i]);
+      for (var h = 0; h < hk.length; h++) seenHub[hk[h]] = true;
+    }
   }
   for (var j = 0; j < localForStatus.length; j++) {
     var local = localForStatus[j];
     var open = local.metaOpen || local.open || local.catalogOpen;
     var surface =
       open && typeof open === 'object' ? String(open.surface || '') : '';
+    var localKeys = hideKeys(local);
+    var already = false;
+    for (var k = 0; k < localKeys.length; k++) {
+      if (seenHub[localKeys[k]]) {
+        already = true;
+        break;
+      }
+    }
+    if (already) continue;
     if (surface === 'anime' || local.mediaType === 'anime') {
       out.push(local);
+      for (var a = 0; a < localKeys.length; a++) seenHub[localKeys[a]] = true;
       continue;
     }
     if (surface === 'drama' || local.mediaType === 'asian_drama') {
+      // Hub drama always wins over a Simkl/TMDB stub with the same tmdb id.
       var tmdbD = asInt(local.tmdbId);
-      if (tmdbD != null && seenTmdb[tmdbD]) continue;
+      if (tmdbD != null) {
+        for (var di = out.length - 1; di >= 0; di--) {
+          if (!myListIsHubRow(out[di]) && asInt(out[di].tmdbId) === tmdbD) {
+            out.splice(di, 1);
+          }
+        }
+        seenTmdb[tmdbD] = true;
+      }
       out.push(local);
-      if (tmdbD != null) seenTmdb[tmdbD] = true;
+      for (var d = 0; d < localKeys.length; d++) seenHub[localKeys[d]] = true;
       continue;
     }
     var tmdb = asInt(local.tmdbId);
