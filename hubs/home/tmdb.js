@@ -638,6 +638,198 @@ function tmdbPickTitleLogo(cfg, images) {
   return chosen ? tmdbImage(cfg, chosen.file_path, 'w500') : '';
 }
 
+// Kit details chrome — same shapes as anime/drama enrich companions.
+function tmdbParseCast(cfg, json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.cast) ? credits.cast : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 20; i++) {
+    var e = list[i] || {};
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      character: String(e.character || '').trim(),
+      profilePath: tmdbImage(cfg, e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function tmdbParseCrew(cfg, json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.crew) ? credits.crew : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 8; i++) {
+    var e = list[i] || {};
+    var job = String(e.job || '').toLowerCase();
+    if (
+      job.indexOf('director') < 0 &&
+      job.indexOf('writer') < 0 &&
+      job.indexOf('creator') < 0
+    ) {
+      continue;
+    }
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      job: String(e.job || '').trim(),
+      profilePath: tmdbImage(cfg, e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function tmdbParseTrailers(json) {
+  var videos = json && json.videos;
+  var list = videos && Array.isArray(videos.results) ? videos.results : [];
+  var allow = {
+    Trailer: 0,
+    Teaser: 1,
+    Featurette: 2,
+    Clip: 3,
+    'Behind the Scenes': 4,
+  };
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var v = list[i] || {};
+    if (String(v.site || '') !== 'YouTube') continue;
+    var type = String(v.type || '');
+    if (!(type in allow)) continue;
+    var key = String(v.key || '').trim();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    out.push({
+      key: key,
+      name: String(v.name || type).trim() || type,
+      type: type,
+      official: v.official === true,
+      site: 'YouTube',
+    });
+  }
+  out.sort(function (a, b) {
+    if (a.official !== b.official) return a.official ? -1 : 1;
+    var ta = allow[a.type] != null ? allow[a.type] : 99;
+    var tb = allow[b.type] != null ? allow[b.type] : 99;
+    if (ta !== tb) return ta - tb;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return out;
+}
+
+function tmdbParseFacts(json, media) {
+  if (!json) return null;
+  var facts = {
+    mediaType: media,
+    status: String(json.status || '').trim(),
+    originalLanguage: String(json.original_language || '').trim(),
+  };
+  var companies = Array.isArray(json.production_companies)
+    ? json.production_companies
+    : [];
+  var prod = [];
+  for (var i = 0; i < companies.length; i++) {
+    var n = String((companies[i] && companies[i].name) || '').trim();
+    if (n) prod.push(n);
+  }
+  if (prod.length) facts.productionCompanies = prod;
+
+  var langs = Array.isArray(json.spoken_languages) ? json.spoken_languages : [];
+  var spoken = [];
+  for (var li = 0; li < langs.length; li++) {
+    var L = langs[li] || {};
+    var ln = String(L.english_name || L.name || '').trim();
+    if (ln) spoken.push(ln);
+  }
+  if (spoken.length) facts.spokenLanguages = spoken;
+
+  if (media === 'movie') {
+    var runtime = Number(json.runtime);
+    if (runtime > 0) facts.runtimeMinutes = runtime;
+    var release = String(json.release_date || '').trim();
+    if (release) facts.releaseDate = release.substring(0, 10);
+    var budget = Number(json.budget);
+    if (budget > 0) facts.budget = budget;
+    var revenue = Number(json.revenue);
+    if (revenue > 0) facts.revenue = revenue;
+  } else {
+    var epRuntime = Array.isArray(json.episode_run_time)
+      ? json.episode_run_time
+      : [];
+    if (epRuntime.length && Number(epRuntime[0]) > 0) {
+      facts.runtimeMinutes = Number(epRuntime[0]);
+    }
+    var first = String(json.first_air_date || '').trim();
+    if (first) facts.releaseDate = first.substring(0, 10);
+    var last = String(json.last_air_date || '').trim();
+    if (last) facts.lastAirDate = last.substring(0, 10);
+    var seasons = Number(json.number_of_seasons);
+    if (seasons > 0) facts.seasonCount = seasons;
+    var episodes = Number(json.number_of_episodes);
+    if (episodes > 0) facts.episodeCount = episodes;
+    var networks = Array.isArray(json.networks) ? json.networks : [];
+    var nets = [];
+    for (var ni = 0; ni < networks.length; ni++) {
+      var nn = String((networks[ni] && networks[ni].name) || '').trim();
+      if (nn) nets.push(nn);
+    }
+    if (nets.length) facts.networks = nets;
+    var creators = Array.isArray(json.created_by) ? json.created_by : [];
+    var created = [];
+    for (var ci = 0; ci < creators.length; ci++) {
+      var cn = String((creators[ci] && creators[ci].name) || '').trim();
+      if (cn) created.push(cn);
+    }
+    if (created.length) facts.creators = created;
+  }
+  return facts;
+}
+
+function tmdbParseBackdrops(cfg, json) {
+  var images = json && json.images;
+  var list = images && Array.isArray(images.backdrops) ? images.backdrops : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 12; i++) {
+    var path = list[i] && list[i].file_path;
+    var url = tmdbImage(cfg, path, 'w1280');
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+function tmdbAttachDetailsChrome(cfg, meta, json, type) {
+  if (!meta || !json) return meta;
+  var cast = tmdbParseCast(cfg, json);
+  var crew = tmdbParseCrew(cfg, json);
+  var trailers = tmdbParseTrailers(json);
+  var facts = tmdbParseFacts(json, type);
+  var backdrops = tmdbParseBackdrops(cfg, json);
+  if (cast.length) meta.cast = cast;
+  if (crew.length) meta.crew = crew;
+  if (trailers.length) meta.trailers = trailers;
+  if (facts) meta.facts = facts;
+  if (backdrops.length) meta.backdrops = backdrops;
+
+  if ((!meta.genres || !meta.genres.length) && Array.isArray(json.genres)) {
+    var names = [];
+    for (var gi = 0; gi < json.genres.length; gi++) {
+      var gn = String((json.genres[gi] && json.genres[gi].name) || '').trim();
+      if (gn) names.push(gn);
+    }
+    if (names.length) meta.genres = names;
+  }
+
+  var premiere = String(
+    type === 'movie' ? json.release_date || '' : json.first_air_date || '',
+  ).trim();
+  if (premiere.length >= 10) meta.premiereDate = premiere.substring(0, 10);
+
+  meta._hubTmdbEnriched = true;
+  return meta;
+}
+
 function tmdbAttachLogos(ctx, cfg, items, limit) {
   if (!Array.isArray(items) || !items.length) return Promise.resolve(items || []);
   var n = Number(limit) > 0 ? Math.min(items.length, Number(limit)) : items.length;
@@ -1198,12 +1390,10 @@ function tmdbDetails(ctx, cfg, params) {
     );
   }
   if (type !== 'movie' && type !== 'tv') type = 'movie';
-  var append =
-    type === 'tv'
-      ? 'external_ids,recommendations,images'
-      : 'external_ids,recommendations,images';
+  var append = 'external_ids,recommendations,images,credits,videos';
   return tmdbGet(ctx, cfg, '/' + type + '/' + id, {
     append_to_response: append,
+    include_image_language: 'en,null',
   }).then(function (json) {
     var meta = tmdbMeta(cfg, json, type);
     if (!meta) return hubFail('details', 'NOT_FOUND', type + ' ' + id);
@@ -1217,6 +1407,7 @@ function tmdbDetails(ctx, cfg, params) {
       var logo = tmdbPickTitleLogo(cfg, json.images);
       if (logo) meta.logo = logo;
     }
+    tmdbAttachDetailsChrome(cfg, meta, json, type);
 
     var rails = {};
     var sideJobs = [];
