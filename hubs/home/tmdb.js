@@ -1339,6 +1339,7 @@ var TMDB_YEAR_RE = /\b((?:19|20)\d{2})\b/;
 var TMDB_SCORE_OP_RE = /(?:^|\s)(>=|<=|>|<)\s*(\d(?:\.\d)?)(?=\s|$)/g;
 var TMDB_SCORE_RANGE_RE = /(?:^|\s)(\d(?:\.\d)?)\s*[-–—]\s*(\d(?:\.\d)?)(?=\s|$)/;
 var TMDB_MEDIA_TYPE_RE = /(?:^|\s)(films?|movies?|series|shows?|tv)(?=\s|$)/i;
+var TMDB_LANG_TOKEN_RE = /(?:^|\s)lang:([a-z]{2})(?=\s|$)/i;
 
 function tmdbEscapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1387,6 +1388,7 @@ function tmdbParseSearchQuery(raw) {
       minScore: null,
       maxScore: null,
       originCountry: null,
+      originalLanguage: null,
     };
   }
 
@@ -1455,6 +1457,14 @@ function tmdbParseSearchQuery(raw) {
   }
   working = working.replace(/\s+/g, ' ').trim();
 
+  var originalLanguage = null;
+  var langMatch = TMDB_LANG_TOKEN_RE.exec(' ' + working + ' ');
+  if (langMatch) {
+    originalLanguage = String(langMatch[1]).toLowerCase();
+    working = (' ' + working + ' ').replace(TMDB_LANG_TOKEN_RE, ' ');
+  }
+  working = working.replace(/\s+/g, ' ').trim();
+
   var originCountry = null;
   if (working) {
     var lower = working.toLowerCase();
@@ -1519,6 +1529,7 @@ function tmdbParseSearchQuery(raw) {
     minScore: minScore,
     maxScore: maxScore,
     originCountry: originCountry,
+    originalLanguage: originalLanguage,
   };
 }
 
@@ -1540,7 +1551,8 @@ function tmdbParsedHasStructuredFilters(p) {
     tmdbParsedHasGenre(p) ||
     tmdbParsedHasScore(p) ||
     !!p.mediaType ||
-    !!p.originCountry
+    !!p.originCountry ||
+    !!p.originalLanguage
   );
 }
 
@@ -1648,6 +1660,7 @@ function tmdbBuildDiscoverQuery(parsed, bounds, page, genres, people, isTv) {
   if (parsed.minScore != null) q['vote_average.gte'] = parsed.minScore;
   if (parsed.maxScore != null) q['vote_average.lte'] = parsed.maxScore;
   if (parsed.originCountry) q.with_origin_country = parsed.originCountry;
+  if (parsed.originalLanguage) q.with_original_language = parsed.originalLanguage;
   return q;
 }
 
@@ -1692,6 +1705,7 @@ function tmdbStructuredSearch(ctx, cfg, params) {
         minScore: null,
         maxScore: null,
         originCountry: null,
+        originalLanguage: null,
       };
   var typeFilter = hubFilterValue(filter, 'type');
   if (typeFilter === 'movie' || typeFilter === 'tv') {
@@ -1781,7 +1795,8 @@ function tmdbStructuredSearch(ctx, cfg, params) {
       bounds != null ||
       tmdbParsedHasScore(parsed) ||
       !!parsed.mediaType ||
-      !!parsed.originCountry
+      !!parsed.originCountry ||
+      !!parsed.originalLanguage
     ) {
       if (tmdbParsedHasGenre(parsed)) {
         if (wantMovies && parsed.movieGenreIds.length) {

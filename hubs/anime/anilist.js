@@ -54,14 +54,37 @@ var ANILIST_RELATION_FORMATS = {
   SPECIAL: true,
 };
 
-// Matches AnimeService section sorts.
+// AniList seasons: Winter=Dec–Feb (year of Jan/Feb), Spring=Mar–May,
+// Summer=Jun–Aug, Fall=Sep–Nov.
+function anilistCurrentSeason(now) {
+  var d = now || new Date();
+  var m = d.getUTCMonth() + 1;
+  var y = d.getUTCFullYear();
+  if (m === 12) return { season: 'WINTER', seasonYear: y + 1 };
+  if (m <= 2) return { season: 'WINTER', seasonYear: y };
+  if (m <= 5) return { season: 'SPRING', seasonYear: y };
+  if (m <= 8) return { season: 'SUMMER', seasonYear: y };
+  return { season: 'FALL', seasonYear: y };
+}
+
+var ANILIST_AIRING_FORMATS = {
+  TV: true,
+  TV_SHORT: true,
+  ONA: true,
+  OVA: true,
+  SPECIAL: true,
+  MOVIE: true,
+};
+
+// season: true → current AniList season. kind: 'airing' → AiringSchedule window.
 var ANILIST_RAILS = {
-  spotlight: { sort: ['TRENDING_DESC'] },
+  spotlight: { sort: ['TRENDING_DESC'], season: true },
   trending: { sort: ['TRENDING_DESC'] },
   top_10: { sort: ['TRENDING_DESC'], limit: 10 },
-  top_airing: { sort: ['POPULARITY_DESC'], status: 'RELEASING' },
+  this_season: { sort: ['POPULARITY_DESC'], season: true },
+  top_airing: { sort: ['TRENDING_DESC'], status: 'RELEASING' },
   popular: { sort: ['POPULARITY_DESC'] },
-  latest_episodes: { sort: ['UPDATED_AT_DESC'], status: 'RELEASING' },
+  latest_episodes: { kind: 'airing', windowHours: 48, fetchSize: 50 },
   top_rated: { sort: ['SCORE_DESC'] },
   most_favorited: { sort: ['FAVOURITES_DESC'] },
   latest_completed: { sort: ['END_DATE_DESC'], status: 'FINISHED' },
@@ -111,10 +134,11 @@ function anilistLayout() {
             // Films / Series / Categories — Trending duplicates Top Rated.
             hideWhenTypeFilter: true,
           },
+          { type: 'rail', id: 'this_season', title: 'This Season', rail: 'this_season' },
           { type: 'rail', id: 'top_airing', title: 'Top Airing', rail: 'top_airing' },
           { type: 'ranked', id: 'top_10', title: 'Top 10 Today', rail: 'top_10', style: 'numbered', pageSize: 10 },
           { type: 'rail', id: 'popular', title: 'Most Popular', rail: 'popular' },
-          { type: 'rail', id: 'latest_episodes', title: 'Latest Episodes', rail: 'latest_episodes' },
+          { type: 'rail', id: 'latest_episodes', title: 'Recently Aired', rail: 'latest_episodes' },
           { type: 'rail', id: 'top_rated', title: 'Top Rated', rail: 'top_rated' },
           { type: 'rail', id: 'most_favorited', title: 'Most Favorited', rail: 'most_favorited' },
           { type: 'rail', id: 'latest_completed', title: 'Recently Completed', rail: 'latest_completed' },
@@ -326,33 +350,93 @@ function anilistRailItemsFromList(railId, list) {
   return out;
 }
 
+function anilistAiringItemsFromSchedules(schedules, params, limit) {
+  var genre = hubFilterValue(params && params.filter, 'genre');
+  var format = hubFilterValue(params && params.filter, 'format');
+  var formatNot = hubFilterValue(params && params.filter, 'format_not');
+  var genreLc = genre ? String(genre).toLowerCase() : '';
+  var out = [];
+  var seen = {};
+  var list = Array.isArray(schedules) ? schedules : [];
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i] || {};
+    var m = row.media;
+    if (!m || !m.id || seen[m.id]) continue;
+    if (m.isAdult) continue;
+    var fmt = String(m.format || '').toUpperCase();
+    if (!fmt || !ANILIST_AIRING_FORMATS[fmt]) continue;
+    if (format && fmt !== String(format).toUpperCase()) continue;
+    if (formatNot && fmt === String(formatNot).toUpperCase()) continue;
+    if (genreLc) {
+      var genres = Array.isArray(m.genres) ? m.genres : [];
+      var hit = false;
+      for (var g = 0; g < genres.length; g++) {
+        if (String(genres[g] || '').toLowerCase() === genreLc) {
+          hit = true;
+          break;
+        }
+      }
+      if (!hit) continue;
+    }
+    seen[m.id] = true;
+    var meta = anilistMeta(m);
+    if (!meta) continue;
+    var ep = Number(row.episode);
+    if (ep > 0) {
+      meta.releaseInfo = (meta.releaseInfo ? meta.releaseInfo + ' • ' : '') + 'Ep ' + ep;
+    }
+    out.push(meta);
+    if (Number(limit) > 0 && out.length >= Number(limit)) break;
+  }
+  return out;
+}
+
+function anilistMediaArgs(spec) {
+  var sort = (spec.sort || ['TRENDING_DESC']).join(', ');
+  var status = spec.status ? ', status: ' + spec.status : '';
+  var season = spec.season ? ', season: $season, seasonYear: $seasonYear' : '';
+  return (
+    'type: ANIME, isAdult: false, sort: [' +
+    sort +
+    ']' +
+    status +
+    season +
+    ', genre: $genre, format: $format, format_not_in: $formatNotIn'
+  );
+}
+
 function anilistFeedQuery(cfg, params) {
-  var genre = hubFilterValue(params.filter, 'genre');
-  var format = hubFilterValue(params.filter, 'format');
-  var formatNot = hubFilterValue(params.filter, 'format_not');
   var perPage = Number(cfg.perPage) || 24;
   var parts = [];
   for (var railId in ANILIST_RAILS) {
     if (!Object.prototype.hasOwnProperty.call(ANILIST_RAILS, railId)) continue;
     var spec = ANILIST_RAILS[railId];
+    if (spec.kind === 'airing') {
+      var fetchSize = Number(spec.fetchSize) > 0 ? Number(spec.fetchSize) : 50;
+      parts.push(
+        railId +
+          ': Page(page: 1, perPage: ' +
+          fetchSize +
+          ') { airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) { episode airingAt media { ' +
+          ANILIST_MEDIA_FIELDS +
+          ' isAdult } } }',
+      );
+      continue;
+    }
     var limit = Number(spec.limit) > 0 ? Number(spec.limit) : perPage;
-    var sort = spec.sort.join(', ');
-    var status = spec.status ? ', status: ' + spec.status : '';
     parts.push(
       railId +
         ': Page(page: 1, perPage: ' +
         limit +
-        ') { media(type: ANIME, isAdult: false, sort: [' +
-        sort +
-        ']' +
-        status +
-        ', genre: $genre, format: $format, format_not_in: $formatNotIn) { ' +
+        ') { media(' +
+        anilistMediaArgs(spec) +
+        ') { ' +
         ANILIST_MEDIA_FIELDS +
         ' } }',
     );
   }
   return (
-    'query AnilistFeed($genre: String, $format: MediaFormat, $formatNotIn: [MediaFormat]) { ' +
+    'query AnilistFeed($genre: String, $format: MediaFormat, $formatNotIn: [MediaFormat], $season: MediaSeason, $seasonYear: Int, $airFrom: Int, $airTo: Int) { ' +
     parts.join(' ') +
     ' }'
   );
@@ -366,6 +450,17 @@ function anilistFeedVariables(params) {
   if (genre) variables.genre = genre;
   if (format) variables.format = format;
   if (formatNot) variables.formatNotIn = [formatNot];
+  var cur = anilistCurrentSeason();
+  variables.season = cur.season;
+  variables.seasonYear = cur.seasonYear;
+  var nowSec = Math.floor(Date.now() / 1000);
+  var hours = 48;
+  var airSpec = ANILIST_RAILS.latest_episodes;
+  if (airSpec && Number(airSpec.windowHours) > 0) {
+    hours = Number(airSpec.windowHours);
+  }
+  variables.airTo = nowSec;
+  variables.airFrom = nowSec - hours * 3600;
   return variables;
 }
 
@@ -373,12 +468,23 @@ function anilistFeed(ctx, cfg, params) {
   return anilistQuery(ctx, cfg, anilistFeedQuery(cfg, params), anilistFeedVariables(params))
     .then(function (data) {
       var rails = {};
+      var perPage = Number(cfg.perPage) || 24;
       for (var railId in ANILIST_RAILS) {
         if (!Object.prototype.hasOwnProperty.call(ANILIST_RAILS, railId)) continue;
+        var spec = ANILIST_RAILS[railId];
         var page = data[railId] || {};
-        rails[railId] = anilistRailItemsFromList(railId, page.media || []);
+        if (spec.kind === 'airing') {
+          rails[railId] = anilistAiringItemsFromSchedules(
+            page.airingSchedules || [],
+            params,
+            perPage,
+          );
+        } else {
+          rails[railId] = anilistRailItemsFromList(railId, page.media || []);
+        }
       }
-      return hubOk('feed', { rails: rails }, { maxAge: 600, swr: 3600 });
+      // Daily-moving rails — shorter TTL than evergreen lists.
+      return hubOk('feed', { rails: rails }, { maxAge: 300, swr: 1800 });
     });
 }
 
@@ -393,25 +499,59 @@ function anilistPage(ctx, cfg, params) {
     : Number(spec.limit) > 0
       ? Number(spec.limit)
       : Number(cfg.perPage) || 24;
+  var pageNum = Number(params.page) > 0 ? Number(params.page) : 1;
+
+  if (spec.kind === 'airing') {
+    var hours = Number(spec.windowHours) > 0 ? Number(spec.windowHours) : 48;
+    var nowSec = Math.floor(Date.now() / 1000);
+    var fetchSize = Math.max(
+      perPage * 2,
+      Number(spec.fetchSize) > 0 ? Number(spec.fetchSize) : 50,
+    );
+    var airQuery =
+      'query ($page: Int, $perPage: Int, $airFrom: Int, $airTo: Int) {' +
+      ' Page(page: $page, perPage: $perPage) {' +
+      '  airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) {' +
+      '   episode airingAt media { ' +
+      ANILIST_MEDIA_FIELDS +
+      ' isAdult }' +
+      '  }' +
+      ' }' +
+      '}';
+    return anilistQuery(ctx, cfg, airQuery, {
+      page: pageNum,
+      perPage: fetchSize,
+      airFrom: nowSec - hours * 3600,
+      airTo: nowSec,
+    }).then(function (data) {
+      var schedules = (data.Page && data.Page.airingSchedules) || [];
+      return anilistAiringItemsFromSchedules(schedules, params, perPage);
+    });
+  }
 
   var query =
-    'query ($page: Int, $perPage: Int, $sort: [MediaSort], $genre: String, $status: MediaStatus, $format: MediaFormat, $formatNotIn: [MediaFormat], $search: String) {' +
+    'query ($page: Int, $perPage: Int, $sort: [MediaSort], $genre: String, $status: MediaStatus, $format: MediaFormat, $formatNotIn: [MediaFormat], $search: String, $season: MediaSeason, $seasonYear: Int) {' +
     ' Page(page: $page, perPage: $perPage) {' +
-    '  media(type: ANIME, isAdult: false, sort: $sort, genre: $genre, status: $status, format: $format, format_not_in: $formatNotIn, search: $search) {' +
+    '  media(type: ANIME, isAdult: false, sort: $sort, genre: $genre, status: $status, format: $format, format_not_in: $formatNotIn, search: $search, season: $season, seasonYear: $seasonYear) {' +
     ANILIST_MEDIA_FIELDS +
     '  }' +
     ' }' +
     '}';
 
   var variables = {
-    page: Number(params.page) > 0 ? Number(params.page) : 1,
+    page: pageNum,
     perPage: perPage,
-    sort: spec.sort,
+    sort: spec.sort || ['TRENDING_DESC'],
   };
   if (genre) variables.genre = genre;
   if (format) variables.format = format;
   if (formatNot) variables.formatNotIn = [formatNot];
   if (spec.status) variables.status = spec.status;
+  if (spec.season) {
+    var cur = anilistCurrentSeason();
+    variables.season = cur.season;
+    variables.seasonYear = cur.seasonYear;
+  }
   var search = String(params.query || '').trim();
   if (search) {
     variables.search = search;
@@ -525,7 +665,7 @@ function extract(ctx) {
       return hubItems(
         action,
         items,
-        { maxAge: 600, swr: 3600 },
+        { maxAge: 300, swr: 1800 },
         { pageSize: perPage },
       );
     })
