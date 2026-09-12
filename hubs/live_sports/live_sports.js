@@ -122,6 +122,7 @@ function liveSportsCatalogActions() {
     {
       id: 'view',
       label: 'View',
+      icon: 'view',
       trailing: true,
       items: [
         { id: 'list', label: 'List' },
