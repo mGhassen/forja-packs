@@ -1,7 +1,8 @@
 // TMDB enrich companion — not a data source.
 // Host runs this after a catalog plugin that declares `"enrich": "enrich-tmdb"`.
 // KissKH / other sources stay standalone; this pack owns match + apply only.
-// Details enrich also returns cast / trailers / recommendations for host paint.
+// Details enrich fills cast / trailers / logo / facts, then resolves TMDB
+// More Like This titles onto KissKH (open.surface drama).
 
 var ENRICH_TMDB_DEFAULTS = {
   rails: ['spotlight'],
@@ -34,18 +35,6 @@ function enrichTmdbShouldRail(cfg, params) {
   return false;
 }
 
-function enrichTmdbDetailsPayload(meta) {
-  var data = { meta: meta };
-  var recs = meta && Array.isArray(meta.recommendations) ? meta.recommendations : [];
-  if (recs.length) {
-    data.rails = {
-      recommendations: { title: 'More Like This', items: recs },
-    };
-    delete meta.recommendations;
-  }
-  return data;
-}
-
 function extract(ctx) {
   var action = hubAction(ctx);
   if (action !== 'enrich') {
@@ -62,11 +51,10 @@ function extract(ctx) {
   if (params.meta && typeof params.meta === 'object') {
     return hubEnrichTmdb(ctx, [params.meta], 1, { details: true })
       .then(function (items) {
-        return hubOk(
-          'enrich',
-          enrichTmdbDetailsPayload(items[0] || params.meta),
-          { maxAge: 900, swr: 3600 },
-        );
+        return hubResolveTmdbRecsToDrama(ctx, items[0] || params.meta);
+      })
+      .then(function (payload) {
+        return hubOk('enrich', payload, { maxAge: 900, swr: 3600 });
       })
       .catch(function (e) {
         return hubFail('enrich', 'UPSTREAM', e && e.message, true);

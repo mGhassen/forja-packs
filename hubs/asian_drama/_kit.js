@@ -932,3 +932,192 @@ function hubEnrichTmdb(ctx, items, limit, opts) {
     return enriched.concat(tail);
   });
 }
+
+// KissKH resolve for TMDB More Like This → drama open (not Home TMDB).
+var HUB_KISSKH_DEFAULTS = {
+  base: 'https://kisskh.co',
+  mirrors: [
+    'https://kisskh.co',
+    'https://kisskh.nl',
+    'https://kisskh.ovh',
+    'https://kisskh.la',
+    'https://kisskh.do',
+    'https://kisskh.is',
+    'https://kisskh.id',
+  ],
+};
+
+function hubKisskhNormTitle(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hubKisskhMetaFromRow(row) {
+  if (!row || !row.id) return null;
+  var name = String(row.title || '').trim();
+  if (!name) return null;
+  var ids = { kisskh: String(row.id) };
+  var tmdb = row.tmdbID || row.tmdbId || row.tmdb_id;
+  if (tmdb) ids.tmdb = String(tmdb);
+  var release = String(row.releaseDate || '').trim();
+  var premiere = hubParseIsoDate(release);
+  var cover = String(row.thumbnail || row.cover || '').trim();
+  if (cover) {
+    cover = cover.replace('media.themoviedb.org/t/p', 'image.tmdb.org/t/p');
+    if (cover.indexOf('//') === 0) cover = 'https:' + cover;
+    else if (cover.charAt(0) === '/') {
+      cover = 'https://image.tmdb.org/t/p/w500' + cover;
+    }
+  }
+  var meta = {
+    id: 'kisskh:' + row.id,
+    type: 'drama',
+    name: name,
+    poster: cover,
+    releaseInfo: release ? release.substring(0, 4) : '',
+    ids: ids,
+    open: {
+      surface: 'drama',
+      id: String(row.id),
+      torrentEp: true,
+      extract: {
+        resolveType: 'drama',
+        panelCategory: 'drama',
+        ctx: { kisskhId: Number(row.id) },
+      },
+    },
+  };
+  if (premiere) meta.premiereDate = premiere;
+  var label = String(row.label || '').trim();
+  if (label) meta.badge = label;
+  return meta;
+}
+
+function hubKisskhGet(ctx, path) {
+  var cfg = hubConfig(ctx, HUB_KISSKH_DEFAULTS);
+  var bases = [cfg.base].concat(Array.isArray(cfg.mirrors) ? cfg.mirrors : []);
+  var seen = {};
+  var ordered = [];
+  for (var i = 0; i < bases.length; i++) {
+    var b = String(bases[i] || '').replace(/\/$/, '');
+    if (!b || seen[b]) continue;
+    seen[b] = true;
+    ordered.push(b);
+  }
+
+  function attempt(index) {
+    if (index >= ordered.length) {
+      return Promise.reject(new Error('all kisskh mirrors failed'));
+    }
+    var base = ordered[index];
+    return ctx
+      .fetch(base + '/api' + path, {
+        headers: {
+          Accept: 'application/json',
+          Referer: base + '/',
+          Origin: base,
+        },
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error('kisskh HTTP ' + res.status);
+        return res.json();
+      })
+      .catch(function () {
+        return attempt(index + 1);
+      });
+  }
+
+  return attempt(0);
+}
+
+function hubKisskhSearch(ctx, q) {
+  var query = String(q || '').trim();
+  if (!query) return Promise.resolve([]);
+  return hubKisskhGet(
+    ctx,
+    '/DramaList/Search?q=' + encodeURIComponent(query) + '&type=0',
+  ).then(function (raw) {
+    var list = Array.isArray(raw) ? raw : raw && raw.data;
+    return Array.isArray(list) ? list : [];
+  });
+}
+
+function hubKisskhPickForRec(rows, rec) {
+  if (!Array.isArray(rows) || !rows.length || !rec) return null;
+  var wantTmdb = String((rec.ids && rec.ids.tmdb) || '').trim();
+  var wantTitle = hubKisskhNormTitle(rec.name);
+  var i;
+  if (wantTmdb) {
+    for (i = 0; i < rows.length; i++) {
+      var rowTmdb = String(
+        rows[i].tmdbID || rows[i].tmdbId || rows[i].tmdb_id || '',
+      ).trim();
+      if (rowTmdb && rowTmdb === wantTmdb) {
+        return hubKisskhMetaFromRow(rows[i]);
+      }
+    }
+  }
+  if (wantTitle) {
+    for (i = 0; i < rows.length; i++) {
+      if (hubKisskhNormTitle(rows[i].title) === wantTitle) {
+        return hubKisskhMetaFromRow(rows[i]);
+      }
+    }
+  }
+  return null;
+}
+
+/// TMDB recommendation cards → KissKH drama metas (skip titles KissKH lacks).
+function hubResolveTmdbRecsToDrama(ctx, meta) {
+  var recs =
+    meta && Array.isArray(meta.recommendations) ? meta.recommendations.slice() : [];
+  if (meta && Array.isArray(meta.recommendations)) {
+    delete meta.recommendations;
+  }
+  if (!recs.length) return Promise.resolve({ meta: meta });
+
+  var out = [];
+  var seen = {};
+  var i = 0;
+
+  function next() {
+    if (i >= recs.length || out.length >= 12) {
+      var data = { meta: meta };
+      if (out.length) {
+        data.rails = {
+          recommendations: { title: 'More Like This', items: out },
+        };
+      }
+      return Promise.resolve(data);
+    }
+    var rec = recs[i++];
+    var title = String((rec && rec.name) || '').trim();
+    if (!title) return next();
+    return hubKisskhSearch(ctx, title)
+      .then(function (rows) {
+        var hit = hubKisskhPickForRec(rows, rec);
+        if (hit && hit.id && !seen[hit.id]) {
+          seen[hit.id] = true;
+          // Prefer TMDB art when KissKH cover is empty.
+          if (!hit.poster && rec.poster) hit.poster = String(rec.poster);
+          if (!hit.background && rec.background) {
+            hit.background = String(rec.background);
+          }
+          if (!(Number(hit.rating) > 0) && Number(rec.rating) > 0) {
+            hit.rating = Number(rec.rating);
+          }
+          out.push(hit);
+        }
+        return next();
+      })
+      .catch(function () {
+        return next();
+      });
+  }
+
+  return next();
+}

@@ -6,13 +6,15 @@ var ANILIST_DEFAULTS = {
   perPage: 24,
 };
 
-var ANILIST_MEDIA_FIELDS = [
+// Shared cooldown across extract runs in the same engine isolate.
+var _anilistCooldownUntilMs = 0;
+
+var ANILIST_CARD_FIELDS = [
   'id',
   'idMal',
   'title { romaji english native }',
   'coverImage { extraLarge large }',
   'bannerImage',
-  'description(asHtml: false)',
   'averageScore',
   'genres',
   'seasonYear',
@@ -21,12 +23,22 @@ var ANILIST_MEDIA_FIELDS = [
   'status',
 ].join(' ');
 
+var ANILIST_MEDIA_FIELDS = [
+  ANILIST_CARD_FIELDS,
+  'description(asHtml: false)',
+].join(' ');
+
 var ANILIST_DETAILS_FIELDS = [
   ANILIST_MEDIA_FIELDS,
   'nextAiringEpisode { episode airingAt }',
   'streamingEpisodes { title thumbnail }',
   'relations { edges { relationType(version: 2) node { ' +
-    ANILIST_MEDIA_FIELDS +
+    ANILIST_CARD_FIELDS +
+    ' type } } }',
+  // Community "more like this" — not franchise relations.
+  'recommendations(page: 1, perPage: 12, sort: [RATING_DESC]) { nodes { ' +
+    'rating mediaRecommendation { ' +
+    ANILIST_CARD_FIELDS +
     ' type } } }',
 ].join(' ');
 
@@ -77,10 +89,11 @@ var ANILIST_AIRING_FORMATS = {
 };
 
 // season: true → current AniList season. kind: 'airing' → AiringSchedule window.
+// feedFrom: reuse another feed Page alias (same sort/filters) — one GraphQL Page.
 var ANILIST_RAILS = {
   spotlight: { sort: ['TRENDING_DESC'], season: true },
   trending: { sort: ['TRENDING_DESC'] },
-  top_10: { sort: ['TRENDING_DESC'], limit: 10 },
+  top_10: { sort: ['TRENDING_DESC'], limit: 10, feedFrom: 'trending' },
   this_season: { sort: ['POPULARITY_DESC'], season: true },
   top_airing: { sort: ['TRENDING_DESC'], status: 'RELEASING' },
   popular: { sort: ['POPULARITY_DESC'] },
@@ -302,7 +315,55 @@ function anilistRelatedFromMedia(m) {
   return out;
 }
 
+function anilistRecommendationsFromMedia(m) {
+  var nodes =
+    m &&
+    m.recommendations &&
+    Array.isArray(m.recommendations.nodes)
+      ? m.recommendations.nodes
+      : [];
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < nodes.length && out.length < 12; i++) {
+    var row = nodes[i] || {};
+    var node = row.mediaRecommendation;
+    if (!node || String(node.type || 'ANIME') !== 'ANIME') continue;
+    var fmt = String(node.format || '').toUpperCase();
+    if (!fmt || !ANILIST_RELATION_FORMATS[fmt]) continue;
+    var id = Number(node.id);
+    if (!(id > 0) || seen[id]) continue;
+    seen[id] = true;
+    var meta = anilistMeta(node);
+    if (!meta) continue;
+    out.push(meta);
+  }
+  return out;
+}
+
+function anilistHeader(res, name) {
+  if (!res || !res.headers) return '';
+  if (typeof res.headers.get === 'function') {
+    return String(res.headers.get(name) || res.headers.get(name.toLowerCase()) || '');
+  }
+  return String(res.headers[name] || res.headers[name.toLowerCase()] || '');
+}
+
+function anilistArmCooldown(res) {
+  var retryAfter = 60;
+  var raw = anilistHeader(res, 'Retry-After');
+  var n = Number(raw);
+  if (n > 0 && n < 600) retryAfter = n;
+  _anilistCooldownUntilMs = Date.now() + retryAfter * 1000;
+}
+
 function anilistQuery(ctx, cfg, query, variables) {
+  var now = Date.now();
+  if (now < _anilistCooldownUntilMs) {
+    var waitSec = Math.max(1, Math.ceil((_anilistCooldownUntilMs - now) / 1000));
+    return Promise.reject(
+      new Error('anilist rate limited; retry in ' + waitSec + 's'),
+    );
+  }
   // AniList Cloudflare rejects bare POSTs (fake 403 "temporarily disabled").
   // Browser / Apollo send anilist.co Referer; Origin alone is not enough.
   return ctx
@@ -317,14 +378,23 @@ function anilistQuery(ctx, cfg, query, variables) {
       body: JSON.stringify({ query: query, variables: variables || {} }),
     })
     .then(function (res) {
-      if (!res.ok) throw new Error('anilist HTTP ' + res.status);
-      return res.json();
-    })
-    .then(function (json) {
-      if (json && json.errors && json.errors.length) {
-        throw new Error(json.errors[0].message || 'anilist error');
+      if (res.status === 429) {
+        anilistArmCooldown(res);
+        throw new Error('anilist HTTP 429');
       }
-      return json && json.data ? json.data : {};
+      if (!res.ok) throw new Error('anilist HTTP ' + res.status);
+      return res.json().then(function (json) {
+        // Some gateways return 200 + GraphQL 429 body.
+        if (json && json.errors && json.errors.length) {
+          var msg = String(json.errors[0].message || '');
+          if (/too many requests/i.test(msg) || /\b429\b/.test(msg)) {
+            anilistArmCooldown(res);
+            throw new Error('anilist HTTP 429');
+          }
+          throw new Error(msg || 'anilist error');
+        }
+        return json && json.data ? json.data : {};
+      });
     });
 }
 
@@ -411,6 +481,8 @@ function anilistFeedQuery(cfg, params) {
   for (var railId in ANILIST_RAILS) {
     if (!Object.prototype.hasOwnProperty.call(ANILIST_RAILS, railId)) continue;
     var spec = ANILIST_RAILS[railId];
+    // Alias rails reuse another Page — do not emit a second GraphQL Page.
+    if (spec.feedFrom) continue;
     if (spec.kind === 'airing') {
       var fetchSize = Number(spec.fetchSize) > 0 ? Number(spec.fetchSize) : 50;
       parts.push(
@@ -418,7 +490,7 @@ function anilistFeedQuery(cfg, params) {
           ': Page(page: 1, perPage: ' +
           fetchSize +
           ') { airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) { episode airingAt media { ' +
-          ANILIST_MEDIA_FIELDS +
+          ANILIST_CARD_FIELDS +
           ' isAdult } } }',
       );
       continue;
@@ -431,7 +503,7 @@ function anilistFeedQuery(cfg, params) {
         ') { media(' +
         anilistMediaArgs(spec) +
         ') { ' +
-        ANILIST_MEDIA_FIELDS +
+        ANILIST_CARD_FIELDS +
         ' } }',
     );
   }
@@ -472,6 +544,7 @@ function anilistFeed(ctx, cfg, params) {
       for (var railId in ANILIST_RAILS) {
         if (!Object.prototype.hasOwnProperty.call(ANILIST_RAILS, railId)) continue;
         var spec = ANILIST_RAILS[railId];
+        if (spec.feedFrom) continue;
         var page = data[railId] || {};
         if (spec.kind === 'airing') {
           rails[railId] = anilistAiringItemsFromSchedules(
@@ -483,8 +556,16 @@ function anilistFeed(ctx, cfg, params) {
           rails[railId] = anilistRailItemsFromList(railId, page.media || []);
         }
       }
-      // Daily-moving rails — shorter TTL than evergreen lists.
-      return hubOk('feed', { rails: rails }, { maxAge: 300, swr: 1800 });
+      for (var aliasId in ANILIST_RAILS) {
+        if (!Object.prototype.hasOwnProperty.call(ANILIST_RAILS, aliasId)) continue;
+        var aliasSpec = ANILIST_RAILS[aliasId];
+        if (!aliasSpec.feedFrom) continue;
+        var src = rails[aliasSpec.feedFrom] || [];
+        var limit = Number(aliasSpec.limit) > 0 ? Number(aliasSpec.limit) : perPage;
+        rails[aliasId] = src.slice(0, limit);
+      }
+      // Evergreen browse — prefer cache over hammering AniList (30–90 req/min).
+      return hubOk('feed', { rails: rails }, { maxAge: 900, swr: 3600 });
     });
 }
 
@@ -513,7 +594,7 @@ function anilistPage(ctx, cfg, params) {
       ' Page(page: $page, perPage: $perPage) {' +
       '  airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) {' +
       '   episode airingAt media { ' +
-      ANILIST_MEDIA_FIELDS +
+      ANILIST_CARD_FIELDS +
       ' isAdult }' +
       '  }' +
       ' }' +
@@ -533,7 +614,7 @@ function anilistPage(ctx, cfg, params) {
     'query ($page: Int, $perPage: Int, $sort: [MediaSort], $genre: String, $status: MediaStatus, $format: MediaFormat, $formatNotIn: [MediaFormat], $search: String, $season: MediaSeason, $seasonYear: Int) {' +
     ' Page(page: $page, perPage: $perPage) {' +
     '  media(type: ANIME, isAdult: false, sort: $sort, genre: $genre, status: $status, format: $format, format_not_in: $formatNotIn, search: $search, season: $season, seasonYear: $seasonYear) {' +
-    ANILIST_MEDIA_FIELDS +
+    ANILIST_CARD_FIELDS +
     '  }' +
     ' }' +
     '}';
@@ -582,12 +663,19 @@ function anilistDetails(ctx, cfg, params) {
     var videos = anilistVideosFromMedia(media);
     if (videos.length) meta.videos = videos;
     var related = anilistRelatedFromMedia(media);
+    var recommendations = anilistRecommendationsFromMedia(media);
     var payload = { meta: meta };
+    var rails = {};
     if (related.length) {
-      payload.rails = {
-        related: { title: 'Related', items: related },
+      rails.related = { title: 'Related', items: related };
+    }
+    if (recommendations.length) {
+      rails.recommendations = {
+        title: 'More Like This',
+        items: recommendations,
       };
     }
+    if (Object.keys(rails).length) payload.rails = rails;
     return hubOk('details', payload, { maxAge: 1800, swr: 3600 });
   });
 }
@@ -665,7 +753,7 @@ function extract(ctx) {
       return hubItems(
         action,
         items,
-        { maxAge: 300, swr: 1800 },
+        { maxAge: 900, swr: 3600 },
         { pageSize: perPage },
       );
     })

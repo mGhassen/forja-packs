@@ -1,7 +1,8 @@
 // TMDB enrich companion — not a data source.
 // Host runs this after a catalog plugin that declares `"enrich": "anime-enrich-tmdb"`.
 // AniList stays standalone; this pack owns match + apply only.
-// Details enrich also returns cast / trailers / recommendations for host paint.
+// Details enrich fills cast / trailers / logo / facts — not More Like This
+// (AniList owns recommendations with open.surface anime).
 
 var ENRICH_TMDB_DEFAULTS = {
   rails: ['spotlight'],
@@ -35,15 +36,10 @@ function enrichTmdbShouldRail(cfg, params) {
 }
 
 function enrichTmdbDetailsPayload(meta) {
-  var data = { meta: meta };
-  var recs = meta && Array.isArray(meta.recommendations) ? meta.recommendations : [];
-  if (recs.length) {
-    data.rails = {
-      recommendations: { title: 'More Like This', items: recs },
-    };
+  if (meta && Array.isArray(meta.recommendations)) {
     delete meta.recommendations;
   }
-  return data;
+  return { meta: meta };
 }
 
 function extract(ctx) {

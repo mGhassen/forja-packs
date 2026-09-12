@@ -481,38 +481,6 @@ function hubTmdbParseTrailers(json) {
   return out;
 }
 
-function hubTmdbParseRecommendations(json, media) {
-  var root = json && json.recommendations;
-  var list = root && Array.isArray(root.results) ? root.results : [];
-  var out = [];
-  for (var i = 0; i < list.length && out.length < 12; i++) {
-    var row = list[i] || {};
-    var id = Number(row.id);
-    if (!(id > 0)) continue;
-    var title = String(
-      media === 'movie' ? row.title || row.name || '' : row.name || row.title || '',
-    ).trim();
-    if (!title) continue;
-    var poster = hubTmdbAbsArt(row.poster_path, 'w500');
-    var backdrop = hubTmdbAbsArt(row.backdrop_path, 'w1280');
-    var overview = String(row.overview || '').trim();
-    var rating = Number(row.vote_average);
-    out.push({
-      id: 'tmdb:' + media + ':' + id,
-      type: media,
-      name: title,
-      poster: poster,
-      background: backdrop,
-      description: overview,
-      rating: rating > 0 ? rating : undefined,
-      ids: { tmdb: String(id) },
-      tmdbMediaType: media,
-      open: { surface: 'tmdb', id: String(id), mediaType: media },
-    });
-  }
-  return out;
-}
-
 function hubTmdbParseFacts(json, media) {
   if (!json) return null;
   var facts = {
@@ -635,9 +603,6 @@ function hubApplyTmdbHit(meta, hit) {
   if (Array.isArray(hit.backdrops) && hit.backdrops.length) {
     meta.backdrops = hit.backdrops;
   }
-  if (Array.isArray(hit.recommendations) && hit.recommendations.length) {
-    meta.recommendations = hit.recommendations;
-  }
   if (Array.isArray(hit.genres) && hit.genres.length && !meta.genres) {
     meta.genres = hit.genres;
   } else if (
@@ -719,13 +684,12 @@ function hubTmdbHitFromDetails(json, media, details) {
     hit.trailers = hubTmdbParseTrailers(json);
     hit.facts = hubTmdbParseFacts(json, media);
     hit.backdrops = hubTmdbParseBackdrops(json);
-    hit.recommendations = hubTmdbParseRecommendations(json, media);
   }
   return hit;
 }
 
 // Prefer pack-embedded TMDB id (same as details) before title search.
-// details=true appends credits/videos/recommendations for kit details chrome.
+// details=true appends credits/videos for kit details chrome.
 function hubTmdbById(ctx, id, preferType, details) {
   var tid = Number(id);
   if (!(tid > 0)) return Promise.resolve(null);
@@ -735,7 +699,7 @@ function hubTmdbById(ctx, id, preferType, details) {
   var key = String(cfg.apiKey || '').trim();
   if (!key) return Promise.resolve(null);
   var append = details
-    ? 'external_ids,images,credits,videos,recommendations'
+    ? 'external_ids,images,credits,videos'
     : 'external_ids,images';
 
   function fetchOne(media) {
