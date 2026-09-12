@@ -197,20 +197,10 @@ function simklCardItem(item) {
   return row;
 }
 
-function openIdInt(openRaw) {
-  if (!openRaw || typeof openRaw !== 'object') return null;
-  return asInt(openRaw.id);
-}
-
 function localMatch(allLocal, item) {
   var tmdb = asInt(item.tmdbId);
   var mt = item.mediaType != null ? String(item.mediaType) : null;
   var remoteKeys = hideKeys(item);
-  var remoteOpenIds = {};
-  [item.tmdbId].forEach(function (v) {
-    var n = asInt(v);
-    if (n != null) remoteOpenIds[n] = true;
-  });
   for (var i = 0; i < allLocal.length; i++) {
     var local = allLocal[i];
     var localKeys = hideKeys(local);
@@ -222,8 +212,8 @@ function localMatch(allLocal, item) {
       }
     }
     if (hit) return local;
-    var oid = openIdInt(local.metaOpen || local.open || local.catalogOpen);
-    if (oid != null && remoteOpenIds[oid]) return local;
+    // Match by tmdbId + mediaType only — never equate anime open.id to a
+    // movie/show tmdb id (that hid the wrong titles across status tabs).
     if (tmdb != null && asInt(local.tmdbId) === tmdb) {
       var lmt = local.mediaType != null ? String(local.mediaType) : null;
       if (lmt === 'asian_drama' || lmt === 'drama') return local;
@@ -266,7 +256,20 @@ function filterSimklByLocal(simklItems, allLocal, status, hiddenKeys) {
         out.push(local);
         continue;
       }
+      // Keep Simkl art; stamp local identity + status onto the card.
+      s.listStatus = localStatus;
+      if (local.uniqueId) s.uniqueId = local.uniqueId;
+      if (local.pluginId) s.pluginId = local.pluginId;
+      var lo = local.metaOpen || local.open || local.catalogOpen;
+      if (lo && typeof lo === 'object') {
+        s.open = lo;
+        s.metaOpen = lo;
+        s.catalogOpen = lo;
+      }
+      out.push(s);
+      continue;
     }
+    s.listStatus = status;
     out.push(s);
   }
   return out;
@@ -471,7 +474,9 @@ function myListLoadFeed(ctx, params) {
           var cards = [];
           for (var i = 0; i < raw.length; i++) {
             var card = simklCardItem(raw[i]);
-            if (card) cards.push(card);
+            if (!card) continue;
+            card.listStatus = status;
+            cards.push(card);
           }
           var filtered = filterSimklByLocal(
             cards,
