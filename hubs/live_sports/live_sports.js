@@ -85,6 +85,8 @@ function liveSportsCatalogActions() {
       label: 'Catalog',
       icon: 'filter',
       dynamicCatalogs: true,
+      // Host remaps chips when these revision tokens bump (install/remove Live addons).
+      deps: ['stremio'],
       items: [
         { id: 'all', label: 'All' },
       ],
