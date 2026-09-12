@@ -90,8 +90,10 @@ var ANILIST_AIRING_FORMATS = {
 
 // season: true → current AniList season. kind: 'airing' → AiringSchedule window.
 // feedFrom: reuse another feed Page alias (same sort/filters) — one GraphQL Page.
+// Spotlight stays global TRENDING — season+RELEASING/FINISHED collapses to ~1
+// slide (most of the season is NOT_YET_RELEASED) so the hero loops one title.
 var ANILIST_RAILS = {
-  spotlight: { sort: ['TRENDING_DESC'], season: true },
+  spotlight: { sort: ['TRENDING_DESC'] },
   trending: { sort: ['TRENDING_DESC'] },
   top_10: { sort: ['TRENDING_DESC'], limit: 10, feedFrom: 'trending' },
   this_season: { sort: ['POPULARITY_DESC'], season: true },
