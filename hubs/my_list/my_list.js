@@ -303,7 +303,9 @@ function mergeLocalHubs(simklItems, localForStatus) {
       for (var a = 0; a < localKeys.length; a++) seenHub[localKeys[a]] = true;
       continue;
     }
-    if (surface === 'drama' || local.mediaType === 'asian_drama') {
+    if (surface === 'drama' ||
+      local.mediaType === 'asian_drama' ||
+      local.mediaType === 'drama') {
       // Hub drama always wins over a Simkl/TMDB stub with the same tmdb id.
       var tmdbD = asInt(local.tmdbId);
       if (tmdbD != null) {
@@ -339,10 +341,71 @@ function myListShapeRow(row) {
   if (!out.type) out.type = kind;
   if (!out.listStatus && out.status) out.listStatus = String(out.status);
   var storedOpen = out.open || out.metaOpen || out.catalogOpen;
+  // Hub rows must keep anime/drama open — never a conflicting tmdb open
+  // (bad KissKH TMDB ids reopen Home with the wrong title).
+  if (myListIsHubRow(out)) {
+    if (
+      storedOpen &&
+      typeof storedOpen === 'object' &&
+      String(storedOpen.surface || '') === 'tmdb'
+    ) {
+      storedOpen = null;
+    }
+    if (!storedOpen || typeof storedOpen !== 'object') {
+      if (kind === 'anime' || out.mediaType === 'anime') {
+        var aid =
+          asInt(out.anilistId) ||
+          (out.ids && asInt(out.ids.anilist)) ||
+          null;
+        if (aid != null) {
+          storedOpen = {
+            surface: 'anime',
+            id: String(aid),
+            extract: {
+              resolveType: 'anime',
+              panelCategory: 'anime',
+              ctx: { anilistId: aid },
+            },
+          };
+        }
+      } else if (
+        kind === 'asian_drama' ||
+        out.mediaType === 'asian_drama' ||
+        out.mediaType === 'drama'
+      ) {
+        var kid =
+          asInt(out.kisskhId) ||
+          (out.ids && asInt(out.ids.kisskh)) ||
+          null;
+        if (kid == null && out.uniqueId) {
+          var uid = String(out.uniqueId);
+          var m = uid.match(/^catalog_(.+)_([^_]+)$/);
+          if (m) kid = asInt(m[2]);
+        }
+        if (kid != null) {
+          storedOpen = {
+            surface: 'drama',
+            id: String(kid),
+            extract: {
+              resolveType: 'drama',
+              panelCategory: 'drama',
+              ctx: { kisskhId: kid },
+            },
+          };
+        }
+      }
+    }
+    if (storedOpen && typeof storedOpen === 'object') {
+      out.open = storedOpen;
+      out.metaOpen = storedOpen;
+      out.catalogOpen = storedOpen;
+    }
+    return out;
+  }
   if (storedOpen && typeof storedOpen === 'object') {
     out.open = storedOpen;
     out.metaOpen = storedOpen;
-  } else if (!myListIsHubRow(out)) {
+  } else {
     var tmdb = asInt(out.tmdbId);
     if (tmdb != null) {
       var openMt =
