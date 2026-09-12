@@ -103,6 +103,40 @@ function myListKindFromRow(row) {
   return 'movie';
 }
 
+function myListTmdbOpen(tmdbId, mediaType) {
+  var mt = String(mediaType || 'movie') === 'tv' ? 'tv' : 'movie';
+  var id = asInt(tmdbId);
+  if (id == null) return null;
+  return {
+    surface: 'tmdb',
+    id: String(id),
+    extract: {
+      resolveType: mt,
+      panelCategory: mt,
+      ctx: { tmdbId: id },
+    },
+  };
+}
+
+function myListIsHubRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  var hubMt = String(row.mediaType || '');
+  if (
+    hubMt === 'anime' ||
+    hubMt === 'drama' ||
+    hubMt === 'asian_drama'
+  ) {
+    return true;
+  }
+  if (row.anilistId != null || row.kisskhId != null) return true;
+  var open = row.metaOpen || row.open || row.catalogOpen;
+  if (open && typeof open === 'object') {
+    var surface = String(open.surface || '');
+    if (surface === 'anime' || surface === 'drama') return true;
+  }
+  return false;
+}
+
 function simklCardItem(item) {
   if (!item || typeof item !== 'object') return null;
   var media = item.show || item.movie || item.anime || item;
@@ -119,18 +153,33 @@ function simklCardItem(item) {
       ? poster
       : 'https://simkl.in/posters/' + poster + '_c.jpg';
   var year = media.year != null ? String(media.year) : '';
-  return {
+  var mediaType =
+    kind === 'anime' ? 'anime' : kind === 'movies' ? 'movie' : 'tv';
+  var tmdbId = asInt(ids.tmdb);
+  var row = {
     title: title,
     posterPath: posterUrl,
     source: 'simkl',
-    mediaType:
-      kind === 'anime' ? 'anime' : kind === 'movies' ? 'movie' : 'tv',
+    mediaType: mediaType,
     _simklType: kind,
-    tmdbId: asInt(ids.tmdb),
+    tmdbId: tmdbId,
     imdbId: ids.imdb != null ? String(ids.imdb) : undefined,
     voteAverage: 0,
     releaseDate: year,
   };
+  // Film/series Simkl stubs hand off to TMDB details via open — not My List.
+  if (mediaType !== 'anime' && tmdbId != null) {
+    var open = myListTmdbOpen(
+      tmdbId,
+      mediaType === 'tv' || kind === 'shows' ? 'tv' : 'movie',
+    );
+    if (open) {
+      row.open = open;
+      row.metaOpen = open;
+      row.catalogOpen = open;
+    }
+  }
+  return row;
 }
 
 function openIdInt(openRaw) {
@@ -250,6 +299,23 @@ function myListShapeRow(row) {
   if (storedOpen && typeof storedOpen === 'object') {
     out.open = storedOpen;
     out.metaOpen = storedOpen;
+  } else if (!myListIsHubRow(out)) {
+    var tmdb = asInt(out.tmdbId);
+    if (tmdb != null) {
+      var openMt =
+        kind === 'tv' ||
+        out._simklType === 'shows' ||
+        String(out.mediaType || '') === 'tv' ||
+        String(out.mediaType || '') === 'series'
+          ? 'tv'
+          : 'movie';
+      var open = myListTmdbOpen(tmdb, openMt);
+      if (open) {
+        out.open = open;
+        out.metaOpen = open;
+        out.catalogOpen = open;
+      }
+    }
   }
   return out;
 }
