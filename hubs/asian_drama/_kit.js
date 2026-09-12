@@ -340,6 +340,198 @@ function hubTmdbPickTitleLogo(images) {
   return chosen ? hubTmdbAbsArt(chosen.file_path, 'w500') : '';
 }
 
+function hubTmdbParseCast(json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.cast) ? credits.cast : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 20; i++) {
+    var e = list[i] || {};
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      character: String(e.character || '').trim(),
+      profilePath: hubTmdbAbsArt(e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function hubTmdbParseCrew(json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.crew) ? credits.crew : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 8; i++) {
+    var e = list[i] || {};
+    var job = String(e.job || '').toLowerCase();
+    if (
+      job.indexOf('director') < 0 &&
+      job.indexOf('writer') < 0 &&
+      job.indexOf('creator') < 0
+    ) {
+      continue;
+    }
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      job: String(e.job || '').trim(),
+      profilePath: hubTmdbAbsArt(e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function hubTmdbParseTrailers(json) {
+  var videos = json && json.videos;
+  var list = videos && Array.isArray(videos.results) ? videos.results : [];
+  var allow = {
+    Trailer: 0,
+    Teaser: 1,
+    Featurette: 2,
+    Clip: 3,
+    'Behind the Scenes': 4,
+  };
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var v = list[i] || {};
+    if (String(v.site || '') !== 'YouTube') continue;
+    var type = String(v.type || '');
+    if (!(type in allow)) continue;
+    var key = String(v.key || '').trim();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    out.push({
+      key: key,
+      name: String(v.name || type).trim() || type,
+      type: type,
+      official: v.official === true,
+      site: 'YouTube',
+    });
+  }
+  out.sort(function (a, b) {
+    if (a.official !== b.official) return a.official ? -1 : 1;
+    var ta = allow[a.type] != null ? allow[a.type] : 99;
+    var tb = allow[b.type] != null ? allow[b.type] : 99;
+    if (ta !== tb) return ta - tb;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return out;
+}
+
+function hubTmdbParseRecommendations(json, media) {
+  var root = json && json.recommendations;
+  var list = root && Array.isArray(root.results) ? root.results : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 12; i++) {
+    var row = list[i] || {};
+    var id = Number(row.id);
+    if (!(id > 0)) continue;
+    var title = String(
+      media === 'movie' ? row.title || row.name || '' : row.name || row.title || '',
+    ).trim();
+    if (!title) continue;
+    var poster = hubTmdbAbsArt(row.poster_path, 'w500');
+    var backdrop = hubTmdbAbsArt(row.backdrop_path, 'w1280');
+    var overview = String(row.overview || '').trim();
+    var rating = Number(row.vote_average);
+    out.push({
+      id: 'tmdb:' + media + ':' + id,
+      type: media,
+      name: title,
+      poster: poster,
+      background: backdrop,
+      description: overview,
+      rating: rating > 0 ? rating : undefined,
+      ids: { tmdb: String(id) },
+      tmdbMediaType: media,
+      open: { surface: 'tmdb', id: String(id), mediaType: media },
+    });
+  }
+  return out;
+}
+
+function hubTmdbParseFacts(json, media) {
+  if (!json) return null;
+  var facts = {
+    mediaType: media,
+    status: String(json.status || '').trim(),
+    originalLanguage: String(json.original_language || '').trim(),
+  };
+  var companies = Array.isArray(json.production_companies)
+    ? json.production_companies
+    : [];
+  var prod = [];
+  for (var i = 0; i < companies.length; i++) {
+    var n = String((companies[i] && companies[i].name) || '').trim();
+    if (n) prod.push(n);
+  }
+  if (prod.length) facts.productionCompanies = prod;
+
+  var langs = Array.isArray(json.spoken_languages) ? json.spoken_languages : [];
+  var spoken = [];
+  for (var li = 0; li < langs.length; li++) {
+    var L = langs[li] || {};
+    var ln = String(L.english_name || L.name || '').trim();
+    if (ln) spoken.push(ln);
+  }
+  if (spoken.length) facts.spokenLanguages = spoken;
+
+  if (media === 'movie') {
+    var runtime = Number(json.runtime);
+    if (runtime > 0) facts.runtimeMinutes = runtime;
+    var release = String(json.release_date || '').trim();
+    if (release) facts.releaseDate = release.substring(0, 10);
+    var budget = Number(json.budget);
+    if (budget > 0) facts.budget = budget;
+    var revenue = Number(json.revenue);
+    if (revenue > 0) facts.revenue = revenue;
+  } else {
+    var epRuntime = Array.isArray(json.episode_run_time)
+      ? json.episode_run_time
+      : [];
+    if (epRuntime.length && Number(epRuntime[0]) > 0) {
+      facts.runtimeMinutes = Number(epRuntime[0]);
+    }
+    var first = String(json.first_air_date || '').trim();
+    if (first) facts.releaseDate = first.substring(0, 10);
+    var last = String(json.last_air_date || '').trim();
+    if (last) facts.lastAirDate = last.substring(0, 10);
+    var seasons = Number(json.number_of_seasons);
+    if (seasons > 0) facts.seasonCount = seasons;
+    var episodes = Number(json.number_of_episodes);
+    if (episodes > 0) facts.episodeCount = episodes;
+    var networks = Array.isArray(json.networks) ? json.networks : [];
+    var nets = [];
+    for (var ni = 0; ni < networks.length; ni++) {
+      var nn = String((networks[ni] && networks[ni].name) || '').trim();
+      if (nn) nets.push(nn);
+    }
+    if (nets.length) facts.networks = nets;
+    var creators = Array.isArray(json.created_by) ? json.created_by : [];
+    var created = [];
+    for (var ci = 0; ci < creators.length; ci++) {
+      var cn = String((creators[ci] && creators[ci].name) || '').trim();
+      if (cn) created.push(cn);
+    }
+    if (created.length) facts.creators = created;
+  }
+  return facts;
+}
+
+function hubTmdbParseBackdrops(json) {
+  var images = json && json.images;
+  var list = images && Array.isArray(images.backdrops) ? images.backdrops : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 12; i++) {
+    var path = list[i] && list[i].file_path;
+    var url = hubTmdbAbsArt(path, 'w1280');
+    if (url) out.push(url);
+  }
+  return out;
+}
+
 function hubApplyTmdbHit(meta, hit) {
   if (!meta || !hit || !hit.id) return meta;
   meta.ids = Object.assign({}, meta.ids || {}, { tmdb: String(hit.id) });
@@ -373,6 +565,28 @@ function hubApplyTmdbHit(meta, hit) {
   ) {
     meta.status = 'NOT_YET_RELEASED';
   }
+  if (Array.isArray(hit.cast) && hit.cast.length) meta.cast = hit.cast;
+  if (Array.isArray(hit.crew) && hit.crew.length) meta.crew = hit.crew;
+  if (Array.isArray(hit.trailers) && hit.trailers.length) {
+    meta.trailers = hit.trailers;
+  }
+  if (hit.facts && typeof hit.facts === 'object') meta.facts = hit.facts;
+  if (Array.isArray(hit.backdrops) && hit.backdrops.length) {
+    meta.backdrops = hit.backdrops;
+  }
+  if (Array.isArray(hit.recommendations) && hit.recommendations.length) {
+    meta.recommendations = hit.recommendations;
+  }
+  if (Array.isArray(hit.genres) && hit.genres.length && !meta.genres) {
+    meta.genres = hit.genres;
+  } else if (
+    Array.isArray(hit.genres) &&
+    hit.genres.length &&
+    Array.isArray(meta.genres) &&
+    !meta.genres.length
+  ) {
+    meta.genres = hit.genres;
+  }
   meta._hubTmdbEnriched = true;
   return meta;
 }
@@ -396,7 +610,7 @@ function hubEnrichMetaTmdbId(meta) {
   return n > 0 ? n : 0;
 }
 
-function hubTmdbHitFromDetails(json, media) {
+function hubTmdbHitFromDetails(json, media, details) {
   if (!json || !json.id) return null;
   var poster = hubTmdbAbsArt(json.poster_path, 'w500');
   var backdrop = hubTmdbAbsArt(json.backdrop_path, 'w1280');
@@ -409,7 +623,16 @@ function hubTmdbHitFromDetails(json, media) {
   var date = String(
     media === 'movie' ? json.release_date || '' : json.first_air_date || '',
   );
-  return {
+  var ext = json.external_ids || {};
+  var imdb = String(ext.imdb_id || '').trim();
+  var genres = [];
+  if (Array.isArray(json.genres)) {
+    for (var gi = 0; gi < json.genres.length; gi++) {
+      var gn = String((json.genres[gi] && json.genres[gi].name) || '').trim();
+      if (gn) genres.push(gn);
+    }
+  }
+  var hit = {
     id: Number(json.id),
     mediaType: media,
     name: name,
@@ -420,16 +643,23 @@ function hubTmdbHitFromDetails(json, media) {
     logo: logo || null,
     overview: overview || null,
     rating: rating > 0 ? rating : null,
-    imdb: (function () {
-      var ext = json.external_ids || {};
-      var id = String(ext.imdb_id || '').trim();
-      return id || null;
-    })(),
+    imdb: imdb || null,
+    genres: genres,
   };
+  if (details) {
+    hit.cast = hubTmdbParseCast(json);
+    hit.crew = hubTmdbParseCrew(json);
+    hit.trailers = hubTmdbParseTrailers(json);
+    hit.facts = hubTmdbParseFacts(json, media);
+    hit.backdrops = hubTmdbParseBackdrops(json);
+    hit.recommendations = hubTmdbParseRecommendations(json, media);
+  }
+  return hit;
 }
 
-// Prefer KissKH/AniList embedded TMDB id (same as details) before title search.
-function hubTmdbById(ctx, id, preferType) {
+// Prefer pack-embedded TMDB id (same as details) before title search.
+// details=true appends credits/videos/recommendations for kit details chrome.
+function hubTmdbById(ctx, id, preferType, details) {
   var tid = Number(id);
   if (!(tid > 0)) return Promise.resolve(null);
   var primary = preferType === 'movie' ? 'movie' : 'tv';
@@ -437,6 +667,9 @@ function hubTmdbById(ctx, id, preferType) {
   var cfg = hubConfig(ctx, {});
   var key = String(cfg.apiKey || '').trim();
   if (!key) return Promise.resolve(null);
+  var append = details
+    ? 'external_ids,images,credits,videos,recommendations'
+    : 'external_ids,images';
 
   function fetchOne(media) {
     var url =
@@ -446,7 +679,9 @@ function hubTmdbById(ctx, id, preferType) {
       tid +
       '?api_key=' +
       encodeURIComponent(key) +
-      '&append_to_response=external_ids,images';
+      '&append_to_response=' +
+      append +
+      (details ? '&include_image_language=en,null' : '');
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -454,7 +689,7 @@ function hubTmdbById(ctx, id, preferType) {
         return res.json();
       })
       .then(function (json) {
-        return hubTmdbHitFromDetails(json, media);
+        return hubTmdbHitFromDetails(json, media, !!details);
       })
       .catch(function () {
         return null;
@@ -641,8 +876,9 @@ function hubTmdbAttachImdb(ctx, meta, hit) {
   });
 }
 
-function hubEnrichTmdb(ctx, items, limit) {
+function hubEnrichTmdb(ctx, items, limit, opts) {
   if (!Array.isArray(items) || !items.length) return Promise.resolve(items || []);
+  var details = !!(opts && opts.details);
   var n = Number(limit) > 0 ? Number(limit) : items.length;
   var head = items.slice(0, n);
   var tail = items.slice(n);
@@ -653,7 +889,7 @@ function hubEnrichTmdb(ctx, items, limit) {
       var year = Number(yearBit) || 0;
       var existingId = hubEnrichMetaTmdbId(meta);
       var start = existingId
-        ? hubTmdbById(ctx, existingId, prefer)
+        ? hubTmdbById(ctx, existingId, prefer, details)
         : Promise.resolve(null);
       return start.then(function (hit) {
         function finish(applied, matchedHit) {
@@ -668,16 +904,19 @@ function hubEnrichTmdb(ctx, items, limit) {
         }
         if (hit) return finish(hubApplyTmdbHit(meta, hit), hit);
         return hubTmdbMatch(ctx, {
-          title: meta.name,
+          title: hubTmdbSearchTitle(meta),
           year: year,
           type: prefer,
         }).then(function (matched) {
           if (!matched || !matched.id) return finish(meta, null);
-          return hubTmdbById(ctx, matched.id, matched.mediaType || prefer).then(
-            function (full) {
-              return finish(hubApplyTmdbHit(meta, full || matched), full || matched);
-            },
-          );
+          return hubTmdbById(
+            ctx,
+            matched.id,
+            matched.mediaType || prefer,
+            details,
+          ).then(function (full) {
+            return finish(hubApplyTmdbHit(meta, full || matched), full || matched);
+          });
         });
       });
     }),
@@ -685,4 +924,3 @@ function hubEnrichTmdb(ctx, items, limit) {
     return enriched.concat(tail);
   });
 }
-

@@ -1,6 +1,7 @@
 // TMDB enrich companion — not a data source.
 // Host runs this after a catalog plugin that declares `"enrich": "anime-enrich-tmdb"`.
 // AniList stays standalone; this pack owns match + apply only.
+// Details enrich also returns cast / trailers / recommendations for host paint.
 
 var ENRICH_TMDB_DEFAULTS = {
   rails: ['spotlight'],
@@ -33,6 +34,18 @@ function enrichTmdbShouldRail(cfg, params) {
   return false;
 }
 
+function enrichTmdbDetailsPayload(meta) {
+  var data = { meta: meta };
+  var recs = meta && Array.isArray(meta.recommendations) ? meta.recommendations : [];
+  if (recs.length) {
+    data.rails = {
+      recommendations: { title: 'More Like This', items: recs },
+    };
+    delete meta.recommendations;
+  }
+  return data;
+}
+
 function extract(ctx) {
   var action = hubAction(ctx);
   if (action !== 'enrich') {
@@ -47,11 +60,11 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (params.meta && typeof params.meta === 'object') {
-    return hubEnrichTmdb(ctx, [params.meta], 1)
+    return hubEnrichTmdb(ctx, [params.meta], 1, { details: true })
       .then(function (items) {
         return hubOk(
           'enrich',
-          { meta: items[0] || params.meta },
+          enrichTmdbDetailsPayload(items[0] || params.meta),
           { maxAge: 900, swr: 3600 },
         );
       })
@@ -65,7 +78,7 @@ function extract(ctx) {
     return hubOk('enrich', { items: items });
   }
 
-  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg))
+  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg), { details: false })
     .then(function (out) {
       return hubOk('enrich', { items: out }, { maxAge: 600, swr: 3600 });
     })
