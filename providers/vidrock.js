@@ -31,24 +31,20 @@ function extract(ctx) {
     return m ? m[1] + 'p' : '';
   }
 
-  function needsHeaders(name, url) {
-    if (name === 'Astra') return true;
-    return /cdn\.vidrock\.store|proxy\.vidrock\.store|hls1\.vdrk\.site|cdn\.niggaflix\.xyz|1shows\.app|streamrk\.site/i.test(
-      url || '',
-    );
-  }
-
   function isAstraPlaylist(url) {
     return /cdn\.vidrock\.store\/playlist\//i.test(url || '') ||
       /streamrk\.site\/playlist\//i.test(url || '');
   }
 
   function row(url, name, language) {
-    var hdrs = needsHeaders(name, url) ? playHeaders : undefined;
+    // CDNs (ngcorp / workers / digitalmonarch / …) 403 without vidrock.ru Referer.
     var label = 'VidRock ' + name + (language ? ' [' + language + ']' : '');
-    var out = { url: url, name: label, quality: qualityOf(url) };
-    if (hdrs) out.headers = hdrs;
-    return out;
+    return {
+      url: url,
+      name: label,
+      quality: qualityOf(url),
+      headers: playHeaders,
+    };
   }
 
   function decryptUrl(enc) {
