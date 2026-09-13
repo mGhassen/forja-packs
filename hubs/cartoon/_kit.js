@@ -49,10 +49,7 @@ function hubConfig(ctx, defaults) {
 }
 
 
-// === BEGIN hubs/_shared/details_paint.js ===
-// Shared hub details paint — upcoming / premiereLabel.
-// Source of truth. Sync into each hub `_kit.js` via sync_details_paint.sh.
-// Pack owns these fields; host only reads them.
+// Pack owns upcoming / premiereLabel — host only reads these fields.
 
 function hubParseIsoDate(raw) {
   var s = String(raw || '').trim();
@@ -156,7 +153,6 @@ function hubStampDetailsPaint(meta) {
   }
   return meta;
 }
-// === END hubs/_shared/details_paint.js ===
 
 function hubOk(action, data, cache) {
   var payload = data || {};
