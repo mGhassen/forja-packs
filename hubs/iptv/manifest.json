@@ -2,9 +2,9 @@
   "schema": 1,
   "id": "forjahq-iptv",
   "name": "ForjaHQ IPTV",
-  "description": "IPTV portals and live channels.",
+  "description": "IPTV portals, live channels, and portal movie/series details.",
   "author": "ForjaHQ",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "tags": [
     "iptv",
     "live"
@@ -68,10 +68,52 @@
         ]
       },
       "prelude": "_kit.js"
+    },
+    {
+      "id": "iptv-vod",
+      "name": "IPTV VOD Details",
+      "description": "Portal movie and series details",
+      "entry": "iptv_vod.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "iptv"
+      ],
+      "capabilities": [
+        "details"
+      ],
+      "enrich": "iptv-enrich-tmdb",
+      "config": {},
+      "prelude": "_kit.js"
+    },
+    {
+      "id": "iptv-enrich-tmdb",
+      "name": "IPTV TMDB Enrich",
+      "description": "Optional TMDB match enrich for IPTV VOD metas",
+      "entry": "enrich_tmdb.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "iptv"
+      ],
+      "capabilities": [
+        "enrich"
+      ],
+      "config": {
+        "rails": [
+          "recommendations"
+        ],
+        "limit": 20
+      },
+      "prelude": "_kit.js"
     }
   ],
   "bundle": [
     "iptv.js",
+    "iptv_vod.js",
+    "enrich_tmdb.js",
     "_kit.js",
     "icons/nav.png"
   ]

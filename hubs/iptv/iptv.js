@@ -459,7 +459,7 @@ async function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
   if (action === 'layout') {
-    return hubOk('layout', { layout: iptvLayout() });
+    return hubOk('layout', iptvLayout());
   }
   if (action === 'feed') {
     return await iptvFeed(ctx);
