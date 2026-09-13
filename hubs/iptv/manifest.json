@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "forjahq-iptv",
+  "name": "ForjaHQ IPTV",
+  "description": "IPTV portals and live channels.",
+  "author": "ForjaHQ",
+  "version": "1.1.0",
+  "tags": [
+    "iptv",
+    "live"
+  ],
+  "plugins": [
+    {
+      "id": "iptv-hub",
+      "name": "IPTV",
+      "description": "IPTV portals and live channels",
+      "entry": "iptv.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "iptv"
+      ],
+      "capabilities": [
+        "nav",
+        "layout",
+        "feed",
+        "searchChannels",
+        "settings"
+      ],
+      "nav": {
+        "tabId": "iptv",
+        "label": "IPTV",
+        "icon": "icons/nav.png",
+        "accent": "#22D3EE"
+      },
+      "settings": {
+        "addon": "iptv",
+        "group": "Portal",
+        "order": 10,
+        "fields": [
+          {
+            "id": "portalUrl",
+            "type": "text",
+            "label": "Portal URL",
+            "subtitle": "Xtream Codes base URL (https://…)",
+            "default": ""
+          },
+          {
+            "id": "portalUsername",
+            "type": "text",
+            "label": "Username",
+            "default": ""
+          },
+          {
+            "id": "portalPassword",
+            "type": "password",
+            "label": "Password",
+            "default": ""
+          },
+          {
+            "id": "portalLabel",
+            "type": "text",
+            "label": "Label",
+            "subtitle": "Optional display name",
+            "default": ""
+          }
+        ]
+      },
+      "prelude": "_kit.js"
+    }
+  ],
+  "bundle": [
+    "iptv.js",
+    "_kit.js",
+    "icons/nav.png"
+  ]
+}

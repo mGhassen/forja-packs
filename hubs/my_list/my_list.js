@@ -431,17 +431,17 @@ function myListShapeRow(row) {
 
 function myListLoadFeed(ctx, params) {
   var host = ctx && ctx.host;
-  var bookmarks = host && host.bookmarks;
+  var store = (host && host.store) || (host && host.bookmarks);
   var simkl = host && host.simkl;
-  if (!bookmarks || typeof bookmarks.list !== 'function') {
-    return Promise.reject(new Error('HOST_LISTS_REQUIRED'));
+  if (!store || typeof store.list !== 'function') {
+    return Promise.reject(new Error('HOST_STORE_REQUIRED'));
   }
   var status =
     (params && (params.status || params.listStatus)) || 'plantowatch';
   status = String(status);
   var hiddenKeys = (params && params.hiddenKeys) || [];
 
-  return Promise.resolve(bookmarks.list({})).then(function (allLocal) {
+  return Promise.resolve(store.list({})).then(function (allLocal) {
     if (!Array.isArray(allLocal)) allLocal = [];
     var localForStatus = [];
     for (var i = 0; i < allLocal.length; i++) {

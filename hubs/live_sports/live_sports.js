@@ -1,6 +1,6 @@
 // Live Sports hub — schedule browse; list/cards + panel/details via host prefs.
-// Schedule rows: MetaRuntime `feed` composes via ctx.host.liveFeed.load.
-// Live TV: MetaRuntime `liveTv` → ctx.host.iptv.searchChannels (RFC-096 A09).
+// Schedule rows: MetaRuntime `feed` → pack aggregate via ctx.host.plugin.* (RFC-109).
+// Live TV: MetaRuntime `liveTv` → IPTV hub `searchChannels` via plugin.run (RFC-109 C).
 
 function liveSportsKindIcons() {
   return {
@@ -189,7 +189,13 @@ function liveSportsShapeRow(row) {
   if (!out.name && out.title) out.name = out.title;
   if (!out.type) out.type = 'live_match';
   if (!out.open && out.id) {
-    out.open = { surface: 'live', id: String(out.id) };
+    out.open = {
+      surface: 'live',
+      id: String(out.id),
+      tabId: 'live_sports',
+    };
+  } else if (out.open && typeof out.open === 'object' && !out.open.tabId) {
+    out.open.tabId = 'live_sports';
   }
   if (!out.sportMatchGame || typeof out.sportMatchGame !== 'object') {
     var title = String(out.title || out.name || '');
@@ -210,21 +216,65 @@ function liveSportsShapeRow(row) {
   return out;
 }
 
+function liveSportsParseHorizonPref(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return { status: 'airing', horizon: 'h1' };
+  var parts = s.split('|');
+  if (parts.length === 2) {
+    var status = String(parts[0] || '').trim().toLowerCase();
+    var horizonTok = String(parts[1] || '').trim().toLowerCase();
+    var horizon =
+      horizonTok === '1h' || horizonTok === 'h1'
+        ? 'h1'
+        : horizonTok === '3h' || horizonTok === 'h3'
+          ? 'h3'
+          : horizonTok === '6h' || horizonTok === 'h6'
+            ? 'h6'
+            : 'h24';
+    if (status === 'live') status = 'airing';
+    if (status !== 'airing' && status !== 'upcoming' && status !== 'both') {
+      status = 'airing';
+    }
+    return { status: status, horizon: horizon };
+  }
+  var low = s.toLowerCase();
+  if (low === 'live' || low === 'airing') return { status: 'airing', horizon: 'h1' };
+  if (low === 'upcoming') return { status: 'upcoming', horizon: 'h24' };
+  if (low === '1h') return { status: 'both', horizon: 'h1' };
+  if (low === '3h') return { status: 'both', horizon: 'h3' };
+  if (low === '6h') return { status: 'both', horizon: 'h6' };
+  if (
+    low === '12h' ||
+    low === '24h' ||
+    low === 'all' ||
+    low === 'day' ||
+    low === 'both'
+  ) {
+    return { status: 'both', horizon: 'h24' };
+  }
+  return { status: 'airing', horizon: 'h1' };
+}
+
 function liveSportsLoadFeed(ctx, params) {
   var host = ctx && ctx.host;
-  var liveFeed = host && host.liveFeed;
-  // Missing bridge → reject (empty ok envelope would skip host flutter_js fallback).
-  if (!liveFeed || typeof liveFeed.load !== 'function') {
-    return Promise.reject(new Error('HOST_LIVE_FEED_REQUIRED'));
+  if (!host || !host.plugin || typeof host.plugin.run !== 'function') {
+    return Promise.reject(new Error('HOST_PLUGIN_RUN_REQUIRED'));
   }
-  return Promise.resolve(
-    liveFeed.load({
-      catalogFilter: (params && params.catalogFilter) || 'all',
-      sportFilter: (params && params.sportFilter) || 'all',
-      scheduleStatus: (params && params.scheduleStatus) || 'airing',
-      scheduleHorizon: (params && params.scheduleHorizon) || 'h1',
-    }),
-  ).then(function (rows) {
+  var p = params || {};
+  var status = String(p.scheduleStatus || '').trim();
+  var horizon = String(p.scheduleHorizon || '').trim();
+  if (!status || !horizon) {
+    var parsed = liveSportsParseHorizonPref(p.horizon || p.schedule || '');
+    if (!status) status = parsed.status;
+    if (!horizon) horizon = parsed.horizon;
+  }
+  return liveSportsAggregateFeed(ctx, {
+    catalogFilter: p.catalogFilter || 'all',
+    sportFilter: p.sportFilter || 'all',
+    scheduleStatus: status || 'airing',
+    scheduleHorizon: horizon || 'h1',
+    force: !!(p.force || p.forceRefresh),
+  }).then(function (rows) {
     if (!Array.isArray(rows)) return [];
     var out = [];
     for (var i = 0; i < rows.length; i++) {
@@ -255,7 +305,7 @@ function liveSportsGameFromRow(row) {
   return game;
 }
 
-/// Live TV tab — pack owns Forja Sports gate + searchChannels trigger.
+/// Live TV tab — pack calls IPTV hub `searchChannels` via plugin.run (RFC-109 C).
 function liveSportsLiveTv(ctx, params) {
   var cfg = hubConfig(ctx, {});
   if (cfg.forjaSportsEnabled === false) {
@@ -264,20 +314,61 @@ function liveSportsLiveTv(ctx, params) {
   var row = (params && params.row) || {};
   var game = liveSportsGameFromRow(row);
   var host = ctx && ctx.host;
-  var iptv = host && host.iptv;
-  if (!iptv || typeof iptv.searchChannels !== 'function') {
-    return Promise.reject(new Error('HOST_IPTV_SEARCH_REQUIRED'));
+  if (!host || !host.plugin || typeof host.plugin.run !== 'function') {
+    return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
   }
   var force = !!(params && params.force);
   return Promise.resolve(
-    iptv.searchChannels({ game: game, force: force }),
-  ).then(function (sources) {
-    return hubOk(
-      'liveTv',
-      { sources: Array.isArray(sources) ? sources : [] },
-      { maxAge: 60, swr: 120 },
-    );
-  });
+    host.plugin.list({ type: 'iptv' }),
+  )
+    .then(function (plugins) {
+      var list = Array.isArray(plugins) ? plugins : [];
+      var iptvId = '';
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        var id = String((p && (p.pluginId || p.id)) || '');
+        var types = (p && p.types) || [];
+        if (
+          id &&
+          (types.indexOf('iptv') >= 0 ||
+            id.indexOf('iptv') >= 0 ||
+            String((p && p.kind) || '') === 'catalog')
+        ) {
+          if (types.indexOf('iptv') >= 0 || id.indexOf('iptv') >= 0) {
+            iptvId = id;
+            break;
+          }
+        }
+      }
+      if (!iptvId) {
+        for (var j = 0; j < list.length; j++) {
+          var q = list[j];
+          var qid = String((q && (q.pluginId || q.id)) || '');
+          if (qid.indexOf('iptv') >= 0) {
+            iptvId = qid;
+            break;
+          }
+        }
+      }
+      if (!iptvId) {
+        return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
+      }
+      return Promise.resolve(
+        host.plugin.run(iptvId, 'searchChannels', {
+          game: game,
+          force: force,
+        }),
+      ).then(function (rows) {
+        return hubOk(
+          'liveTv',
+          { sources: Array.isArray(rows) ? rows : [] },
+          { maxAge: 60, swr: 120 },
+        );
+      });
+    })
+    .catch(function () {
+      return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
+    });
 }
 
 function extract(ctx) {
