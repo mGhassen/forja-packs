@@ -183,10 +183,38 @@ function liveSportsLayout() {
   };
 }
 
+function liveSportsAbsUrl(raw) {
+  var p = String(raw || '').trim();
+  if (p.indexOf('http://') === 0 || p.indexOf('https://') === 0) return p;
+  return '';
+}
+
+function liveSportsClockHm(dateMs) {
+  var n = Number(dateMs) || 0;
+  if (n <= 0) return '';
+  var d = new Date(n);
+  if (isNaN(d.getTime())) return '';
+  var h = d.getHours();
+  var m = d.getMinutes();
+  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+}
+
+function liveSportsNum(v) {
+  if (typeof v === 'number' && isFinite(v)) return v;
+  var s = String(v == null ? '' : v)
+    .trim()
+    .replace(/,/g, '');
+  if (!s) return 0;
+  var n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
+/** Flat paint contract for host EventCard / dense tiles — no Dart product merge. */
 function liveSportsShapeRow(row) {
   if (!row || typeof row !== 'object') return null;
   var out = Object.assign({}, row);
   if (!out.name && out.title) out.name = out.title;
+  if (!out.title && out.name) out.title = out.name;
   if (!out.type) out.type = 'live_match';
   if (!out.open && out.id) {
     out.open = {
@@ -197,12 +225,69 @@ function liveSportsShapeRow(row) {
   } else if (out.open && typeof out.open === 'object' && !out.open.tabId) {
     out.open.tabId = 'live_sports';
   }
-  if (!out.sportMatchGame || typeof out.sportMatchGame !== 'object') {
-    var title = String(out.title || out.name || '');
-    var home = String(out.homeTeam || '');
-    var away = String(out.awayTeam || '');
-    var category = String(out.category || out.sport || '');
-    var dateMs = Number(out.dateMs) || 0;
+
+  var game =
+    out.sportMatchGame && typeof out.sportMatchGame === 'object'
+      ? out.sportMatchGame
+      : null;
+  var title = String(out.title || out.name || (game && game.title) || '').trim();
+  var home = String(out.homeTeam || (game && game.homeTeam) || '').trim();
+  var away = String(out.awayTeam || (game && game.awayTeam) || '').trim();
+  var homeBadge = liveSportsAbsUrl(
+    out.homeBadge || (game && game.homeBadge) || '',
+  );
+  var awayBadge = liveSportsAbsUrl(
+    out.awayBadge || (game && game.awayBadge) || '',
+  );
+  var category = String(
+    out.category || out.sport || out.badge || (game && (game.category || game.sport)) || '',
+  ).trim();
+  var dateMs =
+    liveSportsNum(out.dateMs) ||
+    liveSportsNum(out.startsAt) ||
+    liveSportsNum(out.date) ||
+    (game ? liveSportsNum(game.dateMs) : 0) ||
+    0;
+  var catLower = category.toLowerCase();
+  var alwaysLive =
+    out.alwaysLive === true ||
+    out.always_live === true ||
+    catLower.indexOf('24/7') >= 0 ||
+    catLower.indexOf('24-7') >= 0;
+  var airing = out.airing === true || out.live === true || alwaysLive;
+  var viewers = liveSportsNum(out.viewers);
+  var poster = liveSportsAbsUrl(out.poster || out.posterPath || '');
+  var live = airing || alwaysLive;
+  var clock = liveSportsClockHm(dateMs);
+  var timeLabel = live ? 'live' : dateMs > Date.now() ? clock : '';
+  var scheduleLabel = alwaysLive || dateMs <= 0 ? '' : clock;
+
+  out.title = title;
+  out.name = title || out.name;
+  out.homeTeam = home;
+  out.awayTeam = away;
+  out.homeBadge = homeBadge;
+  out.awayBadge = awayBadge;
+  out.category = category;
+  out.badge = category;
+  out.dateMs = dateMs;
+  out.startsAt = dateMs > 0 ? String(dateMs) : out.startsAt || '';
+  out.airing = airing;
+  out.alwaysLive = alwaysLive;
+  out.viewers = viewers;
+  out.poster = poster;
+  if (poster) out.posterPath = poster;
+  out.timeLabel = timeLabel;
+  out.scheduleLabel = scheduleLabel;
+  out.searchText = [title, home, away, category, out.sport, out.league, out.kind]
+    .map(function (x) {
+      return String(x || '').trim();
+    })
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (!game) {
     out.sportMatchGame = {
       id: String(out.id || ''),
       title: title,
@@ -268,6 +353,14 @@ function liveSportsLoadFeed(ctx, params) {
     if (!status) status = parsed.status;
     if (!horizon) horizon = parsed.horizon;
   }
+  var q = String(p.q || p.query || '')
+    .trim()
+    .toLowerCase();
+  var qTokens = q
+    ? q.split(/\s+/).filter(function (t) {
+        return !!t;
+      })
+    : [];
   return liveSportsAggregateFeed(ctx, {
     catalogFilter: p.catalogFilter || 'all',
     sportFilter: p.sportFilter || 'all',
@@ -279,7 +372,19 @@ function liveSportsLoadFeed(ctx, params) {
     var out = [];
     for (var i = 0; i < rows.length; i++) {
       var shaped = liveSportsShapeRow(rows[i]);
-      if (shaped) out.push(shaped);
+      if (!shaped) continue;
+      if (qTokens.length) {
+        var hay = String(shaped.searchText || shaped.name || '').toLowerCase();
+        var ok = true;
+        for (var t = 0; t < qTokens.length; t++) {
+          if (hay.indexOf(qTokens[t]) < 0) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) continue;
+      }
+      out.push(shaped);
     }
     return out;
   });
