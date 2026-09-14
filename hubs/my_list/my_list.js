@@ -33,10 +33,14 @@ function myListLayout() {
                 focusUp: 'kind',
                 focusDown: 'grid',
               }),
-              kitList('grid', {
-                kindMenu: 'kind',
-                statusTab: 'status',
-              }),
+              hubWithLoad(
+                kitList('grid', {
+                  kindMenu: 'kind',
+                  statusTab: 'status',
+                }),
+                'feed',
+                {},
+              ),
             ],
           ),
         ],
