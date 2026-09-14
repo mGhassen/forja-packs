@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "tags": [
     "iptv",
     "live"
@@ -13,7 +13,7 @@
     {
       "id": "iptv-hub",
       "name": "IPTV",
-      "description": "IPTV portals and live channels",
+      "description": "IPTV portals, live channels, movies, and series",
       "entry": "iptv.js",
       "kind": "catalog",
       "protocol": 1,
@@ -25,6 +25,7 @@
         "nav",
         "layout",
         "feed",
+        "details",
         "searchChannels",
         "settings",
         "listPortals",
@@ -36,6 +37,7 @@
         "shareEncode",
         "shareDecode"
       ],
+      "enrich": "iptv-enrich-tmdb",
       "nav": {
         "tabId": "iptv",
         "label": "IPTV",
@@ -108,27 +110,9 @@
       "prelude": "_prelude.js"
     },
     {
-      "id": "iptv-vod",
-      "name": "IPTV VOD Details",
-      "description": "Portal movie and series details",
-      "entry": "iptv_vod.js",
-      "kind": "catalog",
-      "protocol": 1,
-      "kit": 1,
-      "types": [
-        "iptv"
-      ],
-      "capabilities": [
-        "details"
-      ],
-      "enrich": "iptv-enrich-tmdb",
-      "config": {},
-      "prelude": "_kit.js"
-    },
-    {
       "id": "iptv-enrich-tmdb",
       "name": "IPTV TMDB Enrich",
-      "description": "Optional TMDB match enrich for IPTV VOD metas",
+      "description": "Optional TMDB match enrich for IPTV movie and series details",
       "entry": "enrich_tmdb.js",
       "kind": "catalog",
       "protocol": 1,
@@ -150,12 +134,12 @@
   ],
   "bundle": [
     "iptv.js",
-    "iptv_vod.js",
     "enrich_tmdb.js",
     "_kit.js",
     "_prefs.js",
     "_platforms.js",
     "_portals.js",
+    "_details.js",
     "_prelude.js",
     "icons/nav.png"
   ]

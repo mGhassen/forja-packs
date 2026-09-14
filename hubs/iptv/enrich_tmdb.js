@@ -1,5 +1,5 @@
 // TMDB enrich companion — not a data source.
-// Host runs this after iptv-vod (`"enrich": "iptv-enrich-tmdb"`).
+// Host runs this after iptv-hub details (`"enrich": "iptv-enrich-tmdb"`).
 // Portal meta stays primary; this pack owns match + apply only.
 
 var ENRICH_TMDB_DEFAULTS = {

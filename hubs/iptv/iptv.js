@@ -397,6 +397,9 @@ async function extract(ctx) {
   if (action === 'feed') {
     return await iptvFeed(ctx);
   }
+  if (action === 'details') {
+    return await iptvVodDetails(ctx, params);
+  }
   if (action === 'searchChannels') {
     return await iptvSearchChannels(ctx, params);
   }

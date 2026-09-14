@@ -1,6 +1,4 @@
-// IPTV VOD details — portal meta (+ series episodes via vault + host http).
-
-var IPTV_VAULT_PORTALS = 'iptv.portals';
+// IPTV VOD details — portal movie/series meta (+ series episodes via vault + host http).
 
 function iptvEpisodeVideos(raw) {
   if (!Array.isArray(raw)) return [];
@@ -28,50 +26,13 @@ function iptvEpisodeVideos(raw) {
   return out;
 }
 
-function iptvNormBase(url) {
-  var u = String(url || '').trim().replace(/\/+$/, '');
-  if (!u) return '';
-  if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
-  return u.replace(/\/player_api\.php$/i, '');
-}
-
-function iptvPortalKey(portal) {
-  if (!portal) return '';
-  return (
-    String(portal.url || '').trim().toLowerCase() +
-    '|' +
-    String(portal.username || '').trim().toLowerCase()
-  );
-}
-
-async function iptvLoadPortal(ctx, portalKey) {
-  var host = (ctx && ctx.host) || {};
-  var vault = host.vault;
-  if (!vault || typeof vault.get !== 'function') return null;
-  try {
-    var raw = await vault.get(IPTV_VAULT_PORTALS);
-    if (!raw) return null;
-    var parsed = JSON.parse(String(raw));
-    if (!Array.isArray(parsed)) return null;
-    for (var i = 0; i < parsed.length; i++) {
-      if (iptvPortalKey(parsed[i]) === portalKey) return parsed[i];
-    }
-  } catch (e) {}
-  return null;
-}
-
-function iptvParseJsonBody(res) {
-  if (!res || !res.ok) return null;
-  var body = res.body;
-  if (body == null) return null;
-  if (typeof body === 'object') return body;
-  var s = String(body).trim();
-  if (!s) return null;
-  try {
-    return JSON.parse(s);
-  } catch (e) {
-    return null;
+async function iptvFindPortalByKey(ctx, portalKey) {
+  var portals = await iptvLoadPortals(ctx);
+  if (!Array.isArray(portals)) return null;
+  for (var i = 0; i < portals.length; i++) {
+    if (iptvPortalKey(portals[i]) === portalKey) return portals[i];
   }
+  return null;
 }
 
 async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
@@ -141,7 +102,7 @@ async function iptvVodDetails(ctx, params) {
 
   var videos = iptvEpisodeVideos(params.portalEpisodes || params.episodes);
   if (!isMovie && !videos.length) {
-    var portal = await iptvLoadPortal(ctx, portalKey);
+    var portal = await iptvFindPortalByKey(ctx, portalKey);
     if (portal) {
       videos = await iptvFetchSeriesEpisodes(ctx, portal, streamId);
       if (!plot && videos.length) {
@@ -187,15 +148,4 @@ async function iptvVodDetails(ctx, params) {
 
   if (videos.length) meta.videos = videos;
   return hubOk('details', { meta: meta }, { maxAge: 300, swr: 900 });
-}
-
-function extract(ctx) {
-  var action = hubAction(ctx);
-  var params = hubParams(ctx);
-
-  if (action === 'details') {
-    return iptvVodDetails(ctx, params);
-  }
-
-  return hubFail(action, 'INVALID_ACTION', 'iptv-vod only supports action details');
 }
