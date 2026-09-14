@@ -533,28 +533,30 @@ function tmdbBecause(ctx, cfg, params) {
       : '/movie/' + tmdbId + '/recommendations';
   var title = String(seed.title || meta.name || '').trim();
   return tmdbGet(ctx, cfg, path, { page: 1 }).then(function (json) {
-    return hubOk(
-      'rail',
-      {
-        items: tmdbMetas(cfg, json, mediaType, TMDB_HOME_RAIL_CAP),
-        heading: title ? 'Because you watched ' + title : 'Because you watched',
-        seedPoster: String(meta.poster || meta.background || ''),
-        canShuffle: seeds.length > 1,
-      },
-      { maxAge: 900, swr: 3600 },
-    );
+    var items = tmdbMetas(cfg, json, mediaType, TMDB_HOME_RAIL_CAP);
+    var env = hubItems('rail', items, { maxAge: 900, swr: 3600 })[0];
+    env.data.heading = title
+      ? 'Because you watched ' + title
+      : 'Because you watched';
+    env.data.seedPoster = String(meta.poster || meta.background || '');
+    env.data.canShuffle = seeds.length > 1;
+    return env;
   });
 }
 
 function tmdbLayout() {
   var genreWidgets = tmdbPickGenreRows(3).map(function (g) {
-    return {
-      type: 'rail',
-      id: 'genre_' + g.id,
-      title: g.label,
-      rail: 'genre',
-      params: { genreRow: g.id },
-    };
+    return hubWithLoad(
+      {
+        type: 'rail',
+        id: 'genre_' + g.id,
+        title: g.label,
+        rail: 'genre',
+        params: { genreRow: g.id },
+      },
+      'rail',
+      { rail: 'genre', genreRow: g.id },
+    );
   });
   return {
     pages: {
@@ -568,13 +570,17 @@ function tmdbLayout() {
             showSelectedInTopBar: true,
             options: TMDB_VERTICAL_FILTERS,
           },
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'Spotlight',
-            rail: 'spotlight',
-            bleed: 'featured',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'Spotlight',
+              rail: 'spotlight',
+              bleed: 'featured',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'featured',
@@ -582,23 +588,34 @@ function tmdbLayout() {
             rail: 'featured',
             hideWhenBleed: true,
           }, 'rail', { rail: 'featured' }),
-          {
-            type: 'ranked',
-            id: 'popular',
-            title: 'Popular',
-            rail: 'popular',
-            style: 'numbered',
-          },
+          hubWithLoad(
+            {
+              type: 'ranked',
+              id: 'popular',
+              title: 'Popular',
+              rail: 'popular',
+              style: 'numbered',
+            },
+            'rail',
+            { rail: 'popular' },
+          ),
           { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'mood',
-            id: 'moods',
-            title: "What's your mood?",
-            options: TMDB_MOODS,
-            rail: 'discover',
-          },
-          { type: 'because', id: 'because', rail: 'because' },
-          { type: 'trakt', id: 'trakt' },
+          hubWithLoad(
+            {
+              type: 'mood',
+              id: 'moods',
+              title: "What's your mood?",
+              options: TMDB_MOODS,
+              rail: 'discover',
+            },
+            'rail',
+            { rail: 'discover' },
+          ),
+          hubWithLoad(
+            { type: 'because', id: 'because', rail: 'because' },
+            'rail',
+            { rail: 'because' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'new_releases',
@@ -2139,13 +2156,19 @@ function extract(ctx) {
           ? tmdbAttachLogos(ctx, cfg, items, TMDB_HOME_HERO_CAP)
           : Promise.resolve(items);
       return attach.then(function (withLogos) {
+        var painted =
+          railId === 'spotlight'
+            ? withLogos.map(function (m) {
+                return hubPaintHero(m);
+              })
+            : withLogos;
         return hubItems(
           'rail',
-          withLogos,
+          painted,
           { maxAge: 900, swr: 3600 },
           {
             pageSize: pageSize,
-            hasMore: withLogos.length >= pageSize,
+            hasMore: painted.length >= pageSize,
           },
         )[0];
       });

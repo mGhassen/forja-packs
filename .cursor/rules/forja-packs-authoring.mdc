@@ -16,6 +16,7 @@ When creating or extending packs, read and follow `.cursor/skills/create-forja-p
 | `providers/` | VOD `extract` + `hops/` | Add plugin to `manifest.json` |
 | `livesports/` | Live `catalog` + `resolve` | Add plugin to `manifest.json` |
 | `torrent/` | Indexer `search(ctx)` | Add plugin to `manifest.json` |
+| `debrid/` | Magnet `resolve` | Add plugin to `manifest.json` |
 | `hubs/<slug>/` | Catalog hub (shell tab) | New folder + own `manifest.json` |
 | `hubs/iptv/` | IPTV hub product | Extend existing hub |
 | `archived/` | Dead packs | Never clone for new work |

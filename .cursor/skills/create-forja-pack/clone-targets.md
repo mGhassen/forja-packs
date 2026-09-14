@@ -11,6 +11,7 @@ Prefer the **smallest clean peer** that matches the kind. Copy structure + manif
 | **Live sports** | Add plugin | `livesports/streamfree.js` + its manifest entry | Unified `catalog`+`resolve`; `_prelude.js` |
 | **Live + GOAT/GASM** | Add plugin | Peer already using that unlock (`livesports/` goat/gasm entries) | Only when WASM unlock required |
 | **Torrent** | Add plugin | `torrent/knaben.js` + its manifest entry | `search(ctx)`; keep `_torrent_common.js` prelude |
+| **Debrid** | Add plugin | `debrid/realdebrid.js` + its manifest entry | `extract` + `action: resolve`; keep `_debrid_common.js` prelude |
 | **IPTV hub** | Extend | `hubs/iptv/` (`iptv.js`, `_prelude.js`, `_portals.js`, …) | Edit in place; bump version |
 | **IPTV companion** | New pack | **Ask user** — no live `iptv/` tree; `archived/iptv_vod` is retired | Do not default-clone archived |
 
@@ -79,6 +80,26 @@ Still prefer a forja-packs peer when one exists. Starters for greenfield communi
   "kind": "torrent",
   "searchInputs": ["query"],
   "config": { "source": "My Index" }
+}
+```
+
+### Debrid
+
+```json
+{
+  "id": "myservice",
+  "name": "My Debrid",
+  "entry": "myservice.js",
+  "kind": "debrid",
+  "capabilities": ["resolve", "settings"],
+  "settings": {
+    "addon": "debrid",
+    "group": "My Debrid",
+    "order": 10,
+    "fields": [
+      { "id": "apiKey", "type": "password", "label": "API key" }
+    ]
+  }
 }
 ```
 

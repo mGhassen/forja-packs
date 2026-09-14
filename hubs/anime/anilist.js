@@ -146,13 +146,17 @@ function anilistLayout() {
             { rail: 'spotlight' },
           ),
           { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'mood',
-            id: 'moods',
-            title: 'Pick your vibe',
-            options: ANILIST_MOODS,
-            rail: 'trending',
-          },
+          hubWithLoad(
+            {
+              type: 'mood',
+              id: 'moods',
+              title: 'Pick your vibe',
+              options: ANILIST_MOODS,
+              rail: 'trending',
+            },
+            'rail',
+            { rail: 'trending' },
+          ),
           rail('trending', 'Trending Now', {
             hideWhenBleed: true,
             hideWhenTypeFilter: true,

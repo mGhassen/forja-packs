@@ -174,7 +174,10 @@ function hubItems(action, items, cache, paging) {
   var list = items || [];
   var stamped = [];
   for (var i = 0; i < list.length; i++) {
-    stamped.push(hubStampDetailsPaint(list[i]));
+    var m = hubStampDetailsPaint(list[i]);
+    if (!m || typeof m !== 'object') continue;
+    if (!m.paint) m = hubPaintPoster(m);
+    stamped.push(m);
   }
   var data = { items: stamped };
   if (paging && typeof paging === 'object') {
@@ -237,6 +240,19 @@ function hubPaintPoster(item, opts) {
     paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
   }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
+  if (meta.background || meta.backdrop || opts.backdropUrl) {
+    paint.props.backdropUrl = String(
+      meta.background || meta.backdrop || opts.backdropUrl || '',
+    );
+  }
+  if (meta.logo || opts.logoUrl) {
+    paint.props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  }
+  if (meta.description || meta.overview || opts.overview) {
+    paint.props.overview = String(
+      meta.description || meta.overview || opts.overview || '',
+    );
+  }
   var out = Object.assign({}, meta);
   out.paint = paint;
   if (meta.open) out.open = meta.open;
@@ -249,6 +265,23 @@ function hubPaintPoster(item, opts) {
       open: meta.open || null,
     };
   }
+  return out;
+}
+
+function hubPaintHero(item, opts) {
+  opts = opts || {};
+  var out = hubPaintPoster(item, opts);
+  var meta = item || {};
+  var props = out.paint.props;
+  props.backdropUrl = String(
+    meta.background || meta.backdrop || opts.backdropUrl || props.imageUrl || '',
+  );
+  props.posterUrl = String(meta.poster || props.imageUrl || '');
+  props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  props.overview = String(
+    meta.description || meta.overview || opts.overview || '',
+  );
+  if (meta.releaseInfo) props.year = String(meta.releaseInfo).slice(0, 4);
   return out;
 }
 

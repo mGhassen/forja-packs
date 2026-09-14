@@ -107,9 +107,24 @@ Host does **not** invent `title` / `poster` / schedule fields. Packs shape paint
 
 ```javascript
 hubPaintPoster(meta)           // { paint: { type: 'posterCard', props: { title, imageUrl, … } }, open?, meta? }
+hubPaintHero(meta)             // poster + backdropUrl / logoUrl / overview for hero slides
 hubPaintEvent(meta, opts)      // { paint: { type: 'eventCard', props: { … } } }
 hubWithLoad(node, action, params)  // node.load → host opaque runPlugin(action, params)
 ```
+
+`hubItems` stamps `hubPaintPoster` when an item has no `paint` yet.
+**Page blocks (RFC-112)** — emit JSON `type` + serializable `props` + `children` (no Dart imports, no callbacks in props):
+
+| `type` | Use for |
+|--------|---------|
+| `catalogBody` | Hub catalog scroll body — **shared** by IPTV / Live Sports / My List (never `iptvCatalog` / `liveSportsCatalog` / `myListCatalog`) |
+| `search` | Catalog search page |
+| `details` | Generic details loading/error/body |
+| `matchDetails` | Live match / list-entry full-bleed details |
+| `entryDetails` | Generic list entry details chrome |
+| `shell` / `empty` | Page shell / empty state |
+
+Cards stay `posterCard` / `eventCard` under the shared body. Product difference = pack JSON + `open.surface`, not separate Dart block classes.
 
 Hub `nav.page.action` must declare the opaque page load (usually `"layout"`). Rails/lists that need data use `hubWithLoad(..., 'rail'|'feed'|…, params)` — host never special-cases those action names.
 

@@ -122,6 +122,19 @@ function hubPaintPoster(item, opts) {
     paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
   }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
+  if (meta.background || meta.backdrop || opts.backdropUrl) {
+    paint.props.backdropUrl = String(
+      meta.background || meta.backdrop || opts.backdropUrl || '',
+    );
+  }
+  if (meta.logo || opts.logoUrl) {
+    paint.props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  }
+  if (meta.description || meta.overview || opts.overview) {
+    paint.props.overview = String(
+      meta.description || meta.overview || opts.overview || '',
+    );
+  }
   var out = Object.assign({}, meta);
   out.paint = paint;
   if (meta.open) out.open = meta.open;

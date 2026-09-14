@@ -31,13 +31,17 @@ function kisskhLayout() {
         ],
         pageSize: 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'Spotlight',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'Spotlight',
+              rail: 'spotlight',
+              bleed: 'latest',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           { type: 'continue', id: 'continue_watching' },
           hubWithLoad({
             type: 'rail',
@@ -54,13 +58,17 @@ function kisskhLayout() {
             rail: 'trending',
             aspect: 'landscape',
           }, 'rail', { rail: 'trending' }),
-          {
-            type: 'ranked',
-            id: 'popular',
-            title: 'Popular',
-            rail: 'most_viewed',
-            aspect: 'landscape',
-          },
+          hubWithLoad(
+            {
+              type: 'ranked',
+              id: 'popular',
+              title: 'Popular',
+              rail: 'most_viewed',
+              aspect: 'landscape',
+            },
+            'rail',
+            { rail: 'most_viewed' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'anime',
