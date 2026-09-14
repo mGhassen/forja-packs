@@ -149,7 +149,9 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     url: url,
     kind: 'live',
     platform: platform,
+    portalKey: pkey,
     streamId: id,
+    categoryId: catId,
     epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   };
