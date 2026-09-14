@@ -585,3 +585,12 @@ function kitCategoryBar(id, opts) {
   return Object.assign({ type: 'kit.categoryBar', id: id }, o);
 }
 
+/** Header + side rail + body (IPTV catalog geometry). children: [header, side, body]. */
+function kitColumnsHeader(id, opts, children) {
+  var o = opts && typeof opts === 'object' ? opts : {};
+  return Object.assign(
+    { type: 'columnsHeader', id: id, children: children || [] },
+    o,
+  );
+}
+

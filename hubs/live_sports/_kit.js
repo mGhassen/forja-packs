@@ -466,3 +466,12 @@ function kitCategoryBar(id, opts) {
   return Object.assign({ type: 'kit.categoryBar', id: id }, o);
 }
 
+/** Page top + bodyTop strip + expand grid (Live Sports geometry). children: [top, bodyTop, grid]. */
+function kitTopBody(id, opts, children) {
+  var o = opts && typeof opts === 'object' ? opts : {};
+  return Object.assign(
+    { type: 'topBody', id: id, children: children || [] },
+    o,
+  );
+}
+

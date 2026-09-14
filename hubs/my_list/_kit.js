@@ -451,6 +451,15 @@ function kitList(id, opts) {
   return Object.assign({ type: 'kit.list', id: id }, o);
 }
 
+/** Kind menu? + status tabs + cards grid (My List geometry). children: [menu?, tabs, cards]. */
+function kitTabsCards(id, opts, children) {
+  var o = opts && typeof opts === 'object' ? opts : {};
+  return Object.assign(
+    { type: 'tabsCards', id: id, children: children || [] },
+    o,
+  );
+}
+
 function kitRow(id, opts) {
   var o = opts && typeof opts === 'object' ? opts : {};
   return Object.assign({ type: 'kit.row', id: id }, o);

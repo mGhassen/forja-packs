@@ -118,10 +118,13 @@ hubWithLoad(node, action, params)  // node.load → host opaque runPlugin(action
 | `type` | Use for |
 |--------|---------|
 | `catalogBody` | Hub catalog scroll body — **shared** by IPTV / Live Sports / My List (never `iptvCatalog` / `liveSportsCatalog` / `myListCatalog`) |
-| `search` | Catalog search page |
-| `details` | Generic details loading/error/body |
-| `matchDetails` | Live match / list-entry full-bleed details |
-| `entryDetails` | Generic list entry details chrome |
+| `columnsHeader` | Header + side column + body — IPTV-style top / categories / channels (`sideWidth`, `sideOnLeading`) |
+| `topBody` | Page top + bodyTop strip + expand grid — Live Sports-style chrome / kinds / schedule |
+| `tabsCards` | Optional kind menu + status tabs + cards grid — My List-style filters / posters |
+| `search` | Catalog search page (`hintText`, …) |
+| `details` | Prebuilt details: props drive `DetailsHero` (`title`, `backdropUrl`, `overview`, `genres`, …) |
+| `matchDetails` | Prebuilt match details: same hero props + optional host action/streams slot |
+| `entryDetails` | Entry chrome (`title`, `emptyMessage`) |
 | `shell` / `empty` | Page shell / empty state |
 
 Cards stay `posterCard` / `eventCard` under the shared body. Product difference = pack JSON + `open.surface`, not separate Dart block classes.
