@@ -78,15 +78,18 @@ function iptvLayout() {
               default: 'all',
               items: [{ id: 'all', label: 'All', icon: 'grid' }],
             }),
-            kitList('items', {
-              source: 'iptv',
-              style: 'grid',
-              expand: true,
-              focusUp: 'cats',
-              kindMenu: 'cats',
-              catalogMenu: 'catalog',
-              sortMenu: 'sort',
-            }),
+            hubWithLoad(
+              kitList('items', {
+                style: 'grid',
+                expand: true,
+                focusUp: 'cats',
+                kindMenu: 'cats',
+                catalogMenu: 'catalog',
+                sortMenu: 'sort',
+              }),
+              'feed',
+              {},
+            ),
           ]),
         ],
       },
@@ -146,7 +149,7 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     url: url,
     headers: { 'User-Agent': 'Mozilla/5.0' },
   };
-  return {
+  return hubPaintPoster({
     id: 'iptv:live:' + pkey + ':' + id + (kindOverride ? ':' + kindOverride : ''),
     type: 'iptv',
     kind: catId,
@@ -159,7 +162,7 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     streamId: id,
     epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     categoryId: String(stream.categoryId || stream.category_id || 'all').trim() || 'all',
-  };
+  });
 }
 
 function iptvVodMeta(portal, stream, section, catName) {
@@ -183,7 +186,7 @@ function iptvVodMeta(portal, stream, section, catName) {
     '',
   );
   var kind = isMovie ? 'vod' : 'series';
-  return {
+  return hubPaintPoster({
     id: 'iptv:' + kind + ':' + pkey + ':' + id,
     type: isMovie ? 'movie' : 'tv',
     kind: catId,
@@ -224,7 +227,7 @@ function iptvVodMeta(portal, stream, section, catName) {
     portalKey: pkey,
     streamId: id,
     categoryId: catId,
-  };
+  });
 }
 
 function iptvCatNameMap(categories) {
@@ -425,13 +428,13 @@ async function iptvFeed(ctx) {
   var portal = await iptvResolveActive(ctx);
   if (!portal) {
     return hubItems('feed', [
-      {
+      hubPaintPoster({
         id: 'iptv:setup',
         type: 'message',
         kind: 'all',
         name: 'Add a portal in Settings → Addons → IPTV',
         description: 'Enter portal URL and credentials, then refresh.',
-      },
+      }),
     ]);
   }
 

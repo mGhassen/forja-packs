@@ -161,22 +161,25 @@ function liveSportsLayout() {
               focusUp: 'chrome',
               focusDown: 'schedule',
             }),
-            kitList('schedule', {
-              source: 'live_schedule',
-              style: 'list',
-              open: 'panel',
-              openSetting: 'matchOpen',
-              expand: true,
-              kindMenu: 'kind',
-              catalogMenu: 'catalog',
-              horizonMenu: 'horizon',
-              panelTab: 'providers',
-              panelTabs: [
-                { id: 'providers', label: 'Providers', icon: 'dns' },
-                { id: 'live_tv', label: 'Live TV', icon: 'tv', browse: true, action: 'liveTv' },
-              ],
-              focusRight: 'sources-kind',
-            }),
+            hubWithLoad(
+              kitList('schedule', {
+                style: 'list',
+                open: 'panel',
+                openSetting: 'matchOpen',
+                expand: true,
+                kindMenu: 'kind',
+                catalogMenu: 'catalog',
+                horizonMenu: 'horizon',
+                panelTab: 'providers',
+                panelTabs: [
+                  { id: 'providers', label: 'Providers', icon: 'dns' },
+                  { id: 'live_tv', label: 'Live TV', icon: 'tv', browse: true, action: 'liveTv' },
+                ],
+                focusRight: 'sources-kind',
+              }),
+              'feed',
+              {},
+            ),
           ]),
         ],
       },
@@ -299,7 +302,15 @@ function liveSportsShapeRow(row) {
       dateMs: dateMs,
     };
   }
-  return out;
+  return hubPaintEvent(out, {
+    homeBadgeUrl: homeBadge,
+    awayBadgeUrl: awayBadge,
+    categoryLabel: category,
+    scheduleLabel: scheduleLabel,
+    timeLabel: timeLabel,
+    viewers: viewers,
+    live: live,
+  });
 }
 
 function liveSportsParseHorizonPref(raw) {
