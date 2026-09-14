@@ -282,6 +282,7 @@ function liveSportsShapeRow(row) {
   out.awayBadge = awayBadge;
   out.category = category;
   out.badge = category;
+  if (category && !out.kind) out.kind = category;
   out.dateMs = dateMs;
   out.startsAt = dateMs > 0 ? String(dateMs) : out.startsAt || '';
   out.airing = airing;
