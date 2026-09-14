@@ -127,7 +127,9 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
 
 function iptvVodMeta(portal, stream, section, catName) {
   var id = String(stream.id || stream.stream_id || stream.series_id || '').trim();
-  var name = String(stream.name || stream.title || 'Title').trim() || 'Title';
+  var rawName = String(stream.name || stream.title || 'Title').trim() || 'Title';
+  var cleaned = iptvCleanMediaTitle(rawName);
+  var name = cleaned.title || rawName;
   var logo = String(
     stream.icon ||
       stream.stream_icon ||
@@ -154,6 +156,7 @@ function iptvVodMeta(portal, stream, section, catName) {
     background: logo || undefined,
     badge: isMovie ? 'MOVIE' : 'TV',
     description: catName || '',
+    releaseInfo: cleaned.year != null ? String(cleaned.year) : '',
     open: {
       surface: 'iptv',
       id: id,
@@ -161,7 +164,7 @@ function iptvVodMeta(portal, stream, section, catName) {
       kind: kind,
       portalKey: pkey,
       streamId: id,
-      streamName: name,
+      streamName: rawName,
       streamIcon: logo,
       name: name,
       icon: logo,

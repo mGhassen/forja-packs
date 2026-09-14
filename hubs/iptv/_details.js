@@ -1,5 +1,62 @@
 // IPTV VOD details — portal movie/series meta (+ series episodes via vault + host http).
 
+/** Strip portal/release junk from VOD titles (parity with host cleanIptvMediaTitle). */
+function iptvCleanMediaTitle(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return { title: '', year: null, season: null, episode: null };
+
+  s = s.replace(/[_\.]+/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+
+  var season = null;
+  var episode = null;
+  var se = /\b[Ss](\d{1,2})\s*[Ee](\d{1,3})\b|\b(\d{1,2})\s*[xX]\s*(\d{1,3})\b/.exec(s);
+  if (se) {
+    season = parseInt(se[1] || se[3], 10) || null;
+    episode = parseInt(se[2] || se[4], 10) || null;
+    s = (s.slice(0, se.index) + ' ' + s.slice(se.index + se[0].length)).trim();
+  }
+
+  var year = null;
+  var yearMatch = /\b((?:19|20)\d{2})\b/.exec(s);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1], 10) || null;
+    s = (s.slice(0, yearMatch.index) + ' ' + s.slice(yearMatch.index + yearMatch[0].length)).trim();
+  }
+
+  // Leading `|EN|` / `|FR|` pipe tags (common portal prefixes).
+  for (var i = 0; i < 4; i++) {
+    var next = s.replace(
+      /^\|?\s*(?:EN|FR|AR|ES|DE|IT|PT|NL|TR|PL|RU|MULTI|VO|VF|VOSTFR|VOST|NETFLIX|NF|AMAZON|AMZN|PRIME|DISNEY(?:\+)?|HULU|HBO|MAX|APPLE|ATVP|DC|DV|WEB|WEB[- ]?DL|WEBRip)\s*\|+\s*/i,
+      '',
+    );
+    if (next === s) break;
+    s = next;
+  }
+
+  // Leading platform / lang tags: EN-, FR-, NETFLIX-, Disney+-, etc.
+  s = s.replace(
+    /^(?:EN|FR|AR|ES|DE|IT|PT|NL|TR|PL|RU|MULTI|VO|VF|VOSTFR|VOST|NETFLIX|NF|AMAZON|AMZN|PRIME|DISNEY(?:\+)?|HULU|HBO|MAX|APPLE|ATVP|DC|DV|WEB|WEB[- ]?DL|WEBRip)\s*[-:]\s*/i,
+    '',
+  );
+  s = s.replace(
+    /^(?:EN|FR|AR|ES|DE|IT|PT|NL|TR|PL|RU|MULTI|VO|VF|VOSTFR|VOST|NETFLIX|NF|AMAZON|AMZN|PRIME|DISNEY(?:\+)?|HULU|HBO|MAX|APPLE|ATVP)\s*[-:]\s*/i,
+    '',
+  );
+
+  s = s.replace(/[\[\(\{][^\]\)\}]{0,40}[\]\)\}]/g, ' ');
+
+  var junk =
+    /(?:1080p|720p|480p|2160p|4K|UHD|HDR10?\+?|DV|Dolby(?:\s*Vision)?|x264|x265|h\.?264|h\.?265|HEVC|AVC|AAC|AC3|DTS|Atmos|BluRay|BDRip|BRRip|HDRip|DVDRip|HDTV|WEB[- ]?DL|WEBRip|WEB|REPACK|PROPER|INTERNAL|LIMITED|EXTENDED|UNRATED|IMAX|MULTI|DUAL|SUBBED|DUBBED|VOSTFR|VOST|VF|VO|COMPLETE|SEASON|Saison)/gi;
+  s = s.replace(junk, ' ');
+
+  s = s.replace(/[-|~/\\]+/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/^[\-\s:]+|[\-\s:]+$/g, '').trim();
+
+  return { title: s, year: year, season: season, episode: episode };
+}
+
 function iptvEpisodeVideos(raw) {
   if (!Array.isArray(raw)) return [];
   var out = [];
@@ -96,9 +153,17 @@ async function iptvVodDetails(ctx, params) {
     params.movie === true ||
     params.movie === 'true';
   var type = isMovie ? 'movie' : 'tv';
-  var name = String(params.name || params.title || '').trim() || 'Unknown';
+  var rawName =
+    String(params.streamName || params.name || params.title || '').trim() ||
+    'Unknown';
+  var cleaned = iptvCleanMediaTitle(rawName);
+  var name = cleaned.title || rawName;
   var icon = String(params.icon || params.poster || '').trim();
   var plot = String(params.plot || params.description || '').trim();
+  var releaseInfo =
+    cleaned.year != null
+      ? String(cleaned.year)
+      : String(params.releaseInfo || '').trim();
 
   var videos = iptvEpisodeVideos(params.portalEpisodes || params.episodes);
   if (!isMovie && !videos.length) {
@@ -119,6 +184,7 @@ async function iptvVodDetails(ctx, params) {
     poster: icon,
     background: icon,
     description: plot,
+    releaseInfo: releaseInfo,
     badge: isMovie ? 'MOVIE' : 'TV',
     open: {
       surface: 'iptv',
@@ -126,7 +192,8 @@ async function iptvVodDetails(ctx, params) {
       movie: isMovie,
       kind: kind || (isMovie ? 'vod' : 'series'),
       portalKey: portalKey,
-      streamName: name,
+      streamName: rawName,
+      name: name,
       streamIcon: icon,
       categoryId: String(params.categoryId || ''),
       containerExt: String(params.containerExt || ''),
