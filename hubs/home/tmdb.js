@@ -2110,14 +2110,7 @@ function extract(ctx) {
     }));
   }
   if (action === 'search') {
-    var q = String(params.query || '').trim();
-    var hasFilter = params.filter != null && params.filter !== '';
-    if (!q && !hasFilter) return hubItems('search', []);
-    return wrap(
-      tmdbStructuredSearch(ctx, cfg, params).then(function (items) {
-        return hubItems('search', items, { maxAge: 300 })[0];
-      }),
-    );
+    return wrap(homeSearch(ctx, cfg, params));
   }
   if (action === 'feed') {
     return wrap(

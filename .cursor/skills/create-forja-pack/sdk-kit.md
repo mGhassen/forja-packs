@@ -183,7 +183,8 @@ Live unlock (when pack ships modules): `ctx.live.goatUnlock` / `gasmUnlock` / `s
 | Pack `id` | stable (`forjahq-…`) |
 | `version` | semver; bump on behavior change |
 | Plugin `kind` | `http` \| `hop` \| `catalog` \| `torrent` \| `host` |
-| Catalog | `protocol: 1`, `kit: 1`, `capabilities[]`, usually `nav` + `prelude: "_kit.js"` |
+| Catalog | `protocol: 1`, `kit: 1`, `capabilities[]`, usually `nav` + `prelude: "_kit.js"` (comma-separated OK: `"_kit.js,_search.js"`) |
+| Hub search | Pack owns `action: 'search'` (often `_search.js`); host only opens chrome + `runPlugin` — never TMDB/addons in Dart |
 | `bundle` | every install path |
 | Do **not** set pack/plugin `enabled` | host Settings owns on/off |
 
