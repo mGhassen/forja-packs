@@ -761,7 +761,10 @@ function extract(ctx) {
       return hubFail('feed', 'UPSTREAM', e && e.message, true);
     });
   }
-  if (action !== 'rail' && action !== 'search') {
+  if (action === 'search') {
+    return anilistSearch(ctx, cfg, params);
+  }
+  if (action !== 'rail') {
     return hubFail(action, 'INVALID_ACTION', 'anilist has no action ' + action);
   }
 

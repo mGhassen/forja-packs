@@ -4,7 +4,7 @@
   "name": "ForjaHQ Cartoon",
   "description": "DimaToon Arabic cartoon / anime hub (\u0643\u0631\u062a\u0648\u0646).",
   "author": "ForjaHQ",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "tags": [
     "cartoon",
     "arabic"
@@ -41,12 +41,13 @@
       "config": {
         "origin": "https://www.dima-toon.com"
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     }
   ],
   "bundle": [
     "cartoon.js",
     "_kit.js",
+    "_search.js",
     "icons/nav.png"
   ]
 }

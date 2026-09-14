@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "tags": [
     "anime"
   ],
@@ -42,7 +42,7 @@
         "graphql": "https://graphql.anilist.co",
         "perPage": 24
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     },
     {
       "id": "anime-enrich-tmdb",
@@ -64,12 +64,13 @@
         ],
         "limit": 5
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     }
   ],
   "bundle": [
     "anilist.js",
     "_kit.js",
+    "_search.js",
     "enrich_tmdb.js",
     "icons/nav.png"
   ]

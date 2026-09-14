@@ -4,7 +4,7 @@
   "name": "ForjaHQ Kids",
   "description": "Dimakids Arabic kids cartoons and movies hub.",
   "author": "ForjaHQ",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "tags": [
     "kids",
     "arabic"
@@ -42,12 +42,13 @@
         "origin": "https://www.dimakids.com",
         "files": "https://files.dimakids.com"
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     }
   ],
   "bundle": [
     "kids.js",
     "_kit.js",
+    "_search.js",
     "icons/nav.png"
   ]
 }

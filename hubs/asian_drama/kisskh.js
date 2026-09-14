@@ -453,20 +453,7 @@ function extract(ctx) {
     });
   }
   if (action === 'search') {
-    var q = String(params.query || '').trim();
-    if (!q) return hubItems('search', []);
-    return kisskhList(
-      ctx,
-      cfg,
-      '/DramaList/Search?q=' + encodeURIComponent(q) + '&type=0',
-      params.limit,
-    )
-      .then(function (items) {
-        return hubItems('search', items, { maxAge: 300 });
-      })
-      .catch(function (e) {
-        return hubFail('search', 'UPSTREAM', e && e.message, true);
-      });
+    return kisskhSearch(ctx, cfg, params);
   }
   if (action !== 'rail') {
     return hubFail(action, 'INVALID_ACTION', 'kisskh has no action ' + action);
