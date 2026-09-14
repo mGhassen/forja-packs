@@ -20,7 +20,7 @@ function myListLayout() {
     pages: {
       mylist: {
         widgets: [
-          kitTabsCards(
+          kitStack(
             'page',
             { expand: true },
             [

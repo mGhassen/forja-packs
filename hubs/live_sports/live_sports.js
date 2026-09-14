@@ -146,7 +146,7 @@ function liveSportsLayout() {
     pages: {
       live_sports: {
         widgets: [
-          kitTopBody('page', { expand: true }, [
+          kitStack('page', { expand: true }, [
             kitTopBar('chrome', {
               // ↓ from Catalog / Portals restores last schedule row (not All).
               focusDown: 'schedule',
