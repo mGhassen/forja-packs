@@ -575,13 +575,13 @@ function tmdbLayout() {
             rail: 'spotlight',
             bleed: 'featured',
           },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'featured',
             title: 'Featured This Month',
             rail: 'featured',
             hideWhenBleed: true,
-          },
+          }, 'rail', { rail: 'featured' }),
           {
             type: 'ranked',
             id: 'popular',
@@ -599,12 +599,12 @@ function tmdbLayout() {
           },
           { type: 'because', id: 'because', rail: 'because' },
           { type: 'trakt', id: 'trakt' },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'new_releases',
             title: 'New Releases',
             rail: 'new_releases',
-          },
+          }, 'rail', { rail: 'new_releases' }),
         ].concat(genreWidgets),
       },
     },

@@ -243,14 +243,14 @@ function cartoonLayout() {
             bleed: 'latest',
           },
           { type: 'continue', id: 'continue_watching' },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'latest',
             title: 'أضيف حديثًا',
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'portrait',
-          },
+          }, 'rail', { rail: 'latest' }),
           {
             type: 'ranked',
             id: 'popular',
@@ -258,13 +258,13 @@ function cartoonLayout() {
             rail: 'popular',
             aspect: 'portrait',
           },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'episodes',
             title: 'أحدث الحلقات',
             rail: 'episodes',
             aspect: 'portrait',
-          },
+          }, 'rail', { rail: 'episodes' }),
         ],
       },
     },

@@ -351,13 +351,13 @@ function brstejLayout() {
             rail: 'spotlight',
             bleed: 'latest',
           },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'latest',
             title: 'أخر الاضافات',
             rail: 'latest',
             hideWhenBleed: true,
-          },
+          }, 'rail', { rail: 'latest' }),
           { type: 'continue', id: 'continue_watching' },
           {
             type: 'ranked',

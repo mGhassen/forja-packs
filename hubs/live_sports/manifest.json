@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports Hub",
   "description": "Live sports schedule and streams.",
   "author": "ForjaHQ",
-  "version": "1.0.27",
+  "version": "1.0.28",
   "tags": [
     "sports",
     "live"
@@ -32,7 +32,10 @@
         "tabId": "live_sports",
         "label": "Live Sports",
         "icon": "icons/nav.png",
-        "accent": "#FB923C"
+        "accent": "#FB923C",
+        "page": {
+          "action": "layout"
+        }
       },
       "settings": {
         "addon": "live_sports",

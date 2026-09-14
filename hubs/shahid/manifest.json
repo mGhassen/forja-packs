@@ -4,7 +4,7 @@
   "name": "ForjaHQ Shahid",
   "description": "Shahid movies and series.",
   "author": "ForjaHQ",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "tags": [
     "arabic",
     "shahid"
@@ -37,7 +37,10 @@
         "label": "Shahid",
         "order": 44,
         "accent": "#E31C25",
-        "icon": "icons/nav.png"
+        "icon": "icons/nav.png",
+        "page": {
+          "action": "layout"
+        }
       },
       "settings": {
         "addon": "connected_services",

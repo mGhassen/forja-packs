@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "tags": [
     "home",
     "movies",
@@ -36,7 +36,10 @@
       "nav": {
         "label": "Home",
         "icon": "icons/nav.png",
-        "accent": "#1CE783"
+        "accent": "#1CE783",
+        "page": {
+          "action": "layout"
+        }
       },
       "config": {
         "base": "https://db.speedracelight.com/3",

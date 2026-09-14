@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "tags": [
     "iptv",
     "live"
@@ -42,7 +42,10 @@
         "tabId": "iptv",
         "label": "IPTV",
         "icon": "icons/nav.png",
-        "accent": "#22D3EE"
+        "accent": "#22D3EE",
+        "page": {
+          "action": "layout"
+        }
       },
       "settings": {
         "addon": "iptv",

@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "tags": [
     "anime"
   ],
@@ -32,7 +32,10 @@
       "nav": {
         "label": "Anime",
         "icon": "icons/nav.png",
-        "accent": "#FB7185"
+        "accent": "#FB7185",
+        "page": {
+          "action": "layout"
+        }
       },
       "enrich": "anime-enrich-tmdb",
       "config": {

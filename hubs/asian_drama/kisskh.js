@@ -39,21 +39,21 @@ function kisskhLayout() {
             bleed: 'latest',
           },
           { type: 'continue', id: 'continue_watching' },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'latest',
             title: 'Latest Update',
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'landscape',
-          },
-          {
+          }, 'rail', { rail: 'latest' }),
+          hubWithLoad({
             type: 'rail',
             id: 'trending',
             title: 'Trending',
             rail: 'trending',
             aspect: 'landscape',
-          },
+          }, 'rail', { rail: 'trending' }),
           {
             type: 'ranked',
             id: 'popular',
@@ -61,21 +61,21 @@ function kisskhLayout() {
             rail: 'most_viewed',
             aspect: 'landscape',
           },
-          {
+          hubWithLoad({
             type: 'rail',
             id: 'anime',
             title: 'Anime',
             rail: 'anime',
             aspect: 'landscape',
             hideWhenTypeFilter: true,
-          },
-          {
+          }, 'rail', { rail: 'anime' }),
+          hubWithLoad({
             type: 'rail',
             id: 'upcoming',
             title: 'Upcoming',
             rail: 'upcoming',
             aspect: 'landscape',
-          },
+          }, 'rail', { rail: 'upcoming' }),
         ],
       },
     },
@@ -148,7 +148,7 @@ function kisskhMeta(row) {
   if (desc) meta.description = hubStripHtml(desc);
   var mediaType = kisskhInferMediaType(row);
   if (mediaType) meta.tmdbMediaType = mediaType;
-  return meta;
+  return hubPaintPoster(meta);
 }
 
 function kisskhGet(ctx, cfg, path) {

@@ -4,7 +4,7 @@
   "name": "ForjaHQ My List",
   "description": "Personal watchlists: local bookmarks and Simkl sync.",
   "author": "ForjaHQ",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "tags": [
     "lists"
   ],
@@ -31,7 +31,10 @@
         "tabId": "mylist",
         "label": "My List",
         "icon": "icons/nav.png",
-        "accent": "#FBBF24"
+        "accent": "#FBBF24",
+        "page": {
+          "action": "layout"
+        }
       },
       "settings": {
         "addon": "my_list",
@@ -41,7 +44,9 @@
           {
             "id": "openDefault.movie",
             "type": "hub_select",
-            "hubTypes": ["movie"],
+            "hubTypes": [
+              "movie"
+            ],
             "listOpenDefault": true,
             "label": "Films",
             "subtitle": "Default hub for film rows when nothing is saved on the bookmark",
@@ -50,7 +55,9 @@
           {
             "id": "openDefault.tv",
             "type": "hub_select",
-            "hubTypes": ["tv"],
+            "hubTypes": [
+              "tv"
+            ],
             "listOpenDefault": true,
             "label": "Series",
             "subtitle": "Default hub for series rows when nothing is saved on the bookmark",
@@ -59,7 +66,9 @@
           {
             "id": "openDefault.anime",
             "type": "hub_select",
-            "hubTypes": ["anime"],
+            "hubTypes": [
+              "anime"
+            ],
             "listOpenDefault": true,
             "label": "Anime",
             "subtitle": "Default hub for anime rows when nothing is saved on the bookmark",
@@ -68,7 +77,9 @@
           {
             "id": "openDefault.drama",
             "type": "hub_select",
-            "hubTypes": ["drama"],
+            "hubTypes": [
+              "drama"
+            ],
             "listOpenDefault": true,
             "label": "Asian Drama",
             "subtitle": "Default hub for Asian Drama rows when nothing is saved on the bookmark",

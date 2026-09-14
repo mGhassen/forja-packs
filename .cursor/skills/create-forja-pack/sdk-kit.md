@@ -101,6 +101,18 @@ playFilterGrouped(field, options, opts)  // filters action play row
 
 Legacy aliases still work in host (`stack` → `kit.stack`, …). Prefer `kit.*`.
 
+### Paint (validate + paint host)
+
+Host does **not** invent `title` / `poster` / schedule fields. Packs shape paint:
+
+```javascript
+hubPaintPoster(meta)           // { paint: { type: 'posterCard', props: { title, imageUrl, … } }, open?, meta? }
+hubPaintEvent(meta, opts)      // { paint: { type: 'eventCard', props: { … } } }
+hubWithLoad(node, action, params)  // node.load → host opaque runPlugin(action, params)
+```
+
+Hub `nav.page.action` must declare the opaque page load (usually `"layout"`). Rails/lists that need data use `hubWithLoad(..., 'rail'|'feed'|…, params)` — host never special-cases those action names.
+
 ### Meta / open
 
 Openable items need:

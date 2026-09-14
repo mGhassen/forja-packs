@@ -119,19 +119,32 @@ var ANILIST_MOODS = [
 ];
 
 function anilistLayout() {
+  function rail(id, title, extra) {
+    return hubWithLoad(
+      Object.assign(
+        { type: 'rail', id: id, title: title, rail: id },
+        extra || {},
+      ),
+      'rail',
+      { rail: id },
+    );
+  }
   return {
     pages: {
       anime: {
-        feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'Spotlight',
-            rail: 'spotlight',
-            bleed: 'trending',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'Spotlight',
+              rail: 'spotlight',
+              bleed: 'trending',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           { type: 'continue', id: 'continue_watching' },
           {
             type: 'mood',
@@ -140,23 +153,29 @@ function anilistLayout() {
             options: ANILIST_MOODS,
             rail: 'trending',
           },
-          {
-            type: 'rail',
-            id: 'trending',
-            title: 'Trending Now',
-            rail: 'trending',
+          rail('trending', 'Trending Now', {
             hideWhenBleed: true,
-            // Films / Series / Categories — Trending duplicates Top Rated.
             hideWhenTypeFilter: true,
-          },
-          { type: 'rail', id: 'this_season', title: 'This Season', rail: 'this_season' },
-          { type: 'rail', id: 'top_airing', title: 'Top Airing', rail: 'top_airing' },
-          { type: 'ranked', id: 'top_10', title: 'Top 10 Today', rail: 'top_10', style: 'numbered', pageSize: 10 },
-          { type: 'rail', id: 'popular', title: 'Most Popular', rail: 'popular' },
-          { type: 'rail', id: 'latest_episodes', title: 'Recently Aired', rail: 'latest_episodes' },
-          { type: 'rail', id: 'top_rated', title: 'Top Rated', rail: 'top_rated' },
-          { type: 'rail', id: 'most_favorited', title: 'Most Favorited', rail: 'most_favorited' },
-          { type: 'rail', id: 'latest_completed', title: 'Recently Completed', rail: 'latest_completed' },
+          }),
+          rail('this_season', 'This Season'),
+          rail('top_airing', 'Top Airing'),
+          hubWithLoad(
+            {
+              type: 'ranked',
+              id: 'top_10',
+              title: 'Top 10 Today',
+              rail: 'top_10',
+              style: 'numbered',
+              pageSize: 10,
+            },
+            'rail',
+            { rail: 'top_10' },
+          ),
+          rail('popular', 'Most Popular'),
+          rail('latest_episodes', 'Recently Aired'),
+          rail('top_rated', 'Top Rated'),
+          rail('most_favorited', 'Most Favorited'),
+          rail('latest_completed', 'Recently Completed'),
         ],
       },
     },
@@ -246,7 +265,7 @@ function anilistMeta(m) {
   if (m.status) meta.status = String(m.status);
   if (m.episodes) meta.episodes = Number(m.episodes);
   if (banner) meta.bannerImage = banner;
-  return meta;
+  return hubPaintPoster(meta);
 }
 
 function anilistVideosFromMedia(m) {
