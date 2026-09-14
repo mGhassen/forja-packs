@@ -1,5 +1,6 @@
-// IPTV hub — portals in vault, Xtream live catalog via ctx.host.http,
-// play via open.surface stream / ctx.host.playback.open (RFC-109 Wave C).
+// IPTV hub — portals in vault; Xtream Live / Movies / Series browse via
+// ctx.host.http; live play via open.surface stream; VOD via open.surface iptv
+// → iptv-vod details. Same product surface as pre–Wave C Xtream browse.
 
 var IPTV_VAULT_PORTALS = 'iptv.portals';
 var IPTV_VAULT_ACTIVE = 'iptv.active';
@@ -14,6 +15,17 @@ function iptvLayout() {
               focusDown: 'cats',
               actions: [
                 {
+                  id: 'catalog',
+                  label: 'Section',
+                  icon: 'live_tv',
+                  default: 'live',
+                  items: [
+                    { id: 'live', label: 'Live' },
+                    { id: 'movies', label: 'Movies' },
+                    { id: 'series', label: 'Series' },
+                  ],
+                },
+                {
                   id: 'refresh',
                   label: 'Refresh',
                   icon: 'refresh',
@@ -22,16 +34,19 @@ function iptvLayout() {
               ],
             }),
             kitCategoryBar('cats', {
-              source: 'iptv_categories',
+              dynamic: true,
+              source: 'iptv',
               focusUp: 'chrome',
-              focusDown: 'channels',
+              focusDown: 'items',
+              default: 'all',
             }),
-            kitList('channels', {
-              source: 'iptv_channels',
-              style: 'list',
+            kitList('items', {
+              source: 'iptv',
+              style: 'grid',
               expand: true,
               focusUp: 'cats',
-              categoryBar: 'cats',
+              kindMenu: 'cats',
+              catalogMenu: 'catalog',
             }),
           ]),
         ],
@@ -53,7 +68,7 @@ function iptvHttp(ctx) {
 }
 
 function iptvVault(ctx) {
-  return (iptvHost(ctx).vault) || null;
+  return iptvHost(ctx).vault || null;
 }
 
 function iptvNormBase(url) {
@@ -194,112 +209,206 @@ async function iptvPlayerApi(ctx, portal, action, extra) {
   if (extra && typeof extra === 'object') {
     Object.keys(extra).forEach(function (k) {
       if (extra[k] == null || extra[k] === '') return;
-      qs += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(String(extra[k]));
+      qs +=
+        '&' + encodeURIComponent(k) + '=' + encodeURIComponent(String(extra[k]));
     });
   }
   var url = base + '/player_api.php?' + qs;
-  var res = await request({ method: 'GET', url: url, timeoutMs: 30000 });
+  var res = await request({ method: 'GET', url: url, timeoutMs: 45000 });
   return iptvParseJsonBody(res);
 }
 
-function iptvLiveStreamUrl(portal, stream) {
+function iptvStreamPath(portal, kind, id, ext) {
   var base = iptvNormBase(portal.url);
-  var ext = String((stream && stream.container_extension) || 'ts').replace(/^\./, '');
-  if (!ext) ext = 'ts';
-  var id = String((stream && (stream.stream_id || stream.id)) || '').trim();
-  if (!id) return '';
+  var e = String(ext || 'ts').replace(/^\./, '');
+  if (!e) e = kind === 'live' ? 'ts' : 'mp4';
+  var sid = String(id || '').trim();
+  if (!sid) return '';
+  var folder = kind === 'movie' || kind === 'vod' ? 'movie' : kind === 'series' ? 'series' : 'live';
   return (
     base +
-    '/live/' +
+    '/' +
+    folder +
+    '/' +
     encodeURIComponent(portal.username) +
     '/' +
     encodeURIComponent(portal.password) +
     '/' +
-    encodeURIComponent(id) +
+    encodeURIComponent(sid) +
     '.' +
-    ext
+    e
   );
 }
 
-function iptvChannelMeta(portal, stream, categoryName) {
+function iptvCatMap(categories) {
+  var map = {};
+  if (!Array.isArray(categories)) return map;
+  for (var i = 0; i < categories.length; i++) {
+    var c = categories[i];
+    if (!c) continue;
+    var id = String(c.category_id || c.id || '').trim();
+    if (!id) continue;
+    map[id] = String(c.category_name || c.name || id).trim() || id;
+  }
+  return map;
+}
+
+async function iptvLoadCatMap(ctx, portal, section) {
+  var action =
+    section === 'movies'
+      ? 'get_vod_categories'
+      : section === 'series'
+        ? 'get_series_categories'
+        : 'get_live_categories';
+  return iptvCatMap(await iptvPlayerApi(ctx, portal, action));
+}
+
+function iptvLiveMeta(portal, stream, catName) {
   var id = String(stream.stream_id || stream.id || '').trim();
   var name = String(stream.name || stream.title || 'Channel').trim() || 'Channel';
   var logo = String(stream.stream_icon || stream.logo || '').trim();
-  var url = iptvLiveStreamUrl(portal, stream);
-  var catId = String(stream.category_id || '').trim();
+  var ext = String(stream.container_extension || 'ts').replace(/^\./, '');
+  var url = iptvStreamPath(portal, 'live', id, ext);
+  var catId = String(stream.category_id || '').trim() || 'all';
+  var pkey = iptvPortalKey(portal);
   return {
-    id: 'iptv:' + iptvPortalKey(portal) + ':' + id,
+    id: 'iptv:live:' + pkey + ':' + id,
     type: 'iptv',
+    kind: catId,
+    categoryName: catName || catId,
     name: name,
     poster: logo || undefined,
-    description: categoryName || '',
+    description: catName || '',
     open: {
       surface: 'stream',
       id: url,
       url: url,
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     },
-    categoryId: catId,
-    portalKey: iptvPortalKey(portal),
+    portalKey: pkey,
     streamId: id,
+    categoryId: catId,
   };
 }
 
-async function iptvFeedCategories(ctx, portal) {
-  var json = await iptvPlayerApi(ctx, portal, 'get_live_categories');
+function iptvVodMeta(portal, stream, section, catName) {
+  var id = String(stream.stream_id || stream.series_id || stream.id || '').trim();
+  var name = String(stream.name || stream.title || 'Title').trim() || 'Title';
+  var logo = String(
+    stream.stream_icon || stream.cover || stream.poster || stream.logo || '',
+  ).trim();
+  var catId = String(stream.category_id || '').trim() || 'all';
+  var pkey = iptvPortalKey(portal);
+  var isMovie = section === 'movies';
+  var ext = String(stream.container_extension || 'mp4').replace(/^\./, '');
+  var kind = isMovie ? 'vod' : 'series';
+  return {
+    id: 'iptv:' + kind + ':' + pkey + ':' + id,
+    type: isMovie ? 'movie' : 'tv',
+    kind: catId,
+    categoryName: catName || catId,
+    name: name,
+    poster: logo || undefined,
+    background: logo || undefined,
+    badge: isMovie ? 'MOVIE' : 'TV',
+    description: catName || '',
+    open: {
+      surface: 'iptv',
+      id: id,
+      movie: isMovie,
+      kind: kind,
+      portalKey: pkey,
+      streamId: id,
+      streamName: name,
+      streamIcon: logo,
+      name: name,
+      icon: logo,
+      categoryId: catId,
+      containerExt: ext,
+      platform: String(portal.platform || 'xtream'),
+      extract: {
+        resolveType: 'iptv',
+        panelCategory: 'iptv',
+        ctx: {
+          portalKey: pkey,
+          streamId: id,
+          kind: kind,
+          platform: String(portal.platform || 'xtream'),
+          containerExt: ext,
+          categoryId: catId,
+        },
+      },
+    },
+    portalKey: pkey,
+    streamId: id,
+    categoryId: catId,
+  };
+}
+
+async function iptvFeedLive(ctx, portal) {
+  var cats = await iptvLoadCatMap(ctx, portal, 'live');
+  var json = await iptvPlayerApi(ctx, portal, 'get_live_streams');
   if (!Array.isArray(json)) return [];
   var items = [];
   for (var i = 0; i < json.length; i++) {
-    var c = json[i];
-    if (!c) continue;
-    var id = String(c.category_id || c.id || '').trim();
-    var name = String(c.category_name || c.name || '').trim();
-    if (!id) continue;
-    items.push({
-      id: id,
-      type: 'category',
-      name: name || id,
-      open: { surface: 'iptv_category', id: id },
-    });
-  }
-  return items;
-}
-
-async function iptvFeedChannels(ctx, portal, categoryId) {
-  var extra = {};
-  if (categoryId) extra.category_id = categoryId;
-  var json = await iptvPlayerApi(ctx, portal, 'get_live_streams', extra);
-  if (!Array.isArray(json)) return [];
-  var cats = await iptvFeedCategories(ctx, portal);
-  var catName = '';
-  for (var i = 0; i < cats.length; i++) {
-    if (cats[i].id === String(categoryId || '')) {
-      catName = cats[i].name;
-      break;
-    }
-  }
-  var items = [];
-  for (var j = 0; j < json.length; j++) {
-    var s = json[j];
+    var s = json[i];
     if (!s) continue;
-    if (categoryId && String(s.category_id || '') !== String(categoryId)) continue;
-    var meta = iptvChannelMeta(portal, s, catName);
+    var catId = String(s.category_id || '').trim() || 'all';
+    var meta = iptvLiveMeta(portal, s, cats[catId] || catId);
     if (meta.open && meta.open.url) items.push(meta);
   }
   return items;
 }
 
+async function iptvFeedMovies(ctx, portal) {
+  var cats = await iptvLoadCatMap(ctx, portal, 'movies');
+  var json = await iptvPlayerApi(ctx, portal, 'get_vod_streams');
+  if (!Array.isArray(json)) return [];
+  var items = [];
+  for (var i = 0; i < json.length; i++) {
+    var s = json[i];
+    if (!s) continue;
+    var catId = String(s.category_id || '').trim() || 'all';
+    items.push(iptvVodMeta(portal, s, 'movies', cats[catId] || catId));
+  }
+  return items;
+}
+
+async function iptvFeedSeries(ctx, portal) {
+  var cats = await iptvLoadCatMap(ctx, portal, 'series');
+  var json = await iptvPlayerApi(ctx, portal, 'get_series');
+  if (!Array.isArray(json)) return [];
+  var items = [];
+  for (var i = 0; i < json.length; i++) {
+    var s = json[i];
+    if (!s) continue;
+    var catId = String(s.category_id || '').trim() || 'all';
+    items.push(iptvVodMeta(portal, s, 'series', cats[catId] || catId));
+  }
+  return items;
+}
+
+function iptvSection(params) {
+  var raw = String(
+    (params && (params.catalogFilter || params.section || params.source)) ||
+      'live',
+  )
+    .trim()
+    .toLowerCase();
+  if (raw === 'movies' || raw === 'movie' || raw === 'vod') return 'movies';
+  if (raw === 'series' || raw === 'tv') return 'series';
+  return 'live';
+}
+
 async function iptvFeed(ctx) {
   var params = hubParams(ctx);
-  var source = String(params.source || params.list || 'iptv_channels');
   var portal = await iptvResolveActive(ctx);
   if (!portal) {
     return hubItems('feed', [
       {
         id: 'iptv:setup',
         type: 'message',
+        kind: 'all',
         name: 'Add a portal in Settings → Addons → IPTV',
         description: 'Enter Xtream URL, username, and password, then refresh.',
       },
@@ -307,33 +416,14 @@ async function iptvFeed(ctx) {
   }
 
   try {
-    if (source === 'iptv_categories' || source === 'categories') {
-      return hubItems('feed', await iptvFeedCategories(ctx, portal));
-    }
-    if (source === 'iptv_portals' || source === 'portals') {
-      var portals = await iptvLoadPortals(ctx);
-      var active = await iptvGetActiveKey(ctx);
-      return hubItems(
-        'feed',
-        portals.map(function (p) {
-          var key = iptvPortalKey(p);
-          return {
-            id: 'portal:' + key,
-            type: 'portal',
-            name: String(p.label || p.username || key),
-            description: p.url,
-            badge: key === active ? 'Active' : '',
-            open: { surface: 'iptv_portal', id: key },
-            portalKey: key,
-          };
-        }),
-      );
-    }
-    var filter = params.filter;
-    var categoryId =
-      hubFilterValue(filter, 'category') ||
-      String(params.categoryId || params.category_id || '').trim();
-    return hubItems('feed', await iptvFeedChannels(ctx, portal, categoryId));
+    var section = iptvSection(params);
+    var items =
+      section === 'movies'
+        ? await iptvFeedMovies(ctx, portal)
+        : section === 'series'
+          ? await iptvFeedSeries(ctx, portal)
+          : await iptvFeedLive(ctx, portal);
+    return hubItems('feed', items);
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
   }
@@ -376,7 +466,7 @@ async function iptvSearchChannels(ctx, params) {
     ? params.categoryIds
     : [];
   try {
-    var streams = await iptvFeedChannels(ctx, portal, '');
+    var streams = await iptvFeedLive(ctx, portal);
     var sources = [];
     for (var i = 0; i < streams.length; i++) {
       var ch = streams[i];
@@ -436,7 +526,9 @@ async function iptvAddPortal(ctx, params) {
   if (!found) portals.push(portal);
   await iptvSavePortals(ctx, portals);
   await iptvSetActiveKey(ctx, portal.key);
-  return hubOk('addPortal', { portal: { key: portal.key, label: portal.label, url: portal.url } });
+  return hubOk('addPortal', {
+    portal: { key: portal.key, label: portal.label, url: portal.url },
+  });
 }
 
 async function iptvSelectPortal(ctx, params) {
