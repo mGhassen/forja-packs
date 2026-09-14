@@ -1121,12 +1121,65 @@ async function iptvResolveActive(ctx) {
   return portals[0];
 }
 
+function iptvPortalListItem(portal, activeKey) {
+  var pub = iptvPortalPublic(portal);
+  if (!pub || !pub.key) return null;
+  var label = pub.label || pub.username || pub.key;
+  return {
+    id: pub.key,
+    type: 'portal',
+    kind: 'portal',
+    name: label,
+    title: label,
+    description: pub.url || '',
+    subtitle: pub.url || '',
+    badge: pub.platform || '',
+    selected: pub.key === activeKey,
+    portalKey: pub.key,
+    platform: pub.platform,
+    activeConnections: pub.activeConnections,
+    maxConnections: pub.maxConnections,
+    expiry: pub.expiry,
+    open: {
+      surface: 'iptv',
+      id: pub.key,
+      action: 'selectPortal',
+      portalKey: pub.key,
+    },
+  };
+}
+
+/** Side-panel layout token — foundation paints portalList from items. */
+function iptvPortalsPanelLayout() {
+  return {
+    widgets: [
+      {
+        type: 'portalList',
+        id: 'portals',
+        source: 'listPortals',
+        title: 'Portals',
+        actions: [
+          { id: 'add', label: 'Add', action: 'addPortal' },
+          { id: 'refresh', label: 'Refresh', action: 'listPortals' },
+        ],
+      },
+    ],
+  };
+}
+
 async function iptvListPortals(ctx) {
   var portals = await iptvLoadPortals(ctx);
   var active = await iptvGetActiveKey(ctx);
+  var items = [];
+  for (var i = 0; i < portals.length; i++) {
+    var item = iptvPortalListItem(portals[i], active);
+    if (item) items.push(item);
+  }
   return hubOk('listPortals', {
     active: active,
     portals: portals.map(iptvPortalPublic),
+    items: items,
+    layout: iptvPortalsPanelLayout(),
   });
 }
 
@@ -1384,19 +1437,30 @@ function iptvEpisodeVideos(raw) {
   var out = [];
   for (var i = 0; i < raw.length; i++) {
     var e = raw[i] || {};
-    var id = String(e.id || e.episodeId || '').trim();
+    var id = String(e.id || e.episodeId || e.episode_id || '').trim();
     if (!id) continue;
     var season = Number(e.season);
-    var episode = Number(e.episode);
-    out.push({
+    var episode = Number(e.episode || e.episode_num);
+    var ext = String(
+      e.containerExt || e.container_ext || e.container_extension || e.ext || '',
+    )
+      .replace(/^\./, '')
+      .trim();
+    var thumb = String(e.image || e.thumbnail || e.movie_image || '').trim();
+    var title =
+      String(e.title || e.name || '').trim() ||
+      'Episode ' + (episode > 0 ? episode : i + 1);
+    var row = {
       id: id,
-      title:
-        String(e.title || e.name || '').trim() ||
-        'Episode ' + (episode > 0 ? episode : i + 1),
+      title: title,
       season: season > 0 ? season : 1,
       episode: episode > 0 ? episode : i + 1,
-      thumbnail: String(e.image || e.thumbnail || '').trim(),
-    });
+      thumbnail: thumb,
+    };
+    if (ext) row.containerExt = ext;
+    var plot = String(e.plot || (e.info && e.info.plot) || '').trim();
+    if (plot) row.plot = plot;
+    out.push(row);
   }
   out.sort(function (a, b) {
     if (a.season !== b.season) return a.season - b.season;
@@ -1414,9 +1478,8 @@ async function iptvFindPortalByKey(ctx, portalKey) {
   return null;
 }
 
-async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
-  var host = (ctx && ctx.host) || {};
-  var request = host.http && host.http.request;
+async function iptvFetchSeriesEpisodesHttp(ctx, portal, seriesId) {
+  var request = iptvHttp(ctx);
   if (typeof request !== 'function') return [];
   var base = iptvNormBase(portal.url);
   var url =
@@ -1450,11 +1513,46 @@ async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
             (e.info && (e.info.movie_image || e.info.cover)) || e.movie_image || '',
           ).trim(),
           plot: String((e.info && e.info.plot) || e.plot || '').trim(),
+          container_ext: String(
+            e.container_extension || e.container_ext || e.ext || '',
+          ).trim(),
         });
       }
     });
   }
   return iptvEpisodeVideos(out);
+}
+
+/** Series episodes via engine (Xtream/Stalker) or Xtream HTTP — pack owns meta.videos. */
+async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
+  var sid = String(seriesId || '').trim();
+  if (!sid || !portal) return [];
+  var platform = iptvPlatformOf(portal);
+  var engine = iptvEngine(ctx);
+  if (engine) {
+    try {
+      var res = await iptvEngineIptv(ctx, {
+        action: 'series_episodes',
+        platform: platform,
+        url: iptvNormBase(portal.url) || String(portal.url || '').trim(),
+        username: String(portal.username || portal.mac || ''),
+        password: String(portal.password || portal.serial || ''),
+        seriesId: sid,
+        series_id: sid,
+        timeout_secs: 45,
+      });
+      if (res && res.ok !== false && !res.error) {
+        var fromEngine = iptvEpisodeVideos(res.episodes || res.videos || []);
+        if (fromEngine.length) return fromEngine;
+      }
+    } catch (e) {
+      /* fall through */
+    }
+  }
+  if (platform === 'xtream') {
+    return await iptvFetchSeriesEpisodesHttp(ctx, portal, sid);
+  }
+  return [];
 }
 
 async function iptvVodDetails(ctx, params) {
@@ -1535,7 +1633,40 @@ async function iptvVodDetails(ctx, params) {
     },
   };
 
-  if (videos.length) meta.videos = videos;
+  if (videos.length) {
+    meta.videos = videos.map(function (v) {
+      var open = {
+        surface: 'iptv',
+        id: v.id,
+        movie: false,
+        kind: 'series',
+        portalKey: portalKey,
+        streamId: streamId,
+        episodeId: v.id,
+        season: v.season,
+        episode: v.episode,
+        name: v.title,
+        streamIcon: icon,
+        containerExt: v.containerExt || String(params.containerExt || ''),
+        platform: String(params.platform || 'xtream'),
+        extract: {
+          resolveType: 'iptv',
+          panelCategory: 'iptv',
+          ctx: {
+            portalKey: portalKey,
+            streamId: streamId,
+            episodeId: v.id,
+            kind: 'series',
+            platform: String(params.platform || 'xtream'),
+            containerExt: v.containerExt || String(params.containerExt || ''),
+            season: v.season,
+            episode: v.episode,
+          },
+        },
+      };
+      return Object.assign({}, v, { open: open });
+    });
+  }
   return hubOk('details', { meta: meta }, { maxAge: 300, swr: 900 });
 }
 

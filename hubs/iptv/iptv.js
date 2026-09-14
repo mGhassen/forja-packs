@@ -47,6 +47,7 @@ function iptvCatalogActions() {
       items: [
         { id: 'cards', label: 'Cards' },
         { id: 'list', label: 'List' },
+        { id: 'epg', label: 'EPG' },
       ],
     },
     {
@@ -277,6 +278,21 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
   var cats = iptvCatNameMap(catalog.categories);
   var sort = String((prefs && prefs.liveSort) || 'playlist').trim();
   var streams = iptvSortStreams(catalog.streams || [], sort);
+  var pinned = (prefs && Array.isArray(prefs.pinnedCats) && prefs.pinnedCats) || [];
+  if (pinned.length && section === 'live') {
+    var pinSet = {};
+    for (var pi = 0; pi < pinned.length; pi++) {
+      pinSet[String(pinned[pi] || '').trim()] = pi;
+    }
+    streams = streams.slice().sort(function (a, b) {
+      var ca = String((a && a.categoryId) || '').trim();
+      var cb = String((b && b.categoryId) || '').trim();
+      var pa = Object.prototype.hasOwnProperty.call(pinSet, ca) ? pinSet[ca] : 9999;
+      var pb = Object.prototype.hasOwnProperty.call(pinSet, cb) ? pinSet[cb] : 9999;
+      if (pa !== pb) return pa - pb;
+      return 0;
+    });
+  }
   var items = [];
   var byId = {};
 

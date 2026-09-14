@@ -520,13 +520,24 @@ function liveFeedNormalizePluginRows(pluginId, batch) {
   return collected;
 }
 
+function liveFeedCatalogIdMatches(pluginId, want) {
+  var id = String(pluginId || '').trim();
+  if (!id) return false;
+  var w = String(want || '').trim();
+  if (!w || w === 'all') return true;
+  if (w.indexOf('catalog-') === 0) w = w.slice(8);
+  var wantNorm = w.indexOf('live-') === 0 ? w.slice(5) : w;
+  return id === w || id === wantNorm || id === 'live-' + wantNorm;
+}
+
 function liveSportsAggregateFeed(ctx, params) {
   var host = ctx && ctx.host;
   var query = liveFeedQueryFromParams(params);
   var cfg = hubConfig(ctx, {});
   var force = !!(params && (params.force || params.forceRefresh));
 
-  // Host progressive fan-out passes accumulated catalog rows — pack only reduces.
+  // Optional host-assist: progressive host fans catalogs and passes accumulated rows.
+  // Pack only filters/merges/shapes — same reduce step as after each catalog scrape.
   if (params && Array.isArray(params.rows)) {
     var hostRows = liveFeedNormalizePluginRows('', params.rows);
     return Promise.resolve(
@@ -563,30 +574,44 @@ function liveSportsAggregateFeed(ctx, params) {
     );
   }
 
-  // Legacy one-shot aggregate (older hosts without progressive fan-out).
+  // Pack-owned progressive scrape: sequential catalog fan-out (host live_schedule
+  // progressive is optional UX; this path works when that host file is gone).
   return Promise.resolve(
     host.plugin.list({ type: 'live_sport', capability: 'catalog' }),
   ).then(function (plugins) {
     var list = Array.isArray(plugins) ? plugins : [];
     var wanted = list;
     if (filter && filter !== 'all') {
-      var want = filter;
-      var wantNorm = want.indexOf('live-') === 0 ? want.slice(5) : want;
       wanted = list.filter(function (p) {
         var id = String((p && (p.id || p.pluginId)) || '');
-        return id === want || id === wantNorm || id === 'live-' + wantNorm;
+        return liveFeedCatalogIdMatches(id, filter);
       });
     }
     if (!wanted.length) return [];
 
-    var chain = Promise.resolve([]);
+    var chain = Promise.resolve();
     var raw = [];
     var seen = {};
+    var total = wanted.length;
+    var onProgress =
+      params && typeof params.onProgress === 'function' ? params.onProgress : null;
 
-    wanted.forEach(function (p) {
+    wanted.forEach(function (p, index) {
       var pluginId = String((p && (p.pluginId || p.id)) || '');
+      var pluginName = String((p && (p.name || p.label || pluginId)) || pluginId);
       var pluginKey = liveFeedCacheKey(pluginId);
       chain = chain.then(function () {
+        if (onProgress) {
+          try {
+            onProgress({
+              busy: true,
+              label: 'Loading ' + pluginName + '… ' + (index + 1) + '/' + total,
+              index: index,
+              total: total,
+              pluginId: pluginId,
+            });
+          } catch (e) {}
+        }
         if (!force) {
           var warm = liveFeedCacheGet(host, pluginKey);
           if (warm && Array.isArray(warm.rows) && warm.rows.length) {
@@ -611,13 +636,18 @@ function liveSportsAggregateFeed(ctx, params) {
             });
           },
           function () {
-            /* skip failed catalog */
+            /* skip failed catalog — keep prior rows */
           },
         );
       });
     });
 
     return chain.then(function () {
+      if (onProgress) {
+        try {
+          onProgress({ busy: false, label: null, index: total, total: total });
+        } catch (e) {}
+      }
       liveFeedCacheSet(host, cacheKey, raw);
       return liveFeedFilterRows(raw, query, liveFeedShouldMerge(query, cfg));
     });

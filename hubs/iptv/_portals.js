@@ -165,12 +165,65 @@ async function iptvResolveActive(ctx) {
   return portals[0];
 }
 
+function iptvPortalListItem(portal, activeKey) {
+  var pub = iptvPortalPublic(portal);
+  if (!pub || !pub.key) return null;
+  var label = pub.label || pub.username || pub.key;
+  return {
+    id: pub.key,
+    type: 'portal',
+    kind: 'portal',
+    name: label,
+    title: label,
+    description: pub.url || '',
+    subtitle: pub.url || '',
+    badge: pub.platform || '',
+    selected: pub.key === activeKey,
+    portalKey: pub.key,
+    platform: pub.platform,
+    activeConnections: pub.activeConnections,
+    maxConnections: pub.maxConnections,
+    expiry: pub.expiry,
+    open: {
+      surface: 'iptv',
+      id: pub.key,
+      action: 'selectPortal',
+      portalKey: pub.key,
+    },
+  };
+}
+
+/** Side-panel layout token — foundation paints portalList from items. */
+function iptvPortalsPanelLayout() {
+  return {
+    widgets: [
+      {
+        type: 'portalList',
+        id: 'portals',
+        source: 'listPortals',
+        title: 'Portals',
+        actions: [
+          { id: 'add', label: 'Add', action: 'addPortal' },
+          { id: 'refresh', label: 'Refresh', action: 'listPortals' },
+        ],
+      },
+    ],
+  };
+}
+
 async function iptvListPortals(ctx) {
   var portals = await iptvLoadPortals(ctx);
   var active = await iptvGetActiveKey(ctx);
+  var items = [];
+  for (var i = 0; i < portals.length; i++) {
+    var item = iptvPortalListItem(portals[i], active);
+    if (item) items.push(item);
+  }
   return hubOk('listPortals', {
     active: active,
     portals: portals.map(iptvPortalPublic),
+    items: items,
+    layout: iptvPortalsPanelLayout(),
   });
 }
 
