@@ -135,6 +135,7 @@ function liveSportsCatalogActions() {
       id: 'portals',
       label: 'Portals',
       action: 'portals',
+      hoistSource: 'live_schedule',
       trailing: true,
     },
   ];

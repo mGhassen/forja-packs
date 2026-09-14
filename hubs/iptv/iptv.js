@@ -47,13 +47,14 @@ function iptvCatalogActions() {
       items: [
         { id: 'cards', label: 'Cards' },
         { id: 'list', label: 'List' },
-        { id: 'epg', label: 'EPG' },
+        { id: 'timeline', label: 'Timeline' },
       ],
     },
     {
       id: 'portals',
       label: 'Portals',
       action: 'portals',
+      hoistSource: 'iptv',
       trailing: true,
     },
   ];
@@ -156,6 +157,7 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     open: open,
     portalKey: pkey,
     streamId: id,
+    epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     categoryId: String(stream.categoryId || stream.category_id || 'all').trim() || 'all',
   };
 }
@@ -343,6 +345,81 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
   return items;
 }
 
+/** Timeline style: attach opaque programmes[] (short EPG) for foundation paint. */
+async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
+  var layout = String((prefs && prefs.layout) || '').trim().toLowerCase();
+  if (layout === 'guide' || layout === 'epg') layout = 'timeline';
+  var p = params || {};
+  var styleParam = String(p.listStyle || p.style || '')
+    .trim()
+    .toLowerCase();
+  if (styleParam === 'guide' || styleParam === 'epg') styleParam = 'timeline';
+  var wantTimeline = layout === 'timeline' || styleParam === 'timeline';
+  if (!wantTimeline || !items || !items.length) return items;
+
+  var platform = iptvPlatformOf(portal);
+  var http = iptvHttp(ctx);
+  var base = iptvNormBase(portal.url);
+  var limit = Math.min(items.length, 48);
+
+  for (var i = 0; i < items.length; i++) {
+    if (!Array.isArray(items[i].programmes)) items[i].programmes = [];
+  }
+
+  if (platform !== 'xtream' || !http || !base) return items;
+
+  var qs =
+    'username=' +
+    encodeURIComponent(portal.username) +
+    '&password=' +
+    encodeURIComponent(portal.password);
+
+  for (var j = 0; j < limit; j++) {
+    var row = items[j];
+    if (!row || !row.streamId) continue;
+    try {
+      var url =
+        base +
+        '/player_api.php?' +
+        qs +
+        '&action=get_short_epg&stream_id=' +
+        encodeURIComponent(row.streamId) +
+        '&limit=4';
+      var res = await http({ method: 'GET', url: url, timeoutMs: 8000 });
+      var body = res && (res.body || res.data || res.text);
+      var parsed = typeof body === 'string' ? JSON.parse(body) : body;
+      var list =
+        (parsed && (parsed.epg_listings || parsed.listings || parsed)) || [];
+      if (!Array.isArray(list)) list = [];
+      var programmes = [];
+      for (var k = 0; k < list.length; k++) {
+        var e = list[k] || {};
+        var title = String(e.title || e.name || e.programme || '').trim();
+        if (!title && e.title) {
+          try {
+            title = String(decodeURIComponent(escape(atob(String(e.title))))).trim();
+          } catch (_) {
+            title = String(e.title).trim();
+          }
+        }
+        if (!title) continue;
+        var start = Number(e.start_timestamp || e.startMs || e.start || 0);
+        var end = Number(e.stop_timestamp || e.endMs || e.end || e.stop || 0);
+        if (!start || !end || end <= start) continue;
+        programmes.push({
+          title: title,
+          startMs: start < 1e11 ? start * 1000 : start,
+          endMs: end < 1e11 ? end * 1000 : end,
+        });
+      }
+      row.programmes = programmes;
+    } catch (_) {
+      /* keep empty programmes — timeline still paints channels */
+    }
+  }
+  return items;
+}
+
 async function iptvFeed(ctx) {
   var params = hubParams(ctx);
   var portal = await iptvResolveActive(ctx);
@@ -390,6 +467,15 @@ async function iptvFeed(ctx) {
       prefs,
       q,
     );
+    if (section === 'live') {
+      items = await iptvAttachTimelineProgrammes(
+        ctx,
+        portal,
+        items,
+        prefs,
+        params,
+      );
+    }
     return hubItems('feed', items);
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
