@@ -143,7 +143,6 @@ function hubFilterValue(filter, field) {
   return values.length ? values[0] : '';
 }
 
-
 function hubStripHtml(html) {
   if (html == null) return '';
   return String(html)
@@ -372,8 +371,6 @@ function kitCategoryBar(id, opts) {
   return Object.assign({ type: 'kit.categoryBar', id: id }, o);
 }
 
-
-// --- schedule aggregate (RFC-109 Wave B) ---
 // Live Sports schedule aggregate — pack-owned (RFC-109 Wave B).
 // Calls ctx.host.plugin.list / plugin.run + ctx.host.cache. No host.feed.
 
@@ -898,15 +895,24 @@ function liveFeedNormalizePluginRows(pluginId, batch) {
 
 function liveSportsAggregateFeed(ctx, params) {
   var host = ctx && ctx.host;
+  var query = liveFeedQueryFromParams(params);
+  var cfg = hubConfig(ctx, {});
+  var force = !!(params && (params.force || params.forceRefresh));
+
+  // Host progressive fan-out passes accumulated catalog rows — pack only reduces.
+  if (params && Array.isArray(params.rows)) {
+    var hostRows = liveFeedNormalizePluginRows('', params.rows);
+    return Promise.resolve(
+      liveFeedFilterRows(hostRows, query, liveFeedShouldMerge(query, cfg)),
+    );
+  }
+
   if (!host || !host.plugin || typeof host.plugin.run !== 'function') {
     return Promise.reject(new Error('HOST_PLUGIN_RUN_REQUIRED'));
   }
   if (typeof host.plugin.list !== 'function') {
     return Promise.reject(new Error('HOST_PLUGIN_LIST_REQUIRED'));
   }
-  var query = liveFeedQueryFromParams(params);
-  var cfg = hubConfig(ctx, {});
-  var force = !!(params && (params.force || params.forceRefresh));
   if (force) liveFeedCacheClear(host);
 
   var cacheKey = liveFeedCacheKey(query.catalogFilter);
@@ -930,6 +936,7 @@ function liveSportsAggregateFeed(ctx, params) {
     );
   }
 
+  // Legacy one-shot aggregate (older hosts without progressive fan-out).
   return Promise.resolve(
     host.plugin.list({ type: 'live_sport', capability: 'catalog' }),
   ).then(function (plugins) {

@@ -341,11 +341,15 @@ function liveSportsParseHorizonPref(raw) {
 }
 
 function liveSportsLoadFeed(ctx, params) {
+  var p = params || {};
   var host = ctx && ctx.host;
-  if (!host || !host.plugin || typeof host.plugin.run !== 'function') {
+  var hasRows = Array.isArray(p.rows);
+  if (
+    !hasRows &&
+    (!host || !host.plugin || typeof host.plugin.run !== 'function')
+  ) {
     return Promise.reject(new Error('HOST_PLUGIN_RUN_REQUIRED'));
   }
-  var p = params || {};
   var status = String(p.scheduleStatus || '').trim();
   var horizon = String(p.scheduleHorizon || '').trim();
   if (!status || !horizon) {
@@ -367,6 +371,7 @@ function liveSportsLoadFeed(ctx, params) {
     scheduleStatus: status || 'airing',
     scheduleHorizon: horizon || 'h1',
     force: !!(p.force || p.forceRefresh),
+    rows: hasRows ? p.rows : undefined,
   }).then(function (rows) {
     if (!Array.isArray(rows)) return [];
     var out = [];
