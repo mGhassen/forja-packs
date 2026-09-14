@@ -146,7 +146,7 @@ function liveSportsLayout() {
     pages: {
       live_sports: {
         widgets: [
-          kitStack('page', { expand: true }, [
+          kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
               // ↓ from Catalog / Portals restores last schedule row (not All).
               focusDown: 'schedule',
@@ -173,9 +173,17 @@ function liveSportsLayout() {
                 panelTab: 'providers',
                 panelTabs: [
                   { id: 'providers', label: 'Providers', icon: 'dns' },
-                  { id: 'live_tv', label: 'Live TV', icon: 'tv', browse: true, action: 'liveTv' },
+                  {
+                    id: 'live_tv',
+                    label: 'Live TV',
+                    icon: 'tv',
+                    browse: true,
+                    action: 'liveTv',
+                  },
                 ],
                 focusRight: 'sources-kind',
+                emptyTitle: 'No matches in this schedule',
+                emptyDescription: 'Try another catalog, horizon, or sport filter.',
               }),
               'feed',
               {},

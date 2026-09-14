@@ -263,19 +263,24 @@ function kidsFilters() {
 
 function kidsLayout() {
   return {
+    dir: 'rtl',
     pages: {
       kids: {
         feed: true,
         feedRails: KIDS_FEED_RAILS.slice(),
         pageSize: 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'أحدث المسلسلات',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'أحدث المسلسلات',
+              rail: 'spotlight',
+              bleed: 'latest',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           { type: 'continue', id: 'continue_watching' },
           hubWithLoad({
             type: 'rail',

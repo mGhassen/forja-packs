@@ -338,19 +338,24 @@ function brstejMeta(id, title, poster, opts) {
 
 function brstejLayout() {
   return {
+    dir: 'rtl',
     pages: {
       aflem: {
         feed: true,
         feedRails: BRSTEJ_FEED_RAILS.slice(),
         pageSize: 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'أحدث المسلسلات',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'أحدث المسلسلات',
+              rail: 'spotlight',
+              bleed: 'latest',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'latest',
@@ -359,13 +364,17 @@ function brstejLayout() {
             hideWhenBleed: true,
           }, 'rail', { rail: 'latest' }),
           { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'ranked',
-            id: 'series',
-            title: 'مسلسلات',
-            rail: 'series',
-            style: 'numbered',
-          },
+          hubWithLoad(
+            {
+              type: 'ranked',
+              id: 'series',
+              title: 'مسلسلات',
+              rail: 'series',
+              style: 'numbered',
+            },
+            'rail',
+            { rail: 'series' },
+          ),
         ],
       },
     },

@@ -538,25 +538,35 @@ function fetchRailItems(ctx, cfg, railId) {
 
 function layout() {
   var widgets = [
-    {
-      type: 'hero',
-      id: 'spotlight',
-      title: 'Shahid',
-      rail: 'top_series',
-      bleed: 'top_movies',
-    },
+    hubWithLoad(
+      {
+        type: 'hero',
+        id: 'spotlight',
+        title: 'Shahid',
+        rail: 'top_series',
+        bleed: 'top_movies',
+      },
+      'rail',
+      { rail: 'top_series' },
+    ),
   ];
   for (var i = 0; i < SHAHID_FEED_RAILS.length; i++) {
     var id = SHAHID_FEED_RAILS[i];
     var def = SHAHID_RAILS[id];
     if (!def) continue;
-    widgets.push({
-      type: 'rail',
-      id: id,
-      title: def.label,
-      rail: id,
-      hideWhenBleed: id === 'top_series',
-    });
+    widgets.push(
+      hubWithLoad(
+        {
+          type: 'rail',
+          id: id,
+          title: def.label,
+          rail: id,
+          hideWhenBleed: id === 'top_series',
+        },
+        'rail',
+        { rail: id },
+      ),
+    );
   }
   return hubOk(
     'layout',
@@ -633,7 +643,23 @@ function filters() {
       },
     });
   }
-  return hubOk('filters', { categories: options });
+  return hubOk('filters', {
+    menus: [
+      {
+        id: 'series',
+        label: 'Series',
+        filter: { op: 'eq', field: 'kind', value: 'series' },
+        hideTypeFilterRails: true,
+      },
+      {
+        id: 'movies',
+        label: 'Films',
+        filter: { op: 'eq', field: 'kind', value: 'movie' },
+        hideTypeFilterRails: true,
+      },
+    ],
+    fields: [{ field: 'rail', label: 'Category', options: options }],
+  });
 }
 
 function details(ctx) {

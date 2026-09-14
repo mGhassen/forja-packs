@@ -1,7 +1,7 @@
 # SDK + kit (must read before writing pack JS)
 
 Source of truth: sibling **`forja-sdk`** (`../forja-sdk/` from forja-packs).
-Index: `contract.json` · guide: `DEVELOPING.md` · kits: `catalog-kit.js`, `torrent-kit.js`.
+Index: `contract.json` · guide: `DEVELOPING.md` · layout catalog: `docs/components.md` · machine index: `schema/layout-components.schema.json` · kits: `catalog-kit.js`, `torrent-kit.js`.
 
 Packs **vendor** kits as local prelude (`_kit.js`, `_torrent_common.js`). Never `require` a sibling sdk path at runtime.
 
@@ -88,18 +88,38 @@ Error `code` enum: `INVALID_ACTION` | `INVALID_PARAMS` | `NOT_FOUND` | `AUTH_REQ
 | `filters` | `fields[]` (+ optional play filters) |
 | `enrich` | enriched `items` / `meta` (companion plugin) |
 
-### Layout widgets (`kit.*`)
+### Layout (one foundation catalog)
+
+**Author catalog (full DS):** `forja-sdk/docs/components.md` · `forja-sdk/schema/layout-components.schema.json` — includes `not_mounted` atoms/widgets. Pack JSON only paints `status: mounted`.
+
+**Everything is a component.** Host = one mount table. `kit.stack` composes children; each child is any **mounted** foundation `type` (chrome, list, hero, prepared page, …). No atoms-vs-blocks API.
 
 ```javascript
-kitStack(id, opts, children)  // type: kit.stack — expand:true on last child
-kitMenu(id, items, opts)      // kit.menu — underline filters; focusUp/Down/Left/Right
-kitTabs(id, tabs, opts)       // kit.tabs
-kitList(id, opts)             // kit.list — opaque source id; kindMenu/statusTab
-kitRow(id, opts)              // kit.row — horizontal rail
-playFilterGrouped(field, options, opts)  // filters action play row
+kitStack(id, opts, children)       // kit.stack — expand:true on last child
+kitMenu(id, items, opts)           // kit.menu
+kitTabs(id, tabs, opts)            // kit.tabs
+kitList(id, opts)                  // kit.list — hubWithLoad for feed
+kitRow(id, opts)                   // kit.row — rail
+kitTopBar(id, opts)                // kit.topBar
+kitCategoryBar(id, opts)           // kit.categoryBar — orientation:'vertical' for side rail
+kitNode(type, id, opts, children)  // any foundation type string
+kitColumnsHeader(id, opts, children) // optional prepared page
+kitTopBody(id, opts, children)     // optional prepared page
+kitTabsCards(id, opts, children)   // optional prepared page
+playFilterGrouped(field, options, opts)
 ```
 
-Legacy aliases still work in host (`stack` → `kit.stack`, …). Prefer `kit.*`.
+Usual page:
+
+```javascript
+kitStack('page', { expand: true }, [
+  kitTopBar('chrome', { actions: […] }),
+  kitCategoryBar('cats', { items: […], default: 'all' }),
+  hubWithLoad(kitList('items', { style: 'grid', kindMenu: 'cats' }), 'feed', {}),
+]);
+```
+
+Legacy aliases still work in host (`stack` → `kit.stack`, …). Prefer `kit.*`. Sync helpers from `forja-sdk/catalog-kit.js`.
 
 ### Paint (validate + paint host)
 
@@ -113,21 +133,8 @@ hubWithLoad(node, action, params)  // node.load → host opaque runPlugin(action
 ```
 
 `hubItems` stamps `hubPaintPoster` when an item has no `paint` yet.
-**Page blocks (RFC-112)** — emit JSON `type` + serializable `props` + `children` (no Dart imports, no callbacks in props):
 
-| `type` | Use for |
-|--------|---------|
-| `catalogBody` | Hub catalog scroll body — **shared** by IPTV / Live Sports / My List (never `iptvCatalog` / `liveSportsCatalog` / `myListCatalog`) |
-| `columnsHeader` | Header + side column + body — IPTV-style top / categories / channels (`sideWidth`, `sideOnLeading`) |
-| `topBody` | Page top + bodyTop strip + expand grid — Live Sports-style chrome / kinds / schedule |
-| `tabsCards` | Optional kind menu + status tabs + cards grid — My List-style filters / posters |
-| `search` | Catalog search page (`hintText`, …) |
-| `details` | Prebuilt details: props drive `DetailsHero` (`title`, `backdropUrl`, `overview`, `genres`, …) |
-| `matchDetails` | Prebuilt match details: same hero props + optional host action/streams slot |
-| `entryDetails` | Entry chrome (`title`, `emptyMessage`) |
-| `shell` / `empty` | Page shell / empty state |
-
-Cards stay `posterCard` / `eventCard` under the shared body. Product difference = pack JSON + `open.surface`, not separate Dart block classes.
+Cards stay `posterCard` / `eventCard`. Product difference = pack JSON + `open.surface`, not host Dart.
 
 Hub `nav.page.action` must declare the opaque page load (usually `"layout"`). Rails/lists that need data use `hubWithLoad(..., 'rail'|'feed'|…, params)` — host never special-cases those action names.
 

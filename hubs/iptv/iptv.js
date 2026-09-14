@@ -65,7 +65,7 @@ function iptvLayout() {
     pages: {
       iptv: {
         widgets: [
-          kitStack('page', { expand: true }, [
+          kitColumnsHeader('page', { expand: true }, [
             kitTopBar('chrome', {
               focusDown: 'cats',
               actions: iptvCatalogActions(),
@@ -73,6 +73,7 @@ function iptvLayout() {
             kitCategoryBar('cats', {
               dynamic: true,
               source: 'iptv',
+              orientation: 'vertical',
               focusUp: 'chrome',
               focusDown: 'items',
               default: 'all',
@@ -86,6 +87,9 @@ function iptvLayout() {
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
+                emptyTitle: 'Add a portal in Settings → Addons → IPTV',
+                emptyDescription:
+                  'Enter portal URL and credentials, then refresh.',
               }),
               'feed',
               {},
@@ -433,15 +437,7 @@ async function iptvFeed(ctx) {
   var params = hubParams(ctx);
   var portal = await iptvResolveActive(ctx);
   if (!portal) {
-    return hubItems('feed', [
-      hubPaintPoster({
-        id: 'iptv:setup',
-        type: 'message',
-        kind: 'all',
-        name: 'Add a portal in Settings → Addons → IPTV',
-        description: 'Enter portal URL and credentials, then refresh.',
-      }),
-    ]);
+    return hubItems('feed', []);
   }
 
   try {

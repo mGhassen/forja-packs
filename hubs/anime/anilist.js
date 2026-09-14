@@ -132,6 +132,7 @@ function anilistLayout() {
   return {
     pages: {
       anime: {
+        feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
         widgets: [
           hubWithLoad(

@@ -204,6 +204,7 @@ function iptvPortalsPanelLayout() {
         title: 'Portals',
         actions: [
           { id: 'add', label: 'Add', action: 'addPortal' },
+          { id: 'deal', label: 'Deal', action: 'dealPortals' },
           { id: 'refresh', label: 'Refresh', action: 'listPortals' },
         ],
       },

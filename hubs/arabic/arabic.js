@@ -289,20 +289,25 @@ function arabicHeaders(referer) {
 }
 
 function arabicLayout() {
-  return { 
+  return {
+    dir: 'rtl',
     pages: {
       arabic: {
         feed: true,
         feedRails: ARABIC_FEED_RAILS.slice(),
         pageSize: 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'رائج · Spotlight',
-            rail: 'trending',
-            bleed: 'latest',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'رائج · Spotlight',
+              rail: 'trending',
+              bleed: 'latest',
+            },
+            'rail',
+            { rail: 'trending' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'latest',

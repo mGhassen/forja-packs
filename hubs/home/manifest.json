@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "tags": [
     "home",
     "movies",
@@ -26,6 +26,7 @@
       "capabilities": [
         "nav",
         "layout",
+        "feed",
         "rail",
         "search",
         "structured_search",

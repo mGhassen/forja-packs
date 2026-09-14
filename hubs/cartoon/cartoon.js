@@ -229,19 +229,24 @@ function cartoonMeta(seriesId, title, poster, opts) {
 
 function cartoonLayout() {
   return {
+    dir: 'rtl',
     pages: {
       cartoon: {
         feed: true,
         feedRails: CARTOON_FEED_RAILS.slice(),
         pageSize: 24,
         widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'أحدث المسلسلات',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
+          hubWithLoad(
+            {
+              type: 'hero',
+              id: 'spotlight',
+              title: 'أحدث المسلسلات',
+              rail: 'spotlight',
+              bleed: 'latest',
+            },
+            'rail',
+            { rail: 'spotlight' },
+          ),
           { type: 'continue', id: 'continue_watching' },
           hubWithLoad({
             type: 'rail',
@@ -251,13 +256,17 @@ function cartoonLayout() {
             hideWhenBleed: true,
             aspect: 'portrait',
           }, 'rail', { rail: 'latest' }),
-          {
-            type: 'ranked',
-            id: 'popular',
-            title: 'الأكثر حلقات',
-            rail: 'popular',
-            aspect: 'portrait',
-          },
+          hubWithLoad(
+            {
+              type: 'ranked',
+              id: 'popular',
+              title: 'الأكثر حلقات',
+              rail: 'popular',
+              aspect: 'portrait',
+            },
+            'rail',
+            { rail: 'popular' },
+          ),
           hubWithLoad({
             type: 'rail',
             id: 'episodes',

@@ -20,29 +20,28 @@ function myListLayout() {
     pages: {
       mylist: {
         widgets: [
-          kitStack(
-            'page',
-            { expand: true },
-            [
-              kitMenu('kind', MY_LIST_KIND_ITEMS, {
-                toggle: true,
-                focusDown: 'status',
+          kitTabsCards('page', { expand: true }, [
+            kitMenu('kind', MY_LIST_KIND_ITEMS, {
+              toggle: true,
+              focusDown: 'status',
+            }),
+            kitTabs('status', MY_LIST_STATUS_TABS, {
+              default: 'plantowatch',
+              focusUp: 'kind',
+              focusDown: 'grid',
+            }),
+            hubWithLoad(
+              kitList('grid', {
+                kindMenu: 'kind',
+                statusTab: 'status',
+                emptyTitle: 'Nothing in this list yet',
+                emptyDescription:
+                  'Open a title and tap + to set a watch status.',
               }),
-              kitTabs('status', MY_LIST_STATUS_TABS, {
-                default: 'plantowatch',
-                focusUp: 'kind',
-                focusDown: 'grid',
-              }),
-              hubWithLoad(
-                kitList('grid', {
-                  kindMenu: 'kind',
-                  statusTab: 'status',
-                }),
-                'feed',
-                {},
-              ),
-            ],
-          ),
+              'feed',
+              {},
+            ),
+          ]),
         ],
       },
     },
