@@ -1,0 +1,49 @@
+---
+description: Laws for authoring EngineJS packs in forja-packs (clone peer, never host Dart)
+alwaysApply: true
+---
+
+# forja-packs authoring
+
+This repo is **EngineJS packs only**. Host Dart/Rust → [Forja](https://github.com/mGhassen/Forja). Schemas/kits/starters → [forja-sdk](https://github.com/mGhassen/forja-sdk).
+
+When creating or extending packs, read and follow `.cursor/skills/create-forja-pack/SKILL.md` and **`sdk-kit.md`** (kit/protocol, envelopes, `ctx`, schemas) before writing JS.
+
+## Trees
+
+| Tree | Role | Typical change |
+|------|------|----------------|
+| `providers/` | VOD `extract` + `hops/` | Add plugin to `manifest.json` |
+| `livesports/` | Live `catalog` + `resolve` | Add plugin to `manifest.json` |
+| `torrent/` | Indexer `search(ctx)` | Add plugin to `manifest.json` |
+| `hubs/<slug>/` | Catalog hub (shell tab) | New folder + own `manifest.json` |
+| `hubs/iptv/` | IPTV hub product | Extend existing hub |
+| `archived/` | Dead packs | Never clone for new work |
+
+## Clone-first (mandatory)
+
+1. Pick the peer clone target in the skill `clone-targets.md`.
+2. Copy structure / entry / manifest snippet from that peer.
+3. Rename ids, rewrite upstream logic — do **not** hand-roll a blank pack shape.
+4. Contracts: sibling `forja-sdk` (`DEVELOPING.md`, `schema/manifest.schema.json`). Starters only if no peer fits.
+
+## Forbidden
+
+| Do not | Why |
+|--------|-----|
+| Flutter / Rust / host Dart here | Wrong repo |
+| Vendor SDK under this repo | Kits stay in forja-sdk; packs ship local `_kit.js` / prelude |
+| `streams[]` / `iframe` / embed as playable on catalog rows | Schedule ≠ play URL |
+| `webviewOnly` / embed-only live resolve | Native `{ url, headers? }` or omit |
+| Migration / “formerly / only” copy in `name` / `description` / `nav.label` | Product truth now |
+| Hardcode host pack inventory assumptions | Packs are replaceable |
+| New work under `archived/` | Dead |
+
+## Ship checklist (every change)
+
+- [ ] Stable pack `id`; plugin `id` unique **inside** pack
+- [ ] Bump pack `version` when behavior changes
+- [ ] `bundle` lists every install file (`entry`, `prelude`, icons, unlock assets)
+- [ ] User-facing strings describe current product only
+- [ ] New hub folder → add path to `.github/workflows/validate-manifests.yml`
+- [ ] No host Dart required for pack-only work
