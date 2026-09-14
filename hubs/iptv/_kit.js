@@ -75,7 +75,7 @@ function hubFormatDisplayDate(iso) {
   var s = hubParseIsoDate(iso);
   if (!s) return '';
   var parts = s.split('-');
-  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var m = Number(parts[1]);
   var d = Number(parts[2]);
   var y = Number(parts[0]);
