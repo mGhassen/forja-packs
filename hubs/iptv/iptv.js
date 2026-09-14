@@ -2,6 +2,62 @@
 // Host bridges: vault, http, engine.request, playback.probe, cache.disk*.
 // Player stays host via open.surface / playback.open. No ctx.host.iptv.
 
+function iptvCatalogActions() {
+  return [
+    {
+      id: 'catalog',
+      label: 'Section',
+      icon: 'live_tv',
+      default: 'live',
+      items: [
+        { id: 'live', label: 'Live' },
+        { id: 'movies', label: 'Movies' },
+        { id: 'series', label: 'Series' },
+      ],
+    },
+    {
+      id: 'sort',
+      label: 'Sort',
+      icon: 'filter',
+      default: 'playlist',
+      items: [
+        { id: 'playlist', label: 'Playlist' },
+        { id: 'nameAsc', label: 'Name A–Z' },
+        { id: 'nameDesc', label: 'Name Z–A' },
+      ],
+    },
+    {
+      id: 'refresh',
+      label: 'Refresh',
+      icon: 'refresh',
+      action: 'refresh',
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      action: 'eventSearch',
+      trailing: true,
+      placeholder: 'Channel, movie, series…',
+    },
+    {
+      id: 'view',
+      label: 'View',
+      icon: 'view',
+      trailing: true,
+      items: [
+        { id: 'cards', label: 'Cards' },
+        { id: 'list', label: 'List' },
+      ],
+    },
+    {
+      id: 'portals',
+      label: 'Portals',
+      action: 'portals',
+      trailing: true,
+    },
+  ];
+}
+
 function iptvLayout() {
   return {
     pages: {
@@ -10,31 +66,7 @@ function iptvLayout() {
           kitStack('page', { expand: true }, [
             kitTopBar('chrome', {
               focusDown: 'cats',
-              actions: [
-                {
-                  id: 'portals',
-                  label: 'Portals',
-                  icon: 'dns',
-                  action: 'portals',
-                },
-                {
-                  id: 'catalog',
-                  label: 'Section',
-                  icon: 'live_tv',
-                  default: 'live',
-                  items: [
-                    { id: 'live', label: 'Live' },
-                    { id: 'movies', label: 'Movies' },
-                    { id: 'series', label: 'Series' },
-                  ],
-                },
-                {
-                  id: 'refresh',
-                  label: 'Refresh',
-                  icon: 'refresh',
-                  action: 'refresh',
-                },
-              ],
+              actions: iptvCatalogActions(),
             }),
             kitCategoryBar('cats', {
               dynamic: true,
@@ -42,6 +74,7 @@ function iptvLayout() {
               focusUp: 'chrome',
               focusDown: 'items',
               default: 'all',
+              items: [{ id: 'all', label: 'All', icon: 'grid' }],
             }),
             kitList('items', {
               source: 'iptv',
@@ -50,6 +83,7 @@ function iptvLayout() {
               focusUp: 'cats',
               kindMenu: 'cats',
               catalogMenu: 'catalog',
+              sortMenu: 'sort',
             }),
           ]),
         ],
@@ -229,9 +263,20 @@ function iptvSection(params) {
   return 'live';
 }
 
-async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs) {
+function iptvFeedQueryMatch(meta, q) {
+  var needle = String(q || '')
+    .trim()
+    .toLowerCase();
+  if (!needle) return true;
+  var name = String(meta.name || meta.title || '').toLowerCase();
+  var cat = String(meta.categoryName || meta.kind || '').toLowerCase();
+  return name.indexOf(needle) >= 0 || cat.indexOf(needle) >= 0;
+}
+
+async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
   var cats = iptvCatNameMap(catalog.categories);
-  var streams = iptvSortStreams(catalog.streams || [], prefs.liveSort);
+  var sort = String((prefs && prefs.liveSort) || 'playlist').trim();
+  var streams = iptvSortStreams(catalog.streams || [], sort);
   var items = [];
   var byId = {};
 
@@ -245,6 +290,7 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs) {
         : iptvVodMeta(portal, s, section, cats[catId] || catId);
     if (!meta) continue;
     if (section === 'live' && !(meta.open && meta.open.url)) continue;
+    if (!iptvFeedQueryMatch(meta, q)) continue;
     items.push(meta);
     byId[String(s.id)] = s;
   }
@@ -261,7 +307,7 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs) {
         'Favorites',
         'favorites',
       );
-      if (favMeta) items.push(favMeta);
+      if (favMeta && iptvFeedQueryMatch(favMeta, q)) items.push(favMeta);
     }
     for (var w = 0; w < watchedIds.length; w++) {
       var ws = byId[String(watchedIds[w])];
@@ -272,7 +318,9 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs) {
         'Already watched',
         'watched',
       );
-      if (watchedMeta) items.push(watchedMeta);
+      if (watchedMeta && iptvFeedQueryMatch(watchedMeta, q)) {
+        items.push(watchedMeta);
+      }
     }
   }
 
@@ -309,7 +357,23 @@ async function iptvFeed(ctx) {
       );
     }
     var prefs = await iptvPrefsLoad(ctx, iptvPortalKey(portal), section);
-    var items = await iptvFeedFromCatalog(ctx, portal, section, catalog, prefs);
+    var sortOverride = String((params && params.sort) || '').trim();
+    if (
+      sortOverride === 'playlist' ||
+      sortOverride === 'nameAsc' ||
+      sortOverride === 'nameDesc'
+    ) {
+      prefs = Object.assign({}, prefs, { liveSort: sortOverride });
+    }
+    var q = String((params && params.q) || '').trim();
+    var items = await iptvFeedFromCatalog(
+      ctx,
+      portal,
+      section,
+      catalog,
+      prefs,
+      q,
+    );
     return hubItems('feed', items);
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
@@ -359,7 +423,14 @@ async function iptvSearchChannels(ctx, params) {
   try {
     var catalog = await iptvFetchCatalog(ctx, portal, 'live');
     var prefs = await iptvPrefsLoad(ctx, iptvPortalKey(portal), 'live');
-    var items = await iptvFeedFromCatalog(ctx, portal, 'live', catalog, prefs);
+    var items = await iptvFeedFromCatalog(
+      ctx,
+      portal,
+      'live',
+      catalog,
+      prefs,
+      '',
+    );
     var sources = [];
     for (var i = 0; i < items.length; i++) {
       var ch = items[i];
