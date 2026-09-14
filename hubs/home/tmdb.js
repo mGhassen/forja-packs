@@ -599,7 +599,7 @@ function tmdbLayout() {
             'rail',
             { rail: 'popular' },
           ),
-          { type: 'continue', id: 'continue_watching' },
+          { type: 'continue', id: 'continue_watching', mergeHomeWatchHistory: true },
           hubWithLoad(
             {
               type: 'mood',
