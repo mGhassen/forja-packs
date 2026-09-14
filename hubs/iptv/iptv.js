@@ -147,6 +147,10 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     surface: 'stream',
     id: url,
     url: url,
+    kind: 'live',
+    platform: platform,
+    streamId: id,
+    epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   };
   return hubPaintPoster({
