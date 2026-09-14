@@ -65,7 +65,7 @@ function iptvLayout() {
     pages: {
       iptv: {
         widgets: [
-          kitStack('page', { expand: true }, [
+          kitColumnsHeader('page', { expand: true }, [
             kitTopBar('chrome', {
               focusDown: 'cats',
               actions: iptvCatalogActions(),
@@ -73,6 +73,7 @@ function iptvLayout() {
             kitCategoryBar('cats', {
               dynamic: true,
               source: 'iptv',
+              orientation: 'vertical',
               focusUp: 'chrome',
               focusDown: 'items',
               default: 'all',
