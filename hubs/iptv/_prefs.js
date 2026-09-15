@@ -77,13 +77,9 @@ function iptvPrefsNormalize(raw) {
     sort = d.liveSort;
   }
   var layout = String(raw.layout || d.layout).trim().toLowerCase();
-  if (layout === 'guide' || layout === 'epg') layout = 'timeline';
-  if (
-    layout !== 'cards' &&
-    layout !== 'list' &&
-    layout !== 'grid' &&
-    layout !== 'timeline'
-  ) {
+  if (layout === 'epg') layout = 'guide';
+  if (layout === 'timeline' || layout === 'list') layout = 'guide';
+  if (layout !== 'cards' && layout !== 'grid' && layout !== 'guide') {
     layout = d.layout;
   }
   var pinned = Array.isArray(raw.pinnedCats) ? raw.pinnedCats : [];

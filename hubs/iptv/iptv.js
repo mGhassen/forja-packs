@@ -355,17 +355,19 @@ async function iptvAttachLiveNowProgrammes(ctx, portal, items) {
   return items;
 }
 
-/** Timeline style: attach opaque programmes[] (short EPG) for foundation paint. */
+/** Guide / timeline: attach opaque programmes[] when layout asks for EPG. */
 async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
   var layout = String((prefs && prefs.layout) || '').trim().toLowerCase();
-  if (layout === 'guide' || layout === 'epg') layout = 'timeline';
+  if (layout === 'epg' || layout === 'timeline') layout = 'guide';
   var p = params || {};
-  var styleParam = String(p.listStyle || p.style || '')
+  var styleParam = String(p.listStyle || p.style || p.view || '')
     .trim()
     .toLowerCase();
-  if (styleParam === 'guide' || styleParam === 'epg') styleParam = 'timeline';
-  var wantTimeline = layout === 'timeline' || styleParam === 'timeline';
-  if (!wantTimeline || !items || !items.length) return items;
+  if (styleParam === 'epg' || styleParam === 'timeline') styleParam = 'guide';
+  var wantGuide =
+    layout === 'guide' || styleParam === 'guide' || styleParam === 'timeline';
+  // Host CatalogEpgGuide loads full tables lazily; short EPG still helps NOW badges.
+  if (!wantGuide || !items || !items.length) return items;
   return iptvAttachLiveNowProgrammes(ctx, portal, items);
 }
 
