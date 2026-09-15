@@ -18,6 +18,7 @@ function tmdbLayout() {
     pages: {
       home: {
         feed: true,
+        feedRails: ['spotlight', 'featured', 'popular', 'new_releases'],
         pageSize: TMDB_HOME_RAIL_CAP,
         widgets: [
           {
