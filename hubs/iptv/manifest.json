@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-  "version": "1.5.13",
+  "version": "1.5.15",
   "tags": [
     "iptv",
     "live"
@@ -30,6 +30,7 @@
         "settings",
         "listPortals",
         "addPortal",
+        "importPortal",
         "editPortal",
         "removePortal",
         "selectPortal",

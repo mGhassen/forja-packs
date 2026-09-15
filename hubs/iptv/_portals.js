@@ -165,6 +165,66 @@ async function iptvResolveActive(ctx) {
   return portals[0];
 }
 
+function iptvPortalFormFields(opts) {
+  var o = opts || {};
+  var editing = !!o.editing;
+  return [
+    { id: 'url', label: 'URL', type: 'text', required: !editing },
+    { id: 'username', label: 'Username / MAC', type: 'text' },
+    {
+      id: 'password',
+      label: editing ? 'Password (blank = keep)' : 'Password',
+      type: 'password',
+      required: !editing,
+    },
+    { id: 'label', label: 'Label', type: 'text' },
+  ];
+}
+
+function iptvPortalAddForm() {
+  return {
+    title: 'Add portal',
+    submitLabel: 'Add',
+    cancelLabel: 'Cancel',
+    action: 'addPortal',
+    toastOk: 'Portal added',
+    description: 'Portal URL and credentials.',
+    fields: iptvPortalFormFields({ editing: false }),
+  };
+}
+
+function iptvPortalEditForm() {
+  return {
+    title: 'Edit portal',
+    submitLabel: 'Save',
+    cancelLabel: 'Cancel',
+    action: 'editPortal',
+    toastOk: 'Portal updated',
+    fields: iptvPortalFormFields({ editing: true }),
+  };
+}
+
+function iptvPortalImportForm() {
+  return {
+    title: 'Import portal',
+    submitLabel: 'Import',
+    cancelLabel: 'Cancel',
+    action: 'importPortal',
+    toastOk: 'Portal imported',
+    description: 'Paste an 8-character share code (XXXX-XXXX) or F1. token.',
+    fields: [
+      {
+        id: 'token',
+        label: 'Share code',
+        type: 'text',
+        required: true,
+        hint: 'XXXX-XXXX',
+      },
+      { id: 'label', label: 'Label (optional)', type: 'text' },
+    ],
+  };
+}
+
 function iptvPortalListItem(portal, activeKey) {
   var pub = iptvPortalPublic(portal);
   if (!pub || !pub.key) return null;
@@ -184,6 +244,11 @@ function iptvPortalListItem(portal, activeKey) {
     activeConnections: pub.activeConnections,
     maxConnections: pub.maxConnections,
     expiry: pub.expiry,
+    formValues: {
+      url: pub.url || '',
+      username: pub.username || '',
+      label: label,
+    },
     open: {
       surface: 'iptv',
       id: pub.key,
@@ -203,10 +268,32 @@ function iptvPortalsPanelLayout() {
         source: 'listPortals',
         title: 'Portals',
         actions: [
-          { id: 'add', label: 'Add', action: 'addPortal' },
-          { id: 'deal', label: 'Deal', action: 'dealPortals' },
-          { id: 'refresh', label: 'Refresh', action: 'listPortals' },
+          {
+            id: 'add',
+            label: 'Add',
+            icon: 'add',
+            action: 'addPortal',
+            form: iptvPortalAddForm(),
+          },
+          {
+            id: 'import',
+            label: 'Import',
+            icon: 'content_paste',
+            action: 'importPortal',
+            form: iptvPortalImportForm(),
+          },
+          { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
+          { id: 'refresh', label: 'Refresh', icon: 'refresh', action: 'listPortals' },
         ],
+        itemActions: {
+          edit: {
+            label: 'Edit',
+            action: 'editPortal',
+            form: iptvPortalEditForm(),
+          },
+          remove: { label: 'Delete', action: 'removePortal' },
+          share: { label: 'Copy share code', action: 'shareEncode' },
+        },
       },
     ],
   };
@@ -234,6 +321,35 @@ async function iptvAddPortal(ctx, params) {
   if (err) return hubFail('addPortal', 'INVALID', err);
   await iptvUpsertPortalRow(ctx, portal, { select: true });
   return hubOk('addPortal', { portal: iptvPortalPublic(portal) });
+}
+
+async function iptvImportPortal(ctx, params) {
+  var p = params || {};
+  var decoded = await iptvShareDecode(ctx, {
+    token: p.token || p.code || p.share || p.url || '',
+  });
+  var env = Array.isArray(decoded) ? decoded[0] : decoded;
+  if (!env || !env.ok) {
+    return (
+      decoded ||
+      hubFail('importPortal', 'DECODE_FAILED', 'could not decode share code')
+    );
+  }
+  var data = env.data || {};
+  var row = data.portal || {};
+  var label = String(p.label || p.portalLabel || '').trim();
+  var portal = iptvPortalFromParams({
+    url: row.url,
+    username: row.username,
+    password: row.password,
+    platform: row.platform,
+    userAgent: row.userAgent || row.user_agent,
+    label: label || row.username || row.url,
+  });
+  var err = iptvPortalValidate(portal);
+  if (err) return hubFail('importPortal', 'INVALID', err);
+  await iptvUpsertPortalRow(ctx, portal, { select: true });
+  return hubOk('importPortal', { portal: iptvPortalPublic(portal) });
 }
 
 async function iptvEditPortal(ctx, params) {

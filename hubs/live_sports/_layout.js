@@ -124,11 +124,12 @@ function liveSportsCatalogActions() {
     {
       id: 'view',
       label: 'View',
-      icon: 'view',
+      style: 'group',
       trailing: true,
+      default: 'list',
       items: [
-        { id: 'list', label: 'List' },
-        { id: 'cards', label: 'Cards' },
+        { id: 'list', label: 'List', icon: 'list' },
+        { id: 'cards', label: 'Cards', icon: 'cards' },
       ],
     },
     {

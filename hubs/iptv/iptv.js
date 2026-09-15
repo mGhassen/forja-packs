@@ -569,6 +569,9 @@ async function extract(ctx) {
   if (action === 'addPortal') {
     return await iptvAddPortal(ctx, params);
   }
+  if (action === 'importPortal') {
+    return await iptvImportPortal(ctx, params);
+  }
   if (action === 'editPortal') {
     return await iptvEditPortal(ctx, params);
   }
