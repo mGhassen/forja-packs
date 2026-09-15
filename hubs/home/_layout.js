@@ -34,7 +34,6 @@ function tmdbLayout() {
               rail: 'spotlight',
               bleed: 'featured',
               slideCap: 5,
-              bleedDownOffset: 140,
               actions: [
                 {
                   id: 'details',
