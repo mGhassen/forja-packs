@@ -217,6 +217,38 @@ function hubNotModified(action) {
 }
 
 
+/// Home-style card meta under the title: `2026 • FILM` / `TV`.
+/// Packs that already put format in releaseInfo (anime: `2026 • 12 eps`) pass through.
+function hubPosterTypeLabel(meta) {
+  meta = meta || {};
+  if (String(meta.type || '').toLowerCase() === 'anime') return null;
+  var hint = String(meta.tmdbMediaType || '').trim().toLowerCase();
+  var kind = String(meta.type || '').trim().toLowerCase();
+  if (hint === 'tv' || kind === 'tv' || kind === 'series') return 'TV';
+  if (hint === 'movie' || kind === 'movie') return 'FILM';
+  if (kind === 'drama') {
+    var badge = String(meta.badge || '').trim().toUpperCase();
+    if (badge === 'MOVIE' || badge === 'FILM' || badge === 'HOLLYWOOD') {
+      return 'FILM';
+    }
+    return 'TV';
+  }
+  return null;
+}
+
+function hubPosterCardSubtitle(meta) {
+  meta = meta || {};
+  var release = String(meta.releaseInfo || '').trim();
+  if (release.indexOf(' • ') !== -1) return release || null;
+  var parts = [];
+  if (release) {
+    parts.push(release.indexOf('-') !== -1 ? release.split('-')[0] : release);
+  }
+  var typeLabel = hubPosterTypeLabel(meta);
+  if (typeLabel) parts.push(typeLabel);
+  return parts.length ? parts.join(' • ') : null;
+}
+
 function hubPaintPoster(item, opts) {
   opts = opts || {};
   var meta = item || {};
@@ -235,9 +267,23 @@ function hubPaintPoster(item, opts) {
     paint.props.rating = Number(meta.rating != null ? meta.rating : opts.rating);
   }
   if (opts.rank != null) paint.props.rank = Number(opts.rank);
-  if (meta.badge || opts.badge) paint.props.badge = String(meta.badge || opts.badge);
-  if (opts.subtitle || meta.releaseInfo) {
-    paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
+  var typeLabel = hubPosterTypeLabel(meta);
+  var badge = String(meta.badge || opts.badge || '').trim();
+  // Skip redundant FILM/TV corner chip when type is already in the subtitle.
+  if (badge && !(typeLabel && badge.toUpperCase() === typeLabel)) {
+    paint.props.badge = badge;
+  }
+  if (opts.subtitle) {
+    paint.props.subtitle = String(opts.subtitle);
+  } else {
+    var sub = hubPosterCardSubtitle(meta);
+    if (sub) paint.props.subtitle = sub;
+  }
+  var mediaType = String(meta.tmdbMediaType || meta.type || '')
+    .trim()
+    .toLowerCase();
+  if (mediaType === 'movie' || mediaType === 'tv') {
+    paint.props.mediaType = mediaType;
   }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
   if (meta.background || meta.backdrop || opts.backdropUrl) {
