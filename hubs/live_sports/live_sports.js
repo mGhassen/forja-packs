@@ -95,6 +95,8 @@ function liveSportsCatalogActions() {
       id: 'horizon',
       label: 'Schedule',
       icon: 'schedule',
+      // Host Status×Horizon sheet — never key off bare id alone.
+      dynamicSchedule: true,
       default: 'airing|1h',
       items: [
         { id: 'airing|1h', label: 'Airing' },
