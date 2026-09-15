@@ -360,7 +360,18 @@ async function iptvShareEncode(ctx, params) {
     );
   }
   var p = params || {};
-  var portal = p.portal || p;
+  var portal = p.portal || null;
+  var key = String(p.key || p.portalKey || '').trim();
+  if ((!portal || !portal.url) && key) {
+    var portals = await iptvLoadPortals(ctx);
+    for (var i = 0; i < portals.length; i++) {
+      if (iptvPortalKey(portals[i]) === key) {
+        portal = portals[i];
+        break;
+      }
+    }
+  }
+  if (!portal) portal = p;
   try {
     var res = await engine('portal_share', {
       action: 'encode',
