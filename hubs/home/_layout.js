@@ -33,6 +33,17 @@ function tmdbLayout() {
               title: 'Spotlight',
               rail: 'spotlight',
               bleed: 'featured',
+              slideCap: 5,
+              bleedDownOffset: 140,
+              actions: [
+                {
+                  id: 'details',
+                  label: 'View details',
+                  icon: 'info',
+                  tone: 'primary',
+                },
+                { id: 'follow' },
+              ],
             },
             'rail',
             { rail: 'spotlight' },
@@ -43,6 +54,7 @@ function tmdbLayout() {
             title: 'Featured This Month',
             rail: 'featured',
             hideWhenBleed: true,
+            gap: 20,
           }, 'rail', { rail: 'featured' }),
           hubWithLoad(
             {
