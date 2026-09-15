@@ -855,18 +855,20 @@ async function iptvFetchXtreamHttp(ctx, portal, section) {
       : wire === 'series'
         ? 'get_series'
         : 'get_live_streams';
-  var catsRes = await request({
-    method: 'GET',
-    url: base + '/player_api.php?' + qs + '&action=' + catAction,
-    timeoutMs: 45000,
-  });
-  var streamsRes = await request({
-    method: 'GET',
-    url: base + '/player_api.php?' + qs + '&action=' + streamAction,
-    timeoutMs: 45000,
-  });
-  var cats = iptvParseJsonBody(catsRes);
-  var streams = iptvParseJsonBody(streamsRes);
+  var both = await Promise.all([
+    request({
+      method: 'GET',
+      url: base + '/player_api.php?' + qs + '&action=' + catAction,
+      timeoutMs: 45000,
+    }),
+    request({
+      method: 'GET',
+      url: base + '/player_api.php?' + qs + '&action=' + streamAction,
+      timeoutMs: 45000,
+    }),
+  ]);
+  var cats = iptvParseJsonBody(both[0]);
+  var streams = iptvParseJsonBody(both[1]);
   return {
     categories: iptvNormCategories(cats),
     streams: iptvNormStreams(streams, wire === 'vod' ? 'vod' : wire),

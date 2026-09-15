@@ -468,8 +468,7 @@ async function iptvFeed(ctx) {
       params,
     );
     if (section === 'live') {
-      // Attach a short EPG sample for NOW badges on cards (not only timeline).
-      items = await iptvAttachLiveNowProgrammes(ctx, portal, items);
+      // NOW/EPG is host-lazy (CatalogEpgGuideHost) — never block channel paint.
       items = iptvApplyLiveCardPaint(items);
     }
     var kinds = iptvFeedKinds(catalog, items);
