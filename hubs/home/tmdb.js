@@ -2086,11 +2086,7 @@ function extract(ctx) {
     return hubFail(action, 'INVALID_ACTION', 'tmdb has no action ' + action);
   }
   if (String(params.rail || '') === 'because') {
-    return wrap(
-      tmdbBecause(ctx, cfg, params).then(function (env) {
-        return env[0];
-      }),
-    );
+    return wrap(tmdbBecause(ctx, cfg, params));
   }
   return wrap(
     tmdbList(ctx, cfg, params).then(function (items) {
