@@ -40,7 +40,7 @@ function tmdbLayout() {
                   id: 'details',
                   label: 'View details',
                   icon: 'info',
-                  tone: 'primary',
+                  tone: 'secondary',
                 },
                 { id: 'follow' },
               ],
