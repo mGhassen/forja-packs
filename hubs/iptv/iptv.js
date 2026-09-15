@@ -172,7 +172,7 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     streamId: id,
     epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     categoryId: String(stream.categoryId || stream.category_id || 'all').trim() || 'all',
-  });
+  }, { aspect: 'landscape' });
 }
 
 function iptvVodMeta(portal, stream, section, catName) {
@@ -358,22 +358,13 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
   return items;
 }
 
-/** Timeline style: attach opaque programmes[] (short EPG) for foundation paint. */
-async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
-  var layout = String((prefs && prefs.layout) || '').trim().toLowerCase();
-  if (layout === 'guide' || layout === 'epg') layout = 'timeline';
-  var p = params || {};
-  var styleParam = String(p.listStyle || p.style || '')
-    .trim()
-    .toLowerCase();
-  if (styleParam === 'guide' || styleParam === 'epg') styleParam = 'timeline';
-  var wantTimeline = layout === 'timeline' || styleParam === 'timeline';
-  if (!wantTimeline || !items || !items.length) return items;
-
+/** Short EPG for card NOW badges (always for live; capped). */
+async function iptvAttachLiveNowProgrammes(ctx, portal, items) {
+  if (!items || !items.length) return items;
   var platform = iptvPlatformOf(portal);
   var http = iptvHttp(ctx);
   var base = iptvNormBase(portal.url);
-  var limit = Math.min(items.length, 48);
+  var limit = Math.min(items.length, 16);
 
   for (var i = 0; i < items.length; i++) {
     if (!Array.isArray(items[i].programmes)) items[i].programmes = [];
@@ -390,6 +381,7 @@ async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
   for (var j = 0; j < limit; j++) {
     var row = items[j];
     if (!row || !row.streamId) continue;
+    if (Array.isArray(row.programmes) && row.programmes.length) continue;
     try {
       var url =
         base +
@@ -397,8 +389,8 @@ async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
         qs +
         '&action=get_short_epg&stream_id=' +
         encodeURIComponent(row.streamId) +
-        '&limit=4';
-      var res = await http({ method: 'GET', url: url, timeoutMs: 8000 });
+        '&limit=2';
+      var res = await http({ method: 'GET', url: url, timeoutMs: 6000 });
       var body = res && (res.body || res.data || res.text);
       var parsed = typeof body === 'string' ? JSON.parse(body) : body;
       var list =
@@ -427,10 +419,96 @@ async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
       }
       row.programmes = programmes;
     } catch (_) {
-      /* keep empty programmes — timeline still paints channels */
+      /* keep empty — card still paints without NOW */
     }
   }
   return items;
+}
+
+/** Timeline style: attach opaque programmes[] (short EPG) for foundation paint. */
+async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
+  var layout = String((prefs && prefs.layout) || '').trim().toLowerCase();
+  if (layout === 'guide' || layout === 'epg') layout = 'timeline';
+  var p = params || {};
+  var styleParam = String(p.listStyle || p.style || '')
+    .trim()
+    .toLowerCase();
+  if (styleParam === 'guide' || styleParam === 'epg') styleParam = 'timeline';
+  var wantTimeline = layout === 'timeline' || styleParam === 'timeline';
+  if (!wantTimeline || !items || !items.length) return items;
+  return iptvAttachLiveNowProgrammes(ctx, portal, items);
+}
+
+/** Apply landscape + NOW badge when programmes[] has a current entry. */
+function iptvApplyLiveCardPaint(items) {
+  if (!items || !items.length) return items;
+  var now = Date.now();
+  for (var i = 0; i < items.length; i++) {
+    var row = items[i];
+    if (!row || typeof row !== 'object') continue;
+    if (String(row.type || '') !== 'iptv') continue;
+    if (!row.paint || typeof row.paint !== 'object') {
+      row = hubPaintPoster(row, { aspect: 'landscape' });
+      items[i] = row;
+    }
+    if (!row.paint.props) row.paint.props = {};
+    row.paint.props.aspect = 'landscape';
+    if (row.poster && !row.paint.props.imageUrl) {
+      row.paint.props.imageUrl = String(row.poster);
+    }
+    var programmes = row.programmes;
+    if (!Array.isArray(programmes) || !programmes.length) continue;
+    var hit = null;
+    for (var j = 0; j < programmes.length; j++) {
+      var p = programmes[j];
+      if (!p) continue;
+      var start = Number(p.startMs || 0);
+      var end = Number(p.endMs || 0);
+      if (start && end && start <= now && now < end) {
+        hit = p;
+        break;
+      }
+    }
+    if (!hit) hit = programmes[0];
+    var title = hit && String(hit.title || '').trim();
+    if (!title) continue;
+    row.paint.props.badge = 'NOW';
+    row.paint.props.subtitle = title;
+  }
+  return items;
+}
+
+function iptvFeedKinds(catalog, items) {
+  var out = [];
+  var seen = {};
+  var cats = catalog && catalog.categories;
+  if (Array.isArray(cats)) {
+    for (var i = 0; i < cats.length; i++) {
+      var c = cats[i];
+      if (!c) continue;
+      var id = String(c.id || c.category_id || '').trim();
+      if (!id || seen[id]) continue;
+      seen[id] = true;
+      out.push({
+        id: id,
+        label: String(c.name || c.category_name || id).trim() || id,
+      });
+    }
+  }
+  if (out.length) return out;
+  if (!Array.isArray(items)) return out;
+  for (var j = 0; j < items.length; j++) {
+    var row = items[j];
+    if (!row) continue;
+    var kid = String(row.categoryId || row.kind || '').trim();
+    if (!kid || kid === 'all' || seen[kid]) continue;
+    seen[kid] = true;
+    out.push({
+      id: kid,
+      label: String(row.categoryName || kid).trim() || kid,
+    });
+  }
+  return out;
 }
 
 async function iptvFeed(ctx) {
@@ -473,15 +551,14 @@ async function iptvFeed(ctx) {
       q,
     );
     if (section === 'live') {
-      items = await iptvAttachTimelineProgrammes(
-        ctx,
-        portal,
-        items,
-        prefs,
-        params,
-      );
+      // Attach a short EPG sample for NOW badges on cards (not only timeline).
+      items = await iptvAttachLiveNowProgrammes(ctx, portal, items);
+      items = iptvApplyLiveCardPaint(items);
     }
-    return hubItems('feed', items);
+    var kinds = iptvFeedKinds(catalog, items);
+    var env = hubItems('feed', items)[0];
+    if (kinds.length) env.data.kinds = kinds;
+    return [env];
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
   }
