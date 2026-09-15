@@ -1411,16 +1411,30 @@ function tmdbBuildTvVideos(ctx, cfg, tvId, showJson) {
   });
 }
 
+function tmdbDetailsMediaType(params, typeFromId) {
+  var fromId = String(typeFromId || '').toLowerCase();
+  if (fromId === 'movie' || fromId === 'tv') return fromId;
+  var hint = String(
+    (params && params.mediaType) ||
+      (params && params.extract && params.extract.resolveType) ||
+      '',
+  ).toLowerCase();
+  if (hint === 'series') hint = 'tv';
+  if (hint === 'movie' || hint === 'tv') return hint;
+  return 'movie';
+}
+
 function tmdbDetails(ctx, cfg, params) {
   var raw = String(params.id || '').split(':');
   var id = Number(raw.pop());
-  var type = raw.length ? raw.pop() : 'movie';
+  // Bare open.id is numeric only — movie/tv namespaces collide. Prefer
+  // segment in id (tmdb:tv:1396), else params.mediaType / extract.resolveType.
+  var type = tmdbDetailsMediaType(params, raw.length ? raw.pop() : '');
   if (!id) {
     return Promise.resolve(
       hubFail('details', 'INVALID_PARAMS', 'details needs params.id'),
     );
   }
-  if (type !== 'movie' && type !== 'tv') type = 'movie';
   var append = 'external_ids,recommendations,images,credits,videos';
   return tmdbGet(ctx, cfg, '/' + type + '/' + id, {
     append_to_response: append,

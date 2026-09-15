@@ -264,6 +264,10 @@ function hubPaintPoster(item, opts) {
       poster: imageUrl,
       open: meta.open || null,
     };
+    if (meta.ids) out.meta.ids = meta.ids;
+    if (meta.tmdbMediaType) out.meta.tmdbMediaType = meta.tmdbMediaType;
+    if (meta.background) out.meta.background = meta.background;
+    if (meta.badge) out.meta.badge = meta.badge;
   }
   return out;
 }
