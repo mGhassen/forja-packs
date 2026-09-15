@@ -353,9 +353,24 @@ function tmdbHomeFeed(ctx, cfg, params) {
       rails.spotlight || [],
       TMDB_HOME_HERO_CAP,
     ).then(function () {
+      // Page feed must stamp paint like action:'rail' — host propsOf only
+      // reads paint.props (not raw name/poster).
+      var painted = {};
+      for (var r = 0; r < ids.length; r++) {
+        var rid = ids[r];
+        var list = rails[rid] || [];
+        painted[rid] =
+          rid === 'spotlight'
+            ? list.map(function (m) {
+                return hubPaintHero(m);
+              })
+            : list.map(function (m) {
+                return hubPaintPoster(m);
+              });
+      }
       return hubOk(
         'feed',
-        { rails: rails },
+        { rails: painted },
         { maxAge: 900, swr: 3600 },
       );
     });
