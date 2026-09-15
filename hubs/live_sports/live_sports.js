@@ -417,19 +417,48 @@ function liveSportsLoadFeed(ctx, params) {
 }
 
 function liveSportsGameFromRow(row) {
+  var props =
+    row && row.paint && row.paint.props && typeof row.paint.props === 'object'
+      ? row.paint.props
+      : {};
   var game =
     row && row.sportMatchGame && typeof row.sportMatchGame === 'object'
       ? Object.assign({}, row.sportMatchGame)
       : {
           id: String((row && row.id) || ''),
-          title: String((row && (row.title || row.name)) || ''),
-          homeTeam: String((row && row.homeTeam) || ''),
-          awayTeam: String((row && row.awayTeam) || ''),
-          sport: String((row && (row.category || row.sport)) || ''),
-          category: String((row && (row.category || row.sport)) || ''),
-          dateMs: Number(row && row.dateMs) || 0,
+          title: String(
+            (row && (row.title || row.name)) || props.title || '',
+          ),
+          homeTeam: String(
+            (row && row.homeTeam) || props.homeTeam || '',
+          ),
+          awayTeam: String(
+            (row && row.awayTeam) || props.awayTeam || '',
+          ),
+          sport: String(
+            (row && (row.category || row.sport)) ||
+              props.categoryLabel ||
+              '',
+          ),
+          category: String(
+            (row && (row.category || row.sport)) ||
+              props.categoryLabel ||
+              '',
+          ),
+          dateMs:
+            Number(row && row.dateMs) ||
+            Number(props.startsAt) ||
+            0,
         };
-  var broadcasts = (row && row.broadcastChannels) || game.broadcastChannels;
+  if (!game.homeTeam && props.homeTeam) game.homeTeam = String(props.homeTeam);
+  if (!game.awayTeam && props.awayTeam) game.awayTeam = String(props.awayTeam);
+  if (!game.title && (props.title || (row && row.title))) {
+    game.title = String(props.title || row.title || '');
+  }
+  var broadcasts =
+    (row && row.broadcastChannels) ||
+    game.broadcastChannels ||
+    props.broadcastChannels;
   if (Array.isArray(broadcasts) && broadcasts.length) {
     game.broadcastChannels = broadcasts.slice();
   }
@@ -510,7 +539,7 @@ function extract(ctx) {
   }
   if (action === 'feed' || action === 'rail') {
     return liveSportsLoadFeed(ctx, params).then(function (items) {
-      return hubItems(action, items, { maxAge: 60, swr: 300 });
+      return hubItems(action, items, { maxAge: 300, swr: 900 });
     });
   }
   if (action === 'liveTv') {

@@ -633,6 +633,7 @@ async function iptvSearchChannels(ctx, params) {
         provider: portal.label || 'IPTV',
         portalKey: ch.portalKey,
         streamId: ch.streamId,
+        liveSourceKind: 'iptvXtream',
       });
     }
     return hubOk('searchChannels', { sources: sources }, { maxAge: 60, swr: 120 });

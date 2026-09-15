@@ -80,10 +80,15 @@ function liveFeedCacheGet(host, key) {
 
 function liveFeedCacheSet(host, key, rows) {
   if (!host || !host.cache || typeof host.cache.set !== 'function') return;
-  host.cache.set(LIVE_FEED_CACHE_NS, key, {
-    rows: rows || [],
-    at: Date.now(),
-  });
+  host.cache.set(
+    LIVE_FEED_CACHE_NS,
+    key,
+    {
+      rows: rows || [],
+      at: Date.now(),
+    },
+    { ttlMs: 15 * 60 * 1000 },
+  );
 }
 
 function liveFeedCacheClear(host) {
@@ -556,7 +561,8 @@ function liveSportsAggregateFeed(ctx, params) {
   var cacheKey = liveFeedCacheKey(query.catalogFilter);
   if (!force) {
     var hit = liveFeedCacheGet(host, cacheKey);
-    if (hit && Array.isArray(hit.rows)) {
+    // Empty arrays are not a hit — cancelled scrapes must not poison the slot.
+    if (hit && Array.isArray(hit.rows) && hit.rows.length) {
       return Promise.resolve(
         liveFeedFilterRows(hit.rows, query, liveFeedShouldMerge(query, cfg)),
       );
