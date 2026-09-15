@@ -54,7 +54,6 @@ function tmdbLayout() {
             title: 'Featured This Month',
             rail: 'featured',
             hideWhenBleed: true,
-            gap: 20,
           }, 'rail', { rail: 'featured' }),
           hubWithLoad(
             {
