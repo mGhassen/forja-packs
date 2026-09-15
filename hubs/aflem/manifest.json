@@ -4,7 +4,7 @@
   "name": "ForjaHQ Aflem",
   "description": "Aflem Arabic series hub (Brstej upstream).",
   "author": "ForjaHQ",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "tags": [
     "aflem",
     "arabic"
@@ -41,13 +41,14 @@
       "config": {
         "origin": "https://uo.brstej.com"
       },
-      "prelude": "_kit.js,_search.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     }
   ],
   "bundle": [
     "brstej.js",
     "_kit.js",
     "_search.js",
+    "_layout.js",
     "icons/nav.png"
   ]
 }

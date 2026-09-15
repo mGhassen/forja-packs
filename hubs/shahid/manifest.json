@@ -4,7 +4,7 @@
   "name": "ForjaHQ Shahid",
   "description": "Shahid movies and series.",
   "author": "ForjaHQ",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "tags": [
     "arabic",
     "shahid"
@@ -58,13 +58,14 @@
       "config": {
         "language": "ar"
       },
-      "prelude": "_kit.js,_search.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     }
   ],
   "bundle": [
     "shahid.js",
     "_kit.js",
     "_search.js",
+    "_layout.js",
     "icons/nav.png"
   ]
 }

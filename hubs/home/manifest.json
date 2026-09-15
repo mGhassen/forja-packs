@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "tags": [
     "home",
     "movies",
@@ -47,13 +47,14 @@
         "apiKey": "",
         "pageSize": 20
       },
-      "prelude": "_kit.js,_search.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     }
   ],
   "bundle": [
     "tmdb.js",
     "_kit.js",
     "_search.js",
+    "_layout.js",
     "icons/nav.png",
     "logos/appletv.svg",
     "logos/crunchyroll.svg",

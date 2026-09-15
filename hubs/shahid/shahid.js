@@ -536,55 +536,6 @@ function fetchRailItems(ctx, cfg, railId) {
   });
 }
 
-function layout() {
-  var widgets = [
-    hubWithLoad(
-      {
-        type: 'hero',
-        id: 'spotlight',
-        title: 'Shahid',
-        rail: 'top_series',
-        bleed: 'top_movies',
-      },
-      'rail',
-      { rail: 'top_series' },
-    ),
-  ];
-  for (var i = 0; i < SHAHID_FEED_RAILS.length; i++) {
-    var id = SHAHID_FEED_RAILS[i];
-    var def = SHAHID_RAILS[id];
-    if (!def) continue;
-    widgets.push(
-      hubWithLoad(
-        {
-          type: 'rail',
-          id: id,
-          title: def.label,
-          rail: id,
-          hideWhenBleed: id === 'top_series',
-        },
-        'rail',
-        { rail: id },
-      ),
-    );
-  }
-  return hubOk(
-    'layout',
-    {
-      dir: 'rtl',
-      pages: {
-        shahid: {
-          feed: true,
-          feedRails: SHAHID_FEED_RAILS.slice(),
-          pageSize: 20,
-          widgets: widgets,
-        },
-      },
-    },
-    { maxAge: 3600, swr: 86400 },
-  );
-}
-
 function feed(ctx) {
   var cfg = hubConfig(ctx, SHAHID_DEFAULTS);
   return fetchTopRanking(ctx, cfg, 20).then(function (top) {
@@ -784,7 +735,11 @@ function details(ctx) {
 
 function handle(ctx) {
   var action = hubAction(ctx);
-  if (action === 'layout') return Promise.resolve(layout());
+  if (action === 'layout') {
+    return Promise.resolve(
+      hubOk('layout', shahidLayout(), { maxAge: 3600, swr: 86400 }),
+    );
+  }
   if (action === 'feed') return feed(ctx);
   if (action === 'rail') return rail(ctx);
   if (action === 'search') return shahidSearch(ctx);
