@@ -86,6 +86,11 @@ function iptvLayout() {
               focusUp: 'chrome',
               focusDown: 'items',
               default: 'all',
+              features: {
+                pin: true,
+                reorder: true,
+                widgets: ['favorites', 'watched'],
+              },
               items: [{ id: 'all', label: 'All', icon: 'grid' }],
             }),
             hubWithLoad(
@@ -99,6 +104,21 @@ function iptvLayout() {
                 emptyTitle: 'Add a portal',
                 emptyDescription:
                   'Open Portals to add credentials or import a share code.',
+                loading: {
+                  live: {
+                    title: 'Loading channels',
+                    detail:
+                      'Fetching categories and channels from your portal…',
+                  },
+                  movies: {
+                    title: 'Loading movies',
+                    detail: 'Fetching categories and movies from your portal…',
+                  },
+                  series: {
+                    title: 'Loading series',
+                    detail: 'Fetching categories and series from your portal…',
+                  },
+                },
               }),
               'feed',
               {},

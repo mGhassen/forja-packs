@@ -73,7 +73,7 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     streamId: id,
     epgChannelId: String(stream.epgChannelId || stream.epg_channel_id || '').trim(),
     categoryId: String(stream.categoryId || stream.category_id || 'all').trim() || 'all',
-  }, { aspect: 'landscape' });
+  });
 }
 
 function iptvVodMeta(portal, stream, section, catName) {
@@ -190,11 +190,15 @@ function iptvFeedQueryMatch(meta, q) {
   return name.indexOf(needle) >= 0 || cat.indexOf(needle) >= 0;
 }
 
-async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
+async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, params) {
   var cats = iptvCatNameMap(catalog.categories);
   var sort = String((prefs && prefs.liveSort) || 'playlist').trim();
   var streams = iptvSortStreams(catalog.streams || [], sort);
-  var pinned = (prefs && Array.isArray(prefs.pinnedCats) && prefs.pinnedCats) || [];
+  // Host store SoT (PortalLiveChannelListsStore) via feed params — not vault prefs.
+  var pinned =
+    (params && Array.isArray(params.pinnedCats) && params.pinnedCats) ||
+    (params && Array.isArray(params.categoryOrder) && params.categoryOrder) ||
+    [];
   if (pinned.length && section === 'live') {
     var pinSet = {};
     for (var pi = 0; pi < pinned.length; pi++) {
@@ -209,51 +213,76 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q) {
       return 0;
     });
   }
-  var items = [];
   var byId = {};
-
   for (var i = 0; i < streams.length; i++) {
     var s = streams[i];
     if (!s) continue;
-    var catId = String(s.categoryId || 'all').trim() || 'all';
+    byId[String(s.id)] = s;
+  }
+
+  var filterCat = String(
+    (params && (params.categoryId || params.kind)) || '',
+  ).trim();
+  var FAV = '__favorites__';
+  var WATCHED = '__watched__';
+
+  if (section === 'live' && filterCat === FAV) {
+    var favIds =
+      (params && Array.isArray(params.favorites) && params.favorites) || [];
+    var favItems = [];
+    for (var f = 0; f < favIds.length; f++) {
+      var fs = byId[String(favIds[f])];
+      if (!fs) continue;
+      var favMeta = iptvLiveMeta(portal, fs, 'Favorites', FAV);
+      if (favMeta && favMeta.open && favMeta.open.url && iptvFeedQueryMatch(favMeta, q)) {
+        favItems.push(favMeta);
+      }
+    }
+    return favItems;
+  }
+
+  if (section === 'live' && filterCat === WATCHED) {
+    var watchedIds =
+      (params && Array.isArray(params.watched) && params.watched) || [];
+    var watchedItems = [];
+    for (var w = 0; w < watchedIds.length; w++) {
+      var ws = byId[String(watchedIds[w])];
+      if (!ws) continue;
+      var watchedMeta = iptvLiveMeta(portal, ws, 'Already watched', WATCHED);
+      if (
+        watchedMeta &&
+        watchedMeta.open &&
+        watchedMeta.open.url &&
+        iptvFeedQueryMatch(watchedMeta, q)
+      ) {
+        watchedItems.push(watchedMeta);
+      }
+    }
+    return watchedItems;
+  }
+
+  var items = [];
+  for (var j = 0; j < streams.length; j++) {
+    var st = streams[j];
+    if (!st) continue;
+    var catId = String(st.categoryId || 'all').trim() || 'all';
+    if (
+      filterCat &&
+      filterCat !== 'all' &&
+      filterCat !== FAV &&
+      filterCat !== WATCHED &&
+      catId !== filterCat
+    ) {
+      continue;
+    }
     var meta =
       section === 'live'
-        ? iptvLiveMeta(portal, s, cats[catId] || catId)
-        : iptvVodMeta(portal, s, section, cats[catId] || catId);
+        ? iptvLiveMeta(portal, st, cats[catId] || catId)
+        : iptvVodMeta(portal, st, section, cats[catId] || catId);
     if (!meta) continue;
     if (section === 'live' && !(meta.open && meta.open.url)) continue;
     if (!iptvFeedQueryMatch(meta, q)) continue;
     items.push(meta);
-    byId[String(s.id)] = s;
-  }
-
-  if (section === 'live') {
-    var favIds = prefs.favorites || [];
-    var watchedIds = prefs.watched || [];
-    for (var f = 0; f < favIds.length; f++) {
-      var fs = byId[String(favIds[f])];
-      if (!fs) continue;
-      var favMeta = iptvLiveMeta(
-        portal,
-        fs,
-        'Favorites',
-        'favorites',
-      );
-      if (favMeta && iptvFeedQueryMatch(favMeta, q)) items.push(favMeta);
-    }
-    for (var w = 0; w < watchedIds.length; w++) {
-      var ws = byId[String(watchedIds[w])];
-      if (!ws) continue;
-      var watchedMeta = iptvLiveMeta(
-        portal,
-        ws,
-        'Already watched',
-        'watched',
-      );
-      if (watchedMeta && iptvFeedQueryMatch(watchedMeta, q)) {
-        items.push(watchedMeta);
-      }
-    }
   }
 
   return items;
@@ -340,41 +369,25 @@ async function iptvAttachTimelineProgrammes(ctx, portal, items, prefs, params) {
   return iptvAttachLiveNowProgrammes(ctx, portal, items);
 }
 
-/** Apply landscape + NOW badge when programmes[] has a current entry. */
+/** Mark live rows as channel cards; keep programmes[] for NOW footer / sheet. */
 function iptvApplyLiveCardPaint(items) {
   if (!items || !items.length) return items;
-  var now = Date.now();
   for (var i = 0; i < items.length; i++) {
     var row = items[i];
     if (!row || typeof row !== 'object') continue;
     if (String(row.type || '') !== 'iptv') continue;
     if (!row.paint || typeof row.paint !== 'object') {
-      row = hubPaintPoster(row, { aspect: 'landscape' });
+      row = hubPaintPoster(row);
       items[i] = row;
     }
+    row.paint.type = 'channelCard';
     if (!row.paint.props) row.paint.props = {};
-    row.paint.props.aspect = 'landscape';
+    delete row.paint.props.aspect;
+    delete row.paint.props.badge;
+    delete row.paint.props.subtitle;
     if (row.poster && !row.paint.props.imageUrl) {
       row.paint.props.imageUrl = String(row.poster);
     }
-    var programmes = row.programmes;
-    if (!Array.isArray(programmes) || !programmes.length) continue;
-    var hit = null;
-    for (var j = 0; j < programmes.length; j++) {
-      var p = programmes[j];
-      if (!p) continue;
-      var start = Number(p.startMs || 0);
-      var end = Number(p.endMs || 0);
-      if (start && end && start <= now && now < end) {
-        hit = p;
-        break;
-      }
-    }
-    if (!hit) hit = programmes[0];
-    var title = hit && String(hit.title || '').trim();
-    if (!title) continue;
-    row.paint.props.badge = 'NOW';
-    row.paint.props.subtitle = title;
   }
   return items;
 }
@@ -450,6 +463,7 @@ async function iptvFeed(ctx) {
       catalog,
       prefs,
       q,
+      params,
     );
     if (section === 'live') {
       // Attach a short EPG sample for NOW badges on cards (not only timeline).
@@ -519,7 +533,7 @@ async function iptvSearchChannels(ctx, params) {
     var sources = [];
     for (var i = 0; i < items.length; i++) {
       var ch = items[i];
-      if (ch.kind === 'favorites' || ch.kind === 'watched') continue;
+      if (ch.kind === '__favorites__' || ch.kind === '__watched__' || ch.kind === 'favorites' || ch.kind === 'watched') continue;
       if (categoryIds.length) {
         var cid = String(ch.categoryId || '');
         if (categoryIds.indexOf(cid) < 0) continue;
