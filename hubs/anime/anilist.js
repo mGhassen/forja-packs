@@ -153,7 +153,6 @@ function anilistLayout() {
               id: 'moods',
               title: 'Pick your vibe',
               options: ANILIST_MOODS,
-              rail: 'trending',
             },
             'rail',
             { rail: 'trending' },

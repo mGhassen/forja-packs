@@ -606,7 +606,6 @@ function tmdbLayout() {
               id: 'moods',
               title: "What's your mood?",
               options: TMDB_MOODS,
-              rail: 'discover',
             },
             'rail',
             { rail: 'discover' },
@@ -2085,7 +2084,8 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (action === 'layout') {
-    return hubOk('layout', tmdbLayout(), { maxAge: 3600, swr: 86400 });
+    // Short TTL so seeded genre rows rotate; rails keep their own longer cache.
+    return hubOk('layout', tmdbLayout(), { maxAge: 300, swr: 900 });
   }
   if (action === 'filters') {
     return hubOk('filters', {
