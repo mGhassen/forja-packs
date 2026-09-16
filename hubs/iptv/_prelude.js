@@ -1197,26 +1197,22 @@ async function iptvUpsertFromSettings(ctx) {
     platform: platform,
   };
   portal.key = iptvPortalKey(portal);
-  // Upsert settings portal into inventory only. Never steal active on every
-  // feed/list — that undoes selectPortal. Bootstrap select only when unset.
-  var active = await iptvGetActiveKey(ctx);
-  await iptvUpsertPortalRow(ctx, portal, { select: !active });
+  // Inventory only — never steal / bootstrap active on feed/list.
+  await iptvUpsertPortalRow(ctx, portal, { select: false });
   return portal;
 }
 
 async function iptvResolveActive(ctx) {
-  var fromSettings = await iptvUpsertFromSettings(ctx);
+  await iptvUpsertFromSettings(ctx);
   var portals = await iptvLoadPortals(ctx);
-  if (!portals.length) return fromSettings;
+  if (!portals.length) return null;
 
   var active = await iptvGetActiveKey(ctx);
-  if (active) {
-    for (var i = 0; i < portals.length; i++) {
-      if (iptvPortalKey(portals[i]) === active) return portals[i];
-    }
+  if (!active) return null;
+  for (var i = 0; i < portals.length; i++) {
+    if (iptvPortalKey(portals[i]) === active) return portals[i];
   }
-  if (fromSettings) return fromSettings;
-  return portals[0];
+  return null;
 }
 
 function iptvPortalFormFields(opts) {
@@ -1477,7 +1473,7 @@ async function iptvRemovePortal(ctx, params) {
   await iptvSavePortals(ctx, next);
   var active = await iptvGetActiveKey(ctx);
   if (active === key) {
-    await iptvSetActiveKey(ctx, next.length ? iptvPortalKey(next[0]) : '');
+    await iptvSetActiveKey(ctx, '');
   }
   return hubOk('removePortal', { key: key, remaining: next.length });
 }
