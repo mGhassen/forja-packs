@@ -809,7 +809,10 @@ function hubApplyTmdbHit(meta, hit) {
     meta.genres = hit.genres;
   }
   meta._hubTmdbEnriched = true;
-  return meta;
+  // Hero reads paint.props — rebuild after enrich fills backdrop/logo/synopsis.
+  delete meta.paint;
+  delete meta.meta;
+  return hubPaintPoster(meta);
 }
 
 function hubEnrichPreferType(meta) {
