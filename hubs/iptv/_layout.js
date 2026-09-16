@@ -71,6 +71,7 @@ function iptvCatalogActions() {
       action: 'portals',
       hoistSource: 'iptv',
       trailing: true,
+      width: 160,
     },
   ];
 }
