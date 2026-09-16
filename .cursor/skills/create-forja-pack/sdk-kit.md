@@ -84,9 +84,21 @@ Error `code` enum: `INVALID_ACTION` | `INVALID_PARAMS` | `NOT_FOUND` | `AUTH_REQ
 |--------|----------------|
 | `layout` | `pages.{page}.widgets[]` |
 | `rail` / `feed` / `search` | `items[]` (+ paging) |
-| `details` | `meta` (+ optional `rails`) |
+| `details` | `meta` (+ optional `rails`, optional `layout`) |
 | `filters` | `fields[]` (+ optional play filters) |
 | `enrich` | enriched `items` / `meta` (companion plugin) |
+
+`details.layout` (optional) — host paints backdrop / first body row from these props only:
+
+```javascript
+layout: {
+  fullBleedBackdrop: true,       // backdrop fills viewport (else backdropFraction)
+  backdropFraction: 0.82,        // optional; default 0.82 when not full-bleed
+  firstBodyRowFraction: 0.65,    // optional; first body row Y + overlap; omit = no overlap
+}
+```
+
+Omit `layout` → classic 82% hero, no body pull-up.
 
 ### Layout (one foundation catalog)
 

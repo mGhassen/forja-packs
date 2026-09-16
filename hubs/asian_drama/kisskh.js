@@ -209,7 +209,17 @@ function kisskhDetails(ctx, cfg, params) {
       if (bg) meta.background = kisskhCover(bg);
       var desc = String(raw.description || '').trim();
       if (desc) meta.description = hubStripHtml(desc);
-      return hubOk('details', { meta: meta }, { maxAge: 900, swr: 3600 });
+      return hubOk(
+        'details',
+        {
+          meta: meta,
+          layout: {
+            fullBleedBackdrop: true,
+            firstBodyRowFraction: 0.75,
+          },
+        },
+        { maxAge: 900, swr: 3600 },
+      );
     },
   );
 }

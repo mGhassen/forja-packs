@@ -1429,7 +1429,13 @@ function tmdbDetails(ctx, cfg, params) {
     }
 
     return Promise.all(sideJobs).then(function () {
-      var data = { meta: meta };
+      var data = {
+        meta: meta,
+        layout: {
+          fullBleedBackdrop: true,
+          firstBodyRowFraction: 0.65,
+        },
+      };
       if (Object.keys(rails).length) data.rails = rails;
       return hubOk('details', data, { maxAge: 3600, swr: 86400 });
     });

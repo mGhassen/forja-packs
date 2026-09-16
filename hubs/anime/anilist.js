@@ -674,7 +674,13 @@ function anilistDetails(ctx, cfg, params) {
     if (staff.length) meta.crew = staff;
     var related = anilistRelatedFromMedia(media);
     var recommendations = anilistRecommendationsFromMedia(media);
-    var payload = { meta: meta };
+    var payload = {
+      meta: meta,
+      layout: {
+        fullBleedBackdrop: true,
+        firstBodyRowFraction: 0.65,
+      },
+    };
     var rails = {};
     if (related.length) {
       rails.related = { title: 'Related', items: related };
