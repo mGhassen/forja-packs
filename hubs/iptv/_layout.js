@@ -85,13 +85,11 @@ function iptvLayout() {
               orientation: 'vertical',
               focusUp: 'chrome',
               focusDown: 'items',
-              default: 'all',
               features: {
                 pin: true,
                 reorder: true,
                 widgets: ['favorites', 'watched'],
               },
-              items: [{ id: 'all', label: 'All', icon: 'grid' }],
             }),
             hubWithLoad(
               kitList('items', {
