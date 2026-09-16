@@ -1,0 +1,2101 @@
+[
+  {
+    "id": "ufc",
+    "name": "UFC",
+    "short": "UFC",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      "ufc",
+      "ufc fight pass",
+      "ufc ppv",
+      "ufc on espn",
+      "ufc fight night",
+      "ufc 3",
+      "ufc apex",
+      "ufc on abc"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "wwe",
+    "name": "WWE",
+    "short": "WWE",
+    "gradient": [
+      "#B91C1C",
+      "#1F2937"
+    ],
+    "keywords": [
+      "wwe",
+      "wwe network",
+      "wwe ppv",
+      "wwe raw",
+      "wwe smackdown",
+      "wwe nxt",
+      "wwe premium",
+      "wrestlemania",
+      "summerslam",
+      "royal rumble",
+      "money in the bank",
+      "survivor series"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "aew",
+    "name": "AEW",
+    "short": "AEW",
+    "gradient": [
+      "#B91C1C",
+      "#1F2937"
+    ],
+    "keywords": [
+      "aew",
+      "all elite wrestling",
+      "aew dynamite",
+      "aew rampage",
+      "aew collision",
+      "aew revolution",
+      "aew double or nothing",
+      "aew full gear"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "boxing",
+    "name": "Boxing",
+    "short": "BOX",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      "boxing",
+      "ppv box",
+      "fight night",
+      "fite tv",
+      "fite",
+      "matchroom",
+      "top rank",
+      "premier boxing",
+      "pbc ",
+      "queensberry",
+      "espn boxing",
+      "showtime boxing",
+      "boxnation",
+      "fight network",
+      "dazn boxing",
+      "boxing nation",
+      "golden boy",
+      "wbo",
+      "wbc",
+      "ibf",
+      "wba",
+      "world boxing",
+      "championship boxing",
+      "super middleweight",
+      "heavyweight",
+      "sky sports boxing"
+    ],
+    "exclude": [
+      "box office",
+      "xbox",
+      "boxset",
+      "box set",
+      "music box",
+      "kids box"
+    ]
+  },
+  {
+    "id": "bellator",
+    "name": "Bellator MMA",
+    "short": "BLR",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      "bellator",
+      "bellator mma",
+      "pfl ",
+      "pfl mma",
+      "professional fighters league"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "ppv_events",
+    "name": "PPV Events",
+    "short": "PPV",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      " ppv",
+      "ppv ",
+      "pay per view",
+      "pay-per-view"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "one_championship",
+    "name": "ONE Championship",
+    "short": "ONE",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      "one championship",
+      "one fc",
+      "one mma",
+      "one martial arts"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "f1",
+    "name": "Formula 1",
+    "short": "F1",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "f1 tv",
+      "formula 1",
+      "formula one",
+      "sky f1",
+      "skysports f1",
+      "sky sport f1",
+      "sky sports f1",
+      "ssf1",
+      "ss f1",
+      "espn f1",
+      "f1 race",
+      "grand prix",
+      "gp race",
+      "f1 qualifying",
+      "formula 1 grand prix"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "motogp",
+    "name": "MotoGP",
+    "short": "GP",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "motogp",
+      "moto gp",
+      "moto-gp",
+      "moto2",
+      "moto3",
+      "motogp race"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nascar",
+    "name": "NASCAR",
+    "short": "NSC",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "nascar",
+      "nascar cup",
+      "daytona 500",
+      "nascar xfinity"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "indycar",
+    "name": "IndyCar",
+    "short": "INDY",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "indycar",
+      "indy car",
+      "indy 500",
+      "indianapolis 500"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "wrc",
+    "name": "WRC Rally",
+    "short": "WRC",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "wrc",
+      "world rally",
+      "rallytv",
+      "rally tv",
+      "rally championship"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "superbike",
+    "name": "Superbike / WSBK",
+    "short": "WSBK",
+    "gradient": [
+      "#DC2626",
+      "#111827"
+    ],
+    "keywords": [
+      "wsbk",
+      "superbike",
+      "world superbike",
+      "worldsbk"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bein_sports",
+    "name": "beIN Sports",
+    "short": "BEIN",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "bein sport",
+      "bein sports",
+      "beinsports",
+      "bein ",
+      "bein 1",
+      "bein 2",
+      "bein 3",
+      "bein hd",
+      "bein max",
+      "bein sports arabia",
+      "bein sport arabic"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sky_sports",
+    "name": "Sky Sports",
+    "short": "SKY",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "sky sport",
+      "sky sports",
+      "skysports",
+      "sky sports main event",
+      "sky sports premier league",
+      "sky sports football",
+      "sky sports action",
+      "sky sports arena",
+      "sky sports cricket",
+      "sky sports golf",
+      "sky sports f1"
+    ],
+    "exclude": [
+      "sky sports news"
+    ]
+  },
+  {
+    "id": "tnt_sports",
+    "name": "TNT Sports",
+    "short": "TNT",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "tnt sport",
+      "tnt sports",
+      "bt sport",
+      "btsport",
+      "tnt sports 1",
+      "tnt sports 2",
+      "tnt sports 3",
+      "tnt sports 4",
+      "bt sport 1",
+      "bt sport 2",
+      "bt sport 3"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "champions_league",
+    "name": "Champions League",
+    "short": "UCL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "champions league",
+      "uefa champions",
+      "ucl ",
+      " ucl ",
+      "uefa europa",
+      "europa league",
+      "conference league",
+      "uecl",
+      "bein champions",
+      "bein ucl",
+      "tnt sports ucl",
+      "sky sports ucl",
+      "cbs sports ucl",
+      "paramount+ ucl",
+      "dazn champions",
+      "canal+ champions"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "premier_league",
+    "name": "Premier League",
+    "short": "EPL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "premier league",
+      "epl ",
+      "barclays premier",
+      " bpl ",
+      "sky sports pl",
+      "bein epl",
+      "nbc premier league",
+      "peacock premier league",
+      "manutd",
+      "man city",
+      "arsenal fc"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "la_liga",
+    "name": "La Liga",
+    "short": "LL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "laliga",
+      "la liga",
+      "movistar laliga",
+      "laliga tv",
+      "laliga ea sports"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "serie_a",
+    "name": "Serie A",
+    "short": "SA",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "serie a",
+      "dazn italia",
+      "sky calcio",
+      "calcio",
+      "italian football",
+      "serie a tim"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bundesliga",
+    "name": "Bundesliga",
+    "short": "BL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "bundesliga",
+      "sky bundesliga",
+      "dazn bundes",
+      "german football",
+      "bundesliga 2"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "ligue_1",
+    "name": "Ligue 1",
+    "short": "L1",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "ligue 1",
+      "ligue1",
+      "canal+ sport",
+      "canal plus sport",
+      "rmc sport",
+      "prime video ligue",
+      "french football",
+      "ligue 2",
+      "dazn ligue"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "mls",
+    "name": "MLS",
+    "short": "MLS",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      " mls",
+      "mls ",
+      "major league soccer",
+      "apple mls",
+      "mls season pass",
+      "mls next"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "world_cup",
+    "name": "World Cup",
+    "short": "WC",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "world cup",
+      "fifa world",
+      "fifa+",
+      "fifa plus",
+      "qatar 2022",
+      "wc 2026"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "eredivisie",
+    "name": "Eredivisie",
+    "short": "ERE",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "eredivisie",
+      "dutch football",
+      "netherlands football"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "primeira_liga",
+    "name": "Primeira Liga",
+    "short": "PL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "primeira liga",
+      "liga portugal",
+      "portuguese football",
+      "liga nos",
+      "sport tv portugal"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "super_lig",
+    "name": "Süper Lig",
+    "short": "SL",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "super lig",
+      "süper lig",
+      "turkish football",
+      "bein turkey"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "african_football",
+    "name": "African Football",
+    "short": "CAF",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "afcon",
+      "africa cup",
+      "caf champions",
+      "caf cl",
+      "caf confederations",
+      "supersport africa"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "copa_libertadores",
+    "name": "Copa Libertadores",
+    "short": "LIB",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "copa libertadores",
+      "libertadores",
+      "copa sudamericana",
+      "conmebol"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "beout_q",
+    "name": "SuperSport",
+    "short": "SS",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "supersport",
+      "super sport",
+      "dstv sport"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "espn",
+    "name": "ESPN",
+    "short": "ESPN",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "espn",
+      "espn2",
+      "espn 2",
+      "espnews",
+      "espn+",
+      "espn plus",
+      "espn deportes",
+      "espn u",
+      "espnu"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "fox_sports",
+    "name": "Fox Sports",
+    "short": "FOX",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "fox sport",
+      "fox sports",
+      "fs1",
+      "fs2",
+      "fox soccer",
+      "fox deportes"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nbc_sports",
+    "name": "NBC Sports",
+    "short": "NBC",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "nbc sport",
+      "nbc sports",
+      "nbcsn",
+      "peacock sport",
+      "nbc gold"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cbs_sports",
+    "name": "CBS Sports",
+    "short": "CBS",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "cbs sport",
+      "cbs sports",
+      "paramount sport",
+      "cbs sports hq"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tnt_us",
+    "name": "TNT (USA)",
+    "short": "TNT",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "tnt usa",
+      "tnt us ",
+      "tnt hd usa",
+      "max sports"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nba",
+    "name": "NBA",
+    "short": "NBA",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "nba ",
+      "nba tv",
+      "nba league pass",
+      "nba hd",
+      "nba g league"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nfl",
+    "name": "NFL",
+    "short": "NFL",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "nfl ",
+      "nfl network",
+      "nfl hd",
+      "nfl sunday ticket",
+      "nfl game pass"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nfl_redzone",
+    "name": "NFL RedZone",
+    "short": "RZ",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "redzone",
+      "red zone"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nhl",
+    "name": "NHL",
+    "short": "NHL",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "nhl ",
+      "nhl network",
+      "nhl hd",
+      "nhl tv",
+      "hockey night"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "mlb",
+    "name": "MLB",
+    "short": "MLB",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "mlb ",
+      "mlb network",
+      "mlb hd",
+      "mlb tv",
+      "mlb extra innings"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bally_sports",
+    "name": "Bally Sports",
+    "short": "BSN",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "bally sport",
+      "bally sports",
+      "fanduel sports network"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tennis_channel",
+    "name": "Tennis Channel",
+    "short": "TEN",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "tennis channel",
+      "tennis hd",
+      "atp tennis",
+      "wta tennis",
+      "tennis tv",
+      "wimbledon",
+      "us open tennis",
+      "french open",
+      "australian open",
+      "roland garros",
+      "atp tour",
+      "wta tour"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "golf_channel",
+    "name": "Golf Channel",
+    "short": "GLF",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "golf channel",
+      "golf tv",
+      "sky golf",
+      "pga tour",
+      "masters golf",
+      "the open golf",
+      "ryder cup",
+      "golf live"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "amazon_prime_sport",
+    "name": "Prime Video Sport",
+    "short": "PVS",
+    "gradient": [
+      "#EF4444",
+      "#F59E0B"
+    ],
+    "keywords": [
+      "prime video sport",
+      "prime sport",
+      "amazon sport",
+      "amazon prime sport",
+      "prime video nfl",
+      "prime video ucl",
+      "prime video ligue"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cricket",
+    "name": "Cricket",
+    "short": "CRK",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "cricket",
+      "star sports cricket",
+      "sky sports cricket",
+      "willow cricket",
+      "willow tv",
+      "sony ten",
+      "sony six cricket",
+      "espn cricinfo",
+      "icc cricket",
+      "test match",
+      "odi ",
+      "t20 ",
+      "ipl ",
+      "indian premier league",
+      "big bash",
+      "cpl cricket",
+      "the hundred",
+      "county cricket"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "dazn",
+    "name": "DAZN",
+    "short": "DAZN",
+    "gradient": [
+      "#F97316",
+      "#7C2D12"
+    ],
+    "keywords": [
+      "dazn"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "eurosport",
+    "name": "Eurosport",
+    "short": "EURO",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "eurosport",
+      "eurosport 1",
+      "eurosport 2",
+      "discovery+ sport",
+      "gcn+ ",
+      "cycling tv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "axs_wrestling",
+    "name": "Wrestling AXS",
+    "short": "AXS",
+    "gradient": [
+      "#B91C1C",
+      "#1F2937"
+    ],
+    "keywords": [
+      "axs tv",
+      "njpw",
+      "new japan pro",
+      "impact wrestling",
+      "tna "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sport_tv",
+    "name": "Sport TV (general)",
+    "short": "STV",
+    "gradient": [
+      "#7C3AED",
+      "#22D3EE"
+    ],
+    "keywords": [
+      "sport tv",
+      "sportv",
+      "sport channel",
+      "sports channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cnn",
+    "name": "CNN",
+    "short": "CNN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "cnn",
+      "cnn international",
+      "cnn hd"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bbc_news",
+    "name": "BBC News",
+    "short": "BBC",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "bbc news",
+      "bbc world",
+      "bbc world news"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "fox_news",
+    "name": "Fox News",
+    "short": "FXN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "fox news",
+      "fox business"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "msnbc",
+    "name": "MSNBC",
+    "short": "MSN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "msnbc"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sky_news",
+    "name": "Sky News",
+    "short": "SKN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "sky news",
+      "sky news arabia"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "al_jazeera",
+    "name": "Al Jazeera",
+    "short": "AJ",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "al jazeera",
+      "aljazeera",
+      "jazeera",
+      "al jazeera english",
+      "al jazeera arabic"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cnbc",
+    "name": "CNBC",
+    "short": "CNBC",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "cnbc",
+      "cnbc international",
+      "cnbc arabic"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bloomberg",
+    "name": "Bloomberg",
+    "short": "BLM",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "bloomberg",
+      "bloomberg tv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "france24",
+    "name": "France 24",
+    "short": "F24",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "france 24",
+      "france24"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "dw_news",
+    "name": "DW News",
+    "short": "DW",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "dw news",
+      "deutsche welle",
+      " dw "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "euronews",
+    "name": "Euronews",
+    "short": "EN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "euronews",
+      "euro news"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "rt_news",
+    "name": "RT News",
+    "short": "RT",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "rt news",
+      "russia today"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "trt_world",
+    "name": "TRT World",
+    "short": "TRT",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "trt world",
+      "trt haber"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sky_sports_news",
+    "name": "Sky Sports News",
+    "short": "SSN",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "sky sports news",
+      "ssn "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bbc_one",
+    "name": "BBC One",
+    "short": "BBC1",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "bbc one",
+      "bbc1",
+      "bbc 1"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bbc_two",
+    "name": "BBC Two",
+    "short": "BBC2",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "bbc two",
+      "bbc2",
+      "bbc 2"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "itv",
+    "name": "ITV",
+    "short": "ITV",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "itv1",
+      "itv 1",
+      "itv2",
+      "itv 2",
+      "itv3",
+      "itv 3",
+      "itv4",
+      "itv 4",
+      "itv hd",
+      "itvx"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "channel_4",
+    "name": "Channel 4",
+    "short": "CH4",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "channel 4",
+      "channel4",
+      "ch4 ",
+      "e4 ",
+      " e4",
+      "more4"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "channel_5",
+    "name": "Channel 5",
+    "short": "CH5",
+    "gradient": [
+      "#1D4ED8",
+      "#22C55E"
+    ],
+    "keywords": [
+      "channel 5",
+      "channel5",
+      "ch5 ",
+      "5star",
+      "5 star",
+      "5usa"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "hbo",
+    "name": "HBO",
+    "short": "HBO",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "hbo",
+      "hbo max",
+      "max originals",
+      "hbo signature",
+      "hbo family"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "showtime",
+    "name": "Showtime",
+    "short": "SHO",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "showtime",
+      "showtime 2"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "starz",
+    "name": "Starz",
+    "short": "STZ",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "starz",
+      "starz encore"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cinemax",
+    "name": "Cinemax",
+    "short": "CMX",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "cinemax",
+      "max prime"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "paramount",
+    "name": "Paramount",
+    "short": "PAR",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "paramount network",
+      "paramount+",
+      "paramount plus",
+      "paramount channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "amc",
+    "name": "AMC",
+    "short": "AMC",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      " amc ",
+      "amc hd",
+      "amc usa",
+      "amc network",
+      "amc+"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "fx",
+    "name": "FX",
+    "short": "FX",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      " fx ",
+      "fx hd",
+      "fxx",
+      "fx usa",
+      "fx movie"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tnt_drama",
+    "name": "TBS / TNT Drama",
+    "short": "TBS",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "tbs ",
+      "tbs hd",
+      "tnt drama"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "usa_network",
+    "name": "USA Network",
+    "short": "USA",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "usa network",
+      " usa hd",
+      "usa channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "syfy",
+    "name": "Syfy",
+    "short": "SYFY",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "syfy",
+      "sci fi",
+      "sci-fi"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "lifetime",
+    "name": "Lifetime",
+    "short": "LIFE",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "lifetime",
+      "lifetime movie"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "hallmark",
+    "name": "Hallmark",
+    "short": "HLM",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "hallmark",
+      "hallmark channel",
+      "hallmark movies"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tcm",
+    "name": "TCM",
+    "short": "TCM",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "tcm ",
+      "turner classic"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sky_cinema",
+    "name": "Sky Cinema",
+    "short": "SCIN",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "sky cinema",
+      "sky movies",
+      "sky cinema premiere",
+      "sky cinema action",
+      "sky cinema comedy",
+      "sky cinema drama"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "osn_movies",
+    "name": "OSN Movies",
+    "short": "OSNM",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "osn movies",
+      "osn cinema",
+      "osn series",
+      "osn streaming"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "netflix",
+    "name": "Netflix",
+    "short": "NF",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "netflix"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "apple_tv",
+    "name": "Apple TV+",
+    "short": "ATV",
+    "gradient": [
+      "#EC4899",
+      "#8B5CF6"
+    ],
+    "keywords": [
+      "apple tv",
+      "apple tv+",
+      "appletv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "discovery",
+    "name": "Discovery",
+    "short": "DISC",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "discovery",
+      "discovery+",
+      "discovery channel"
+    ],
+    "exclude": [
+      "kids"
+    ]
+  },
+  {
+    "id": "history",
+    "name": "History",
+    "short": "HIST",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "history channel",
+      "history hd",
+      "history us",
+      "history uk",
+      " hist "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "nat_geo",
+    "name": "Nat Geo",
+    "short": "NATGEO",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "national geographic",
+      "nat geo",
+      "natgeo",
+      "nat-geo",
+      "nat geo wild"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "animal_planet",
+    "name": "Animal Planet",
+    "short": "AP",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "animal planet"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tlc",
+    "name": "TLC",
+    "short": "TLC",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "tlc "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "food_network",
+    "name": "Food Network",
+    "short": "FOOD",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "food network",
+      "food channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "hgtv",
+    "name": "HGTV",
+    "short": "HGTV",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "hgtv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "investigation",
+    "name": "ID",
+    "short": "ID",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "investigation discovery",
+      " id channel",
+      " id hd",
+      "id usa"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "vice",
+    "name": "Vice / Vice TV",
+    "short": "VICE",
+    "gradient": [
+      "#14B8A6",
+      "#0F766E"
+    ],
+    "keywords": [
+      "vice tv",
+      "vicetv",
+      "vice channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "cartoon_network",
+    "name": "Cartoon Network",
+    "short": "CN",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "cartoon network",
+      "cartoonnetwork",
+      " cn hd"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "disney",
+    "name": "Disney",
+    "short": "DSN",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "disney channel",
+      "disney hd",
+      "disney xd",
+      "disney junior",
+      "disney jr"
+    ],
+    "exclude": [
+      "disney+",
+      "disney plus"
+    ]
+  },
+  {
+    "id": "nickelodeon",
+    "name": "Nickelodeon",
+    "short": "NICK",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "nickelodeon",
+      "nick jr",
+      "nick hd",
+      "nicktoons",
+      "nick "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "boomerang",
+    "name": "Boomerang",
+    "short": "BOOM",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "boomerang"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "pbs_kids",
+    "name": "PBS Kids",
+    "short": "PBS",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "pbs kids",
+      "pbs hd",
+      " pbs "
+    ],
+    "exclude": []
+  },
+  {
+    "id": "baby_tv",
+    "name": "Baby TV",
+    "short": "BTV",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "baby tv",
+      "baby channel"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "spacetoon",
+    "name": "Spacetoon",
+    "short": "SPC",
+    "gradient": [
+      "#FBBF24",
+      "#F472B6"
+    ],
+    "keywords": [
+      "spacetoon"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "mtv",
+    "name": "MTV",
+    "short": "MTV",
+    "gradient": [
+      "#06B6D4",
+      "#A855F7"
+    ],
+    "keywords": [
+      " mtv ",
+      "mtv hd",
+      "mtv usa",
+      "mtv uk",
+      "mtv live",
+      "mtv 80s",
+      "mtv 90s",
+      "mtv hits",
+      "mtv music"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "vh1",
+    "name": "VH1",
+    "short": "VH1",
+    "gradient": [
+      "#06B6D4",
+      "#A855F7"
+    ],
+    "keywords": [
+      "vh1",
+      "vh-1"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "bet",
+    "name": "BET",
+    "short": "BET",
+    "gradient": [
+      "#06B6D4",
+      "#A855F7"
+    ],
+    "keywords": [
+      "bet ",
+      "bet hd",
+      "bet hip",
+      "bet usa"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "mbc_masr",
+    "name": "MBC Masr",
+    "short": "MBM",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "mbc masr",
+      "mbc مصر"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "comedy_central",
+    "name": "Comedy Central",
+    "short": "CC",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "comedy central",
+      "comedy central hd"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "adult_swim",
+    "name": "Adult Swim",
+    "short": "AS",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "adult swim"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "telemundo",
+    "name": "Telemundo",
+    "short": "TLM",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "telemundo"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "univision",
+    "name": "Univision",
+    "short": "UNI",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "univision",
+      "unimas"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "tudn",
+    "name": "TUDN",
+    "short": "TUDN",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "tudn"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "mbc",
+    "name": "MBC",
+    "short": "MBC",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "mbc1",
+      "mbc 1",
+      "mbc2",
+      "mbc 2",
+      "mbc3",
+      "mbc 3",
+      "mbc4",
+      "mbc 4",
+      "mbc action",
+      "mbc max",
+      "mbc drama",
+      "mbc bollywood",
+      "mbc persia"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "rotana",
+    "name": "Rotana",
+    "short": "ROT",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "rotana",
+      "rotana cinema",
+      "rotana khalijiah",
+      "rotana music",
+      "rotana klassik"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "osn",
+    "name": "OSN",
+    "short": "OSN",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "osn",
+      "osn hd",
+      "osn yahala",
+      "osn living"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "abu_dhabi",
+    "name": "Abu Dhabi TV",
+    "short": "ADTV",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "abu dhabi tv",
+      "ad sport",
+      "ad sports",
+      "abu dhabi sport"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "dubai_tv",
+    "name": "Dubai TV",
+    "short": "DXB",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "dubai tv",
+      "dubai one",
+      "dubai sport"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "saudi_tv",
+    "name": "Saudi TV",
+    "short": "STV",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "saudi tv",
+      "ksa sport",
+      "ksa sports",
+      "saudi sport"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "alarabiya",
+    "name": "Al Arabiya",
+    "short": "ARB",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "al arabiya",
+      "alarabiya",
+      "arabiya"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "almajd",
+    "name": "Al Majd",
+    "short": "MAJ",
+    "gradient": [
+      "#059669",
+      "#064E3B"
+    ],
+    "keywords": [
+      "al majd",
+      "almajd",
+      "majd quran",
+      "majd kids"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "star_plus",
+    "name": "Star Plus",
+    "short": "STR",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "star plus",
+      "star+",
+      "star sports india",
+      "star sports 1",
+      "star sports 2",
+      "star gold"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "zee_tv",
+    "name": "Zee TV",
+    "short": "ZEE",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "zee tv",
+      "zee cinema",
+      "zee anmol",
+      "zee news",
+      "zee entertainment"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sony_india",
+    "name": "Sony (India)",
+    "short": "SNY",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "sony tv",
+      "sony max",
+      "sony sab",
+      "sony six",
+      "sony pix",
+      "sony ten",
+      "sony liv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "colors",
+    "name": "Colors",
+    "short": "CLR",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "colors tv",
+      "colors hd",
+      "colors cineplex",
+      "colors rishtey"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "sun_tv",
+    "name": "Sun TV",
+    "short": "SUN",
+    "gradient": [
+      "#F59E0B",
+      "#DB2777"
+    ],
+    "keywords": [
+      "sun tv",
+      "sun news",
+      "sun music",
+      "surya tv",
+      "kiran tv"
+    ],
+    "exclude": []
+  },
+  {
+    "id": "aaj_tak",
+    "name": "Aaj Tak / India Today",
+    "short": "AAJ",
+    "gradient": [
+      "#0EA5E9",
+      "#1E293B"
+    ],
+    "keywords": [
+      "aaj tak",
+      "india today",
+      "india news"
+    ],
+    "exclude": []
+  }
+]

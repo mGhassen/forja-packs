@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-  "version": "1.5.27",
+  "version": "1.5.29",
   "tags": [
     "iptv",
     "live"
@@ -111,7 +111,7 @@
           }
         ]
       },
-      "prelude": "_prelude.js,_layout.js"
+      "prelude": "_prelude.js,_channels_data.js,_channels.js,_layout.js"
     },
     {
       "id": "iptv-enrich-tmdb",
@@ -145,7 +145,10 @@
     "_portals.js",
     "_details.js",
     "_prelude.js",
+    "_channels_data.js",
+    "_channels.js",
     "_layout.js",
+    "channels.json",
     "icons/nav.png"
   ]
 }

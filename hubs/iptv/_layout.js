@@ -27,6 +27,12 @@ function iptvCatalogActions() {
           icon: 'video_library',
           colors: ['#1CE783', '#13AA2E'],
         },
+        {
+          id: 'channels',
+          label: 'Channels',
+          icon: 'sports',
+          colors: ['#F97316', '#7C2D12'],
+        },
       ],
     },
     {
@@ -116,6 +122,10 @@ function iptvLayout() {
                   series: {
                     title: 'Loading series',
                     detail: 'Fetching categories and series from your portal…',
+                  },
+                  channels: {
+                    title: 'Scanning portals',
+                    detail: 'Matching this brand across your IPTV portals…',
                   },
                 },
               }),

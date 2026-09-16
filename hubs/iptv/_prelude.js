@@ -1324,7 +1324,8 @@ function iptvPortalsPanelLayout() {
         width: 380,
         searchPlaceholder: 'Search portals…',
         emptyTitle: 'No portals yet',
-        emptyDescription: 'Add a portal to browse channels.',
+        emptyDescription:
+          'Add a portal or import a share code to browse channels.',
         actions: [
           {
             id: 'scrape',
@@ -1333,6 +1334,13 @@ function iptvPortalsPanelLayout() {
             action: 'scrape',
           },
           { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
+          {
+            id: 'import',
+            label: 'Import',
+            icon: 'file_download',
+            action: 'importPortal',
+            form: iptvPortalImportForm(),
+          },
           {
             id: 'add',
             label: 'Add',

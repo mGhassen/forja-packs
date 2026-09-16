@@ -177,6 +177,7 @@ function iptvSection(params) {
     .toLowerCase();
   if (raw === 'movies' || raw === 'movie' || raw === 'vod') return 'movies';
   if (raw === 'series' || raw === 'tv') return 'series';
+  if (raw === 'channels' || raw === 'channel') return 'channels';
   return 'live';
 }
 
@@ -472,13 +473,17 @@ function iptvFeedKinds(catalog, items) {
 
 async function iptvFeed(ctx) {
   var params = hubParams(ctx);
+  var section = iptvSection(params);
+  if (section === 'channels') {
+    return await iptvChannelsFeed(ctx, params);
+  }
+
   var portal = await iptvResolveActive(ctx);
   if (!portal) {
     return hubItems('feed', []);
   }
 
   try {
-    var section = iptvSection(params);
     var skipCache = !!(params && (params.refresh || params.force));
     var catalog = await iptvFetchCatalog(ctx, portal, section, {
       skipCache: skipCache,
