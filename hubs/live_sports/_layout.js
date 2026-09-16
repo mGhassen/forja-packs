@@ -132,13 +132,6 @@ function liveSportsCatalogActions() {
         { id: 'cards', label: 'Cards', icon: 'cards' },
       ],
     },
-    {
-      id: 'portals',
-      label: 'Portals',
-      action: 'portals',
-      hoistSource: 'live_schedule',
-      trailing: true,
-    },
   ];
 }
 
@@ -149,7 +142,7 @@ function liveSportsLayout() {
         widgets: [
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
-              // ↓ from Catalog / Portals restores last schedule row (not All).
+              // ↓ from Catalog restores last schedule row (not All).
               focusDown: 'schedule',
               actions: liveSportsCatalogActions(),
             }),

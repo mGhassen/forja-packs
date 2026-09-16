@@ -81,12 +81,11 @@ var TMDB_HOME_FETCH_PAGES = 2;
 // Hourly mix — pick distinct TMDB pages in 1..max (Dart home_catalog_rotate).
 var TMDB_HOME_ROTATE_MAX_PAGE = 5;
 
-// Visual priority for pack feed claim (spotlight → featured → popular → new).
+// First-paint feed claim (spotlight → featured → popular). Lower rails lazy.
 var TMDB_FEED_CLAIM = [
   { id: 'spotlight', cap: TMDB_HOME_HERO_CAP, mode: 'exclusive' },
   { id: 'featured', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
   { id: 'popular', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
-  { id: 'new_releases', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
 ];
 
 function tmdbWatchProviderQuery(filter) {
@@ -2092,6 +2091,9 @@ function extract(ctx) {
     tmdbList(ctx, cfg, params).then(function (items) {
       var pageSize =
         Number(params.limit) > 0 ? Number(params.limit) : TMDB_HOME_RAIL_CAP;
+      var page = Number(params.page) > 0 ? Number(params.page) : 1;
+      var maxPages =
+        Number(params.maxPages) > 0 ? Number(params.maxPages) : 4;
       var railId = String(params.rail || 'spotlight');
       var attach =
         railId === 'spotlight'
@@ -2110,7 +2112,7 @@ function extract(ctx) {
           { maxAge: 900, swr: 3600 },
           {
             pageSize: pageSize,
-            hasMore: painted.length >= pageSize,
+            hasMore: page < maxPages && painted.length >= pageSize,
           },
         )[0];
       });

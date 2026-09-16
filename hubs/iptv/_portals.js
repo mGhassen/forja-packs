@@ -267,6 +267,10 @@ function iptvPortalsPanelLayout() {
         id: 'portals',
         source: 'listPortals',
         title: 'Portals',
+        width: 380,
+        searchPlaceholder: 'Search portals…',
+        emptyTitle: 'No portals yet',
+        emptyDescription: 'Add or import a portal to browse channels.',
         actions: [
           {
             id: 'add',

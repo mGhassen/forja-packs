@@ -18,8 +18,10 @@ function tmdbLayout() {
     pages: {
       home: {
         feed: true,
+        // First-paint only — new_releases / genre rows lazy-load when visible.
         feedRails: ['spotlight', 'featured', 'popular', 'new_releases'],
         pageSize: TMDB_HOME_RAIL_CAP,
+        maxPages: 4,
         widgets: [
           {
             type: 'vertical_filters',
@@ -62,9 +64,10 @@ function tmdbLayout() {
               title: 'Popular',
               rail: 'popular',
               style: 'numbered',
+              maxPages: 2,
             },
             'rail',
-            { rail: 'popular' },
+            { rail: 'popular', maxPages: 2 },
           ),
           { type: 'continue', id: 'continue_watching', mergeHomeWatchHistory: true },
           hubWithLoad(
