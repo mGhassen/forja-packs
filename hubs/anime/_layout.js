@@ -41,7 +41,6 @@ function anilistLayout() {
           ),
           rail('trending', 'Trending Now', {
             hideWhenBleed: true,
-            hideWhenTypeFilter: true,
           }),
           rail('this_season', 'This Season'),
           rail('top_airing', 'Top Airing'),
