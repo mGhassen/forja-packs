@@ -50,7 +50,7 @@ function iptvCatalogActions() {
       label: 'Search',
       action: 'eventSearch',
       trailing: true,
-      placeholder: 'Channel, movie, series…',
+      placeholder: 'Search channels or categories…',
     },
     {
       id: 'sort',
