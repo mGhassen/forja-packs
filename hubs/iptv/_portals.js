@@ -146,7 +146,10 @@ async function iptvUpsertFromSettings(ctx) {
     platform: platform,
   };
   portal.key = iptvPortalKey(portal);
-  await iptvUpsertPortalRow(ctx, portal, { select: true });
+  // Upsert settings portal into inventory only. Never steal active on every
+  // feed/list — that undoes selectPortal. Bootstrap select only when unset.
+  var active = await iptvGetActiveKey(ctx);
+  await iptvUpsertPortalRow(ctx, portal, { select: !active });
   return portal;
 }
 
@@ -273,18 +276,18 @@ function iptvPortalsPanelLayout() {
         emptyDescription: 'Add a portal to browse channels.',
         actions: [
           {
+            id: 'scrape',
+            label: 'Scrape',
+            icon: 'travel_explore',
+            action: 'scrape',
+          },
+          { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
+          {
             id: 'add',
             label: 'Add',
             icon: 'add',
             action: 'addPortal',
             form: iptvPortalAddForm(),
-          },
-          { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
-          {
-            id: 'scrape',
-            label: 'Scrape',
-            icon: 'travel_explore',
-            action: 'scrape',
           },
         ],
         itemActions: {
