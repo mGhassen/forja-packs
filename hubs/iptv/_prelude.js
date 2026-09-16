@@ -1321,7 +1321,7 @@ function iptvPortalsPanelLayout() {
         width: 380,
         searchPlaceholder: 'Search portals…',
         emptyTitle: 'No portals yet',
-        emptyDescription: 'Add or import a portal to browse channels.',
+        emptyDescription: 'Add a portal to browse channels.',
         actions: [
           {
             id: 'add',
@@ -1330,15 +1330,13 @@ function iptvPortalsPanelLayout() {
             action: 'addPortal',
             form: iptvPortalAddForm(),
           },
-          {
-            id: 'import',
-            label: 'Import',
-            icon: 'content_paste',
-            action: 'importPortal',
-            form: iptvPortalImportForm(),
-          },
           { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
-          { id: 'refresh', label: 'Refresh', icon: 'refresh', action: 'listPortals' },
+          {
+            id: 'scrape',
+            label: 'Scrape',
+            icon: 'travel_explore',
+            action: 'scrape',
+          },
         ],
         itemActions: {
           edit: {
