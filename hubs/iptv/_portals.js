@@ -52,11 +52,23 @@ async function iptvSetActiveKey(ctx, key) {
   }
 }
 
+function iptvPortalDisplayName(portal) {
+  var label = String((portal && portal.label) || '').trim();
+  var name = String((portal && portal.name) || '').trim();
+  var username = String((portal && portal.username) || '').trim();
+  var key = portal ? iptvPortalKey(portal) : '';
+  var keyLc = String(key || '').toLowerCase();
+  if (label && label.toLowerCase() !== keyLc) return label;
+  if (name && name.toLowerCase() !== keyLc) return name;
+  if (username) return username;
+  return 'Portal';
+}
+
 function iptvPortalPublic(portal) {
   if (!portal) return null;
   return {
     key: iptvPortalKey(portal),
-    label: String(portal.label || portal.name || portal.username || '').trim(),
+    label: iptvPortalDisplayName(portal),
     url: String(portal.url || '').trim(),
     username: String(portal.username || '').trim(),
     platform: iptvPlatformOf(portal),
@@ -85,7 +97,7 @@ function iptvPortalFromParams(p) {
     url: url,
     username: username,
     password: password,
-    label: label || username || url,
+    label: label,
     platform: platform,
   };
   if (userAgent) portal.userAgent = userAgent;
@@ -142,7 +154,7 @@ async function iptvUpsertFromSettings(ctx) {
     url: url,
     username: username,
     password: password,
-    label: label || username || url,
+    label: label,
     platform: platform,
   };
   portal.key = iptvPortalKey(portal);
@@ -227,7 +239,11 @@ function iptvPortalImportForm() {
 function iptvPortalListItem(portal, activeKey) {
   var pub = iptvPortalPublic(portal);
   if (!pub || !pub.key) return null;
-  var label = pub.label || pub.username || pub.key;
+  var label = pub.label;
+  var storedLabel = String((portal && portal.label) || '').trim();
+  if (storedLabel && storedLabel.toLowerCase() === String(pub.key || '').toLowerCase()) {
+    storedLabel = '';
+  }
   return {
     id: pub.key,
     type: 'portal',
@@ -246,7 +262,7 @@ function iptvPortalListItem(portal, activeKey) {
     formValues: {
       url: pub.url || '',
       username: pub.username || '',
-      label: label,
+      label: storedLabel,
     },
     open: {
       surface: 'iptv',
@@ -353,7 +369,7 @@ async function iptvImportPortal(ctx, params) {
     password: row.password,
     platform: row.platform,
     userAgent: row.userAgent || row.user_agent,
-    label: label || row.username || row.url,
+    label: label,
   });
   var err = iptvPortalValidate(portal);
   if (err) return hubFail('importPortal', 'INVALID', err);

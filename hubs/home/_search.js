@@ -1,9 +1,139 @@
 // Home hub search — pack-owned product (RFC-109).
 // Host only opens search chrome and calls action `search` / `search_helpers`.
 // Relies on tmdb.js helpers (tmdbStructuredSearch, hubConfig, …) at call time.
+//
+// Results are never strict-empty: page 1 soft-fills with related (or trending).
+// Scroll loads up to 3 pages; pages 2–3 are relatedness hops (new seed each page),
+// not the same TMDB multi query again.
 
-var HOME_SEARCH_MAX_PAGES = 5;
+var HOME_SEARCH_MAX_PAGES = 3;
 var HOME_HELPER_POOL = 64;
+
+function homeSearchMetaKey(meta) {
+  if (!meta) return '';
+  var id = meta.ids && meta.ids.tmdb;
+  if (id == null || id === '') return '';
+  return String(meta.type || '') + ':' + String(id);
+}
+
+function homeSearchExcludeIds(params) {
+  var seen = {};
+  var raw = (params && params.excludeIds) || [];
+  if (!Array.isArray(raw)) return seen;
+  for (var i = 0; i < raw.length; i++) {
+    var k = String(raw[i] || '').trim().toLowerCase();
+    if (k) seen[k] = true;
+  }
+  return seen;
+}
+
+function homeSearchPaintEnvelope(painted, pageSize, hasMore) {
+  return hubItems(
+    'search',
+    painted,
+    { maxAge: 300 },
+    { pageSize: pageSize, hasMore: hasMore },
+  )[0];
+}
+
+function homeSearchPaintList(list) {
+  var painted = [];
+  for (var i = 0; i < list.length; i++) {
+    if (!list[i]) continue;
+    painted.push(hubPaintPoster(list[i]));
+  }
+  return painted;
+}
+
+function homeSearchMetasFromJson(cfg, json, forcedType, seen, limit) {
+  var rows = (json && json.results) || [];
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (row && row.media_type === 'person') continue;
+    var meta = tmdbMeta(cfg, row, forcedType || '');
+    if (!meta) continue;
+    var key = homeSearchMetaKey(meta).toLowerCase();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    out.push(meta);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function homeSearchRelatedMetas(ctx, cfg, seed, seen, limit) {
+  if (!seed || !(limit > 0)) return Promise.resolve([]);
+  var type = seed.type;
+  var id = seed.id;
+  return Promise.all([
+    homeHelperSafeJson(
+      tmdbGet(ctx, cfg, '/' + type + '/' + id + '/recommendations', {
+        page: 1,
+      }),
+    ),
+    homeHelperSafeJson(
+      tmdbGet(ctx, cfg, '/' + type + '/' + id + '/similar', { page: 1 }),
+    ),
+  ]).then(function (jsons) {
+    var queues = [
+      homeSearchMetasFromJson(cfg, jsons[0], type, {}, 40),
+      homeSearchMetasFromJson(cfg, jsons[1], type, {}, 40),
+    ];
+    var out = [];
+    var progress = true;
+    while (progress && out.length < limit) {
+      progress = false;
+      for (var q = 0; q < queues.length; q++) {
+        while (queues[q].length) {
+          var meta = queues[q].shift();
+          var key = homeSearchMetaKey(meta).toLowerCase();
+          if (!key || seen[key]) continue;
+          seen[key] = true;
+          out.push(meta);
+          progress = true;
+          break;
+        }
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  });
+}
+
+function homeSearchTrendingMetas(ctx, cfg, seen, limit) {
+  return Promise.all([
+    homeHelperSafeJson(tmdbGet(ctx, cfg, '/trending/movie/day', { page: 1 })),
+    homeHelperSafeJson(tmdbGet(ctx, cfg, '/trending/tv/day', { page: 1 })),
+    homeHelperSafeJson(tmdbGet(ctx, cfg, '/movie/popular', { page: 1 })),
+    homeHelperSafeJson(tmdbGet(ctx, cfg, '/tv/popular', { page: 1 })),
+  ]).then(function (jsons) {
+    var queues = [
+      homeSearchMetasFromJson(cfg, jsons[0], 'movie', {}, 20),
+      homeSearchMetasFromJson(cfg, jsons[1], 'tv', {}, 20),
+      homeSearchMetasFromJson(cfg, jsons[2], 'movie', {}, 20),
+      homeSearchMetasFromJson(cfg, jsons[3], 'tv', {}, 20),
+    ];
+    var out = [];
+    var progress = true;
+    while (progress && out.length < limit) {
+      progress = false;
+      for (var q = 0; q < queues.length; q++) {
+        while (queues[q].length) {
+          var meta = queues[q].shift();
+          var key = homeSearchMetaKey(meta).toLowerCase();
+          if (!key || seen[key]) continue;
+          seen[key] = true;
+          out.push(meta);
+          progress = true;
+          break;
+        }
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  });
+}
 
 function homeSearch(ctx, cfg, params) {
   var p = params || {};
@@ -18,51 +148,75 @@ function homeSearch(ctx, cfg, params) {
     Number(p.limit) > 0
       ? Number(p.limit)
       : Number((cfg && cfg.pageSize) || 20) || 20;
+  if (page > HOME_SEARCH_MAX_PAGES) {
+    return Promise.resolve(
+      homeSearchPaintEnvelope([], pageSize, false),
+    );
+  }
 
-  // Page 1 keeps structured fan-in (multi + discover). Later pages: multi only.
+  if (page > 1) {
+    return homeSearchRelatedPage(ctx, cfg, p, page, pageSize);
+  }
+
   var searchParams = Object.assign({}, p, { limit: pageSize });
-  var fetch =
-    page <= 1
-      ? tmdbStructuredSearch(ctx, cfg, searchParams)
-      : homeSearchMultiPage(ctx, cfg, searchParams, page);
-
-  return fetch.then(function (items) {
-    var list = Array.isArray(items) ? items : [];
-    var painted = [];
-    for (var i = 0; i < list.length; i++) {
-      if (!list[i]) continue;
-      painted.push(hubPaintPoster(list[i]));
+  var seen = homeSearchExcludeIds(p);
+  return tmdbStructuredSearch(ctx, cfg, searchParams).then(function (items) {
+    var hits = Array.isArray(items) ? items.slice() : [];
+    var seedMeta = hits.length ? hits[0] : null;
+    var out = [];
+    for (var i = 0; i < hits.length; i++) {
+      var key = homeSearchMetaKey(hits[i]).toLowerCase();
+      if (!key || seen[key]) continue;
+      seen[key] = true;
+      out.push(hits[i]);
     }
-    var hasMore = page < HOME_SEARCH_MAX_PAGES && painted.length >= pageSize;
-    return hubItems(
-      'search',
-      painted,
-      { maxAge: 300 },
-      { pageSize: pageSize, hasMore: hasMore },
-    )[0];
+
+    var padNeed = pageSize - out.length;
+    var seed = homeHelperParseSeed({ seed: seedMeta }) ||
+      homeHelperParseSeed(p);
+
+    function finish(list) {
+      var painted = homeSearchPaintList(list);
+      var hasSeed = !!(seed || homeHelperParseSeed({ seed: list[0] }));
+      var hasMore =
+        page < HOME_SEARCH_MAX_PAGES && hasSeed && painted.length > 0;
+      return homeSearchPaintEnvelope(painted, pageSize, hasMore);
+    }
+
+    if (padNeed <= 0) return Promise.resolve(finish(out));
+
+    if (seed) {
+      return homeSearchRelatedMetas(ctx, cfg, seed, seen, padNeed).then(
+        function (related) {
+          for (var r = 0; r < related.length; r++) out.push(related[r]);
+          if (out.length > 0) return finish(out);
+          return homeSearchTrendingMetas(ctx, cfg, seen, pageSize).then(finish);
+        },
+      );
+    }
+
+    return homeSearchTrendingMetas(ctx, cfg, seen, pageSize).then(function (
+      trending,
+    ) {
+      for (var t = 0; t < trending.length; t++) out.push(trending[t]);
+      return finish(out);
+    });
   });
 }
 
-function homeSearchMultiPage(ctx, cfg, params, page) {
-  var trimmed = String(params.query || '').trim();
-  if (!trimmed) return Promise.resolve([]);
-  var limit = Number(params.limit) > 0 ? Number(params.limit) : 20;
-  return tmdbSearchMultiPage(ctx, cfg, trimmed, page).then(function (json) {
-    var rows = (json && json.results) || [];
-    var out = [];
-    var seen = {};
-    for (var i = 0; i < rows.length; i++) {
-      var row = rows[i];
-      if (row && row.media_type === 'person') continue;
-      var meta = tmdbMeta(cfg, row, '');
-      if (!meta) continue;
-      var key = meta.type + ':' + (meta.ids && meta.ids.tmdb);
-      if (seen[key]) continue;
-      seen[key] = true;
-      out.push(meta);
-      if (out.length >= limit) break;
-    }
-    return out;
+function homeSearchRelatedPage(ctx, cfg, params, page, pageSize) {
+  var seen = homeSearchExcludeIds(params);
+  var seed = homeHelperParseSeed(params);
+  if (!seed) {
+    return Promise.resolve(homeSearchPaintEnvelope([], pageSize, false));
+  }
+  return homeSearchRelatedMetas(ctx, cfg, seed, seen, pageSize).then(function (
+    related,
+  ) {
+    var painted = homeSearchPaintList(related);
+    var hasMore =
+      page < HOME_SEARCH_MAX_PAGES && painted.length > 0;
+    return homeSearchPaintEnvelope(painted, pageSize, hasMore);
   });
 }
 
