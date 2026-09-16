@@ -99,6 +99,7 @@ function iptvLayout() {
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
+                pageSize: 48,
                 emptyTitle: 'Add a portal',
                 emptyDescription:
                   'Open Portals to add credentials or import a share code.',

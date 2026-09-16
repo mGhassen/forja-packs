@@ -261,6 +261,52 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, para
     return watchedItems;
   }
 
+  // VOD: collect matching streams first, page, then stamp metas — never
+  // JSON.stringify tens of thousands of posters on the flutter_js isolate.
+  if (section !== 'live') {
+    var matched = [];
+    for (var j = 0; j < streams.length; j++) {
+      var st = streams[j];
+      if (!st) continue;
+      var catId = String(st.categoryId || 'all').trim() || 'all';
+      if (
+        filterCat &&
+        filterCat !== 'all' &&
+        filterCat !== FAV &&
+        filterCat !== WATCHED &&
+        catId !== filterCat
+      ) {
+        continue;
+      }
+      var name = String(st.name || st.title || '').trim();
+      if (q) {
+        var needle = String(q).toLowerCase();
+        var hay = (name + ' ' + (cats[catId] || catId)).toLowerCase();
+        if (hay.indexOf(needle) < 0) continue;
+      }
+      matched.push(st);
+    }
+    var pageNum = Number(params && params.page);
+    if (!isFinite(pageNum) || pageNum < 1) pageNum = 1;
+    var pageSize = Number(
+      params && (params.limit || params.pageSize || params.perPage),
+    );
+    if (!(pageSize > 0)) pageSize = 48;
+    var start = (pageNum - 1) * pageSize;
+    var slice = matched.slice(start, start + pageSize);
+    var vodItems = [];
+    for (var k = 0; k < slice.length; k++) {
+      var vst = slice[k];
+      var vCat = String(vst.categoryId || 'all').trim() || 'all';
+      var vMeta = iptvVodMeta(portal, vst, section, cats[vCat] || vCat);
+      if (!vMeta) continue;
+      vodItems.push(vMeta);
+    }
+    vodItems._iptvPageSize = pageSize;
+    vodItems._iptvHasMore = start + slice.length < matched.length;
+    return vodItems;
+  }
+
   var items = [];
   for (var j = 0; j < streams.length; j++) {
     var st = streams[j];
@@ -275,12 +321,9 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, para
     ) {
       continue;
     }
-    var meta =
-      section === 'live'
-        ? iptvLiveMeta(portal, st, cats[catId] || catId)
-        : iptvVodMeta(portal, st, section, cats[catId] || catId);
+    var meta = iptvLiveMeta(portal, st, cats[catId] || catId);
     if (!meta) continue;
-    if (section === 'live' && !(meta.open && meta.open.url)) continue;
+    if (!(meta.open && meta.open.url)) continue;
     if (!iptvFeedQueryMatch(meta, q)) continue;
     items.push(meta);
   }
@@ -467,12 +510,24 @@ async function iptvFeed(ctx) {
       q,
       params,
     );
+    var kinds = iptvFeedKinds(catalog, items);
+    var paging = { hasMore: false };
     if (section === 'live') {
       // NOW/EPG is host-lazy (CatalogEpgGuideHost) — never block channel paint.
       items = iptvApplyLiveCardPaint(items);
+    } else {
+      var pageSize = Number(items && items._iptvPageSize);
+      if (!(pageSize > 0)) pageSize = 48;
+      paging = {
+        pageSize: pageSize,
+        hasMore: !!(items && items._iptvHasMore),
+      };
+      try {
+        delete items._iptvPageSize;
+        delete items._iptvHasMore;
+      } catch (e) {}
     }
-    var kinds = iptvFeedKinds(catalog, items);
-    var env = hubItems('feed', items)[0];
+    var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
     return [env];
   } catch (e) {
