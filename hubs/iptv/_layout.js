@@ -109,7 +109,7 @@ function iptvLayout() {
                 pageSize: 48,
                 emptyTitle: 'Choose a portal',
                 emptyDescription:
-                  'Select a provider to browse Live TV, Movies, and Series.',
+                  'Select a portal to browse Live TV, Movies, and Series.',
                 loading: {
                   live: {
                     title: 'Loading channels',

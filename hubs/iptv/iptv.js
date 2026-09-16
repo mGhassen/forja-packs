@@ -30,7 +30,10 @@ function iptvStreamPath(portal, kind, id, ext) {
 }
 
 function iptvLiveMeta(portal, stream, catName, kindOverride) {
-  var id = String(stream.id || stream.stream_id || '').trim();
+  // Stalker: rust puts create_link cmd in stream_id; keep cmd override if present.
+  var id = String(
+    stream.cmd || stream.id || stream.stream_id || '',
+  ).trim();
   var name = String(stream.name || stream.title || 'Channel').trim() || 'Channel';
   var logo = String(stream.icon || stream.stream_icon || stream.logo || '').trim();
   var ext = String(stream.ext || stream.container_extension || 'ts').replace(
@@ -42,7 +45,11 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
   if (!url && platform === 'xtream') {
     url = iptvStreamPath(portal, 'live', id, ext);
   }
-  // Stalker needs create_link at play time (host); skip rows with no URL yet.
+  // Stalker: no CDN URL until host create_link — paint with pending handoff.
+  if (!url && platform === 'stalker') {
+    if (!id) return null;
+    url = 'pending:stalker:' + id;
+  }
   if (!url) return null;
   var catId = String(
     kindOverride || stream.categoryId || stream.category_id || 'all',
@@ -544,6 +551,10 @@ async function iptvFeed(ctx) {
     }
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
+    if (!items.length) {
+      env.data.emptyTitle = 'No channels';
+      env.data.emptyDescription = 'Nothing in this category.';
+    }
     return [env];
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
@@ -619,7 +630,8 @@ async function iptvSearchChannels(ctx, params) {
         provider: portal.label || 'IPTV',
         portalKey: ch.portalKey,
         streamId: ch.streamId,
-        liveSourceKind: 'iptvXtream',
+        liveSourceKind:
+          iptvPlatformOf(portal) === 'stalker' ? 'iptvStalker' : 'iptvXtream',
       });
     }
     return hubOk('searchChannels', { sources: sources }, { maxAge: 60, swr: 120 });
