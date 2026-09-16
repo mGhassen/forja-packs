@@ -480,7 +480,17 @@ async function iptvFeed(ctx) {
 
   var portal = await iptvResolveActive(ctx);
   if (!portal) {
-    return hubItems('feed', []);
+    var env = hubItems('feed', [])[0];
+    env.data.kinds = [];
+    env.data.coverBody = true;
+    env.data.emptyTitle = 'Choose a portal';
+    env.data.emptyDescription =
+      'Select a provider to browse Live TV, Movies, and Series.';
+    env.data.emptyAction = {
+      label: 'Open portal',
+      action: 'portals',
+    };
+    return [env];
   }
 
   try {

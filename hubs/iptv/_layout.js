@@ -106,9 +106,9 @@ function iptvLayout() {
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
                 pageSize: 48,
-                emptyTitle: 'Add a portal',
+                emptyTitle: 'Choose a portal',
                 emptyDescription:
-                  'Open Portals to add credentials or import a share code.',
+                  'Select a provider to browse Live TV, Movies, and Series.',
                 loading: {
                   live: {
                     title: 'Loading channels',

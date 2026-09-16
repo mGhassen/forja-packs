@@ -139,11 +139,41 @@ async function iptvChannelsFeed(ctx, params) {
       '',
   ).trim();
   var q = String((params && params.q) || '').trim().toLowerCase();
+  var force = !!(params && (params.refresh || params.force));
 
+  // No brand selected: idle stays empty; search fans out across curated brands.
   if (!channelId || channelId === 'all') {
-    var emptyEnv = hubItems('feed', [], null)[0];
-    if (kinds.length) emptyEnv.data.kinds = kinds;
-    return [emptyEnv];
+    if (!q) {
+      var emptyEnv = hubItems('feed', [], null)[0];
+      if (kinds.length) emptyEnv.data.kinds = kinds;
+      return [emptyEnv];
+    }
+    var globalHits = [];
+    var seenUrl = {};
+    for (var i = 0; i < kinds.length; i++) {
+      var kind = kinds[i];
+      if (!kind || !kind.id) continue;
+      var channel = iptvCuratedById(kind.id);
+      if (!channel) continue;
+      var brandLabel = String(
+        kind.label || channel.name || channel.short || kind.id || '',
+      ).toLowerCase();
+      var brandMatch = brandLabel.indexOf(q) >= 0;
+      var scanned = await iptvScanChannel(ctx, channel, { force: force });
+      for (var h = 0; h < scanned.length; h++) {
+        var meta = scanned[h];
+        if (!meta) continue;
+        if (!brandMatch && !iptvFeedQueryMatch(meta, q)) continue;
+        var url = meta.open && meta.open.url ? String(meta.open.url) : '';
+        if (!url || seenUrl[url]) continue;
+        seenUrl[url] = true;
+        globalHits.push(meta);
+      }
+    }
+    globalHits = iptvApplyLiveCardPaint(globalHits);
+    var globalEnv = hubItems('feed', globalHits, null)[0];
+    if (kinds.length) globalEnv.data.kinds = kinds;
+    return [globalEnv];
   }
 
   var channel = iptvCuratedById(channelId);
@@ -153,7 +183,6 @@ async function iptvChannelsFeed(ctx, params) {
     return [miss];
   }
 
-  var force = !!(params && (params.refresh || params.force));
   var hits = await iptvScanChannel(ctx, channel, { force: force });
   if (q) {
     hits = hits.filter(function (m) {
