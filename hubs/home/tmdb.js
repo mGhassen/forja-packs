@@ -774,7 +774,9 @@ function tmdbAttachDetailsChrome(cfg, meta, json, type) {
   if (premiere.length >= 10) meta.premiereDate = premiere.substring(0, 10);
 
   meta._hubTmdbEnriched = true;
-  return meta;
+  delete meta.paint;
+  delete meta.meta;
+  return hubPaintHero(meta);
 }
 
 function tmdbAttachLogos(ctx, cfg, items, limit) {
@@ -792,7 +794,15 @@ function tmdbAttachLogos(ctx, cfg, items, limit) {
         tmdbGet(ctx, cfg, '/' + type + '/' + tid + '/images', {})
           .then(function (json) {
             var logo = tmdbPickTitleLogo(cfg, json);
-            if (logo) items[idx].logo = logo;
+            if (logo) {
+              items[idx].logo = logo;
+              // Restamp if this row was already painted (cache / feed reuse).
+              if (items[idx].paint) {
+                delete items[idx].paint;
+                delete items[idx].meta;
+                items[idx] = hubPaintHero(items[idx]);
+              }
+            }
           })
           .catch(function () {}),
       );

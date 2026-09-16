@@ -268,6 +268,23 @@ function hubPaintPoster(item, opts) {
   return out;
 }
 
+function hubPaintHero(item, opts) {
+  opts = opts || {};
+  var out = hubPaintPoster(item, opts);
+  var meta = item || {};
+  var props = out.paint.props;
+  props.backdropUrl = String(
+    meta.background || meta.backdrop || opts.backdropUrl || props.imageUrl || '',
+  );
+  props.posterUrl = String(meta.poster || props.imageUrl || '');
+  props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  props.overview = String(
+    meta.description || meta.overview || opts.overview || '',
+  );
+  if (meta.releaseInfo) props.year = String(meta.releaseInfo).slice(0, 4);
+  return out;
+}
+
 function hubPaintEvent(item, opts) {
   opts = opts || {};
   var meta = item || {};
@@ -812,7 +829,7 @@ function hubApplyTmdbHit(meta, hit) {
   // Hero reads paint.props — rebuild after enrich fills backdrop/logo/synopsis.
   delete meta.paint;
   delete meta.meta;
-  return hubPaintPoster(meta);
+  return hubPaintHero(meta);
 }
 
 function hubEnrichPreferType(meta) {

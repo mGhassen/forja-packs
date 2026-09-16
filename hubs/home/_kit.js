@@ -585,7 +585,10 @@ function hubApplyTmdbHit(meta, hit) {
   if (hit.rating != null && !(Number(meta.rating) > 0)) {
     meta.rating = Number(hit.rating);
   }
-  return meta;
+  meta._hubTmdbEnriched = true;
+  delete meta.paint;
+  delete meta.meta;
+  return hubPaintHero(meta);
 }
 
 function hubEnrichPreferType(meta) {
