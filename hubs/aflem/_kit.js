@@ -122,7 +122,8 @@ function hubStampDetailsPaint(meta) {
     if (!earliest || day < earliest) earliest = day;
   }
   var labelIso = premiere || earliest;
-  var upcoming = status === 'NOT_YET_RELEASED';
+  var upcoming =
+    status === 'NOT_YET_RELEASED' || status === 'UPCOMING';
   var isMovie = hubMetaIsMovie(meta);
   if (!upcoming && !isMovie && videos.length) {
     var dated = [];
@@ -138,13 +139,18 @@ function hubStampDetailsPaint(meta) {
         }
       }
       if (allFuture) upcoming = true;
+    } else if (labelIso && hubIsFutureIsoDate(labelIso)) {
+      // Stub episodes with no air dates — trust future premiere.
+      upcoming = true;
     }
   }
   if (!upcoming && labelIso && hubIsFutureIsoDate(labelIso)) {
     if (isMovie || !videos.length) upcoming = true;
   }
   meta.upcoming = !!upcoming;
-  if (upcoming && !status) meta.status = 'NOT_YET_RELEASED';
+  if (upcoming && (!status || status === 'UPCOMING')) {
+    meta.status = 'NOT_YET_RELEASED';
+  }
   if (labelIso) {
     meta.premiereDate = meta.premiereDate || labelIso;
     meta.premiereLabel = hubFormatDisplayDate(labelIso);
@@ -156,7 +162,11 @@ function hubStampDetailsPaint(meta) {
 
 function hubOk(action, data, cache) {
   var payload = data || {};
-  if (String(action) === 'details' && payload.meta && typeof payload.meta === 'object') {
+  if (
+    (String(action) === 'details' || String(action) === 'enrich') &&
+    payload.meta &&
+    typeof payload.meta === 'object'
+  ) {
     payload = Object.assign({}, payload, { meta: hubStampDetailsPaint(payload.meta) });
   }
   var env = {

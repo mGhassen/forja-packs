@@ -77,6 +77,8 @@ function kisskhMeta(row) {
     },
   };
   if (premiere) meta.premiereDate = premiere;
+  var status = String(row.status || '').trim();
+  if (status) meta.status = status;
   var label = String(row.label || '').trim();
   if (label) meta.badge = label;
   var desc = String(row.description || '').trim();
@@ -199,7 +201,9 @@ function kisskhDetails(ctx, cfg, params) {
         return a.episode - b.episode;
       });
       if (videos.length) meta.videos = videos;
-      else if (
+      // KissKH "Upcoming" (+ future premiere with no eps) → stamp Coming soon.
+      if (
+        !meta.status &&
         meta.premiereDate &&
         hubIsFutureIsoDate(meta.premiereDate)
       ) {
