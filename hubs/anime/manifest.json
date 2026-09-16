@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "tags": [
     "anime"
   ],
@@ -26,6 +26,7 @@
         "feed",
         "rail",
         "search",
+        "search_helpers",
         "filters",
         "details"
       ],

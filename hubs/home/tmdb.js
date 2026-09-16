@@ -2074,6 +2074,9 @@ function extract(ctx) {
   if (action === 'search') {
     return wrap(homeSearch(ctx, cfg, params));
   }
+  if (action === 'search_helpers') {
+    return wrap(homeSearchHelpers(ctx, cfg, params));
+  }
   if (action === 'feed') {
     return wrap(
       tmdbHomeFeed(ctx, cfg, params).then(function (env) {

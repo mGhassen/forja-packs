@@ -700,6 +700,11 @@ function extract(ctx) {
   if (action === 'search') {
     return anilistSearch(ctx, cfg, params);
   }
+  if (action === 'search_helpers') {
+    return anilistSearchHelpers(ctx, cfg, params).catch(function (e) {
+      return hubFail('search_helpers', 'UPSTREAM', e && e.message, true);
+    });
+  }
   if (action !== 'rail') {
     return hubFail(action, 'INVALID_ACTION', 'anilist has no action ' + action);
   }

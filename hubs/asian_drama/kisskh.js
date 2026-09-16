@@ -390,6 +390,11 @@ function extract(ctx) {
   if (action === 'search') {
     return kisskhSearch(ctx, cfg, params);
   }
+  if (action === 'search_helpers') {
+    return kisskhSearchHelpers(ctx, cfg, params).catch(function (e) {
+      return hubFail('search_helpers', 'UPSTREAM', e && e.message, true);
+    });
+  }
   if (action !== 'rail') {
     return hubFail(action, 'INVALID_ACTION', 'kisskh has no action ' + action);
   }
