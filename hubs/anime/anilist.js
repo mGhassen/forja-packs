@@ -32,6 +32,10 @@ var ANILIST_DETAILS_FIELDS = [
   ANILIST_MEDIA_FIELDS,
   'nextAiringEpisode { episode airingAt }',
   'streamingEpisodes { title thumbnail }',
+  'characters(page: 1, perPage: 16, sort: [ROLE, RELEVANCE, ID]) { edges { ' +
+    'role node { name { full } image { large } } } }',
+  'staff(page: 1, perPage: 10, sort: [RELEVANCE, ID]) { edges { ' +
+    'role node { name { full } image { large } } } }',
   'relations { edges { relationType(version: 2) node { ' +
     ANILIST_CARD_FIELDS +
     ' type } } }',
@@ -236,6 +240,51 @@ function anilistVideosFromMedia(m) {
     });
   }
   return videos;
+}
+
+function anilistPersonImage(node) {
+  if (!node || !node.image) return '';
+  return anilistAbsUrl(node.image.large || node.image.medium || '');
+}
+
+function anilistCharactersFromMedia(m) {
+  var edges =
+    m &&
+    m.characters &&
+    Array.isArray(m.characters.edges)
+      ? m.characters.edges
+      : [];
+  var out = [];
+  for (var i = 0; i < edges.length && out.length < 16; i++) {
+    var e = edges[i] || {};
+    var node = e.node || {};
+    var name = String((node.name && node.name.full) || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      character: String(e.role || '').trim().replace(/_/g, ' '),
+      profilePath: anilistPersonImage(node),
+    });
+  }
+  return out;
+}
+
+function anilistStaffFromMedia(m) {
+  var edges =
+    m && m.staff && Array.isArray(m.staff.edges) ? m.staff.edges : [];
+  var out = [];
+  for (var i = 0; i < edges.length && out.length < 10; i++) {
+    var e = edges[i] || {};
+    var node = e.node || {};
+    var name = String((node.name && node.name.full) || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      job: String(e.role || '').trim(),
+      profilePath: anilistPersonImage(node),
+    });
+  }
+  return out;
 }
 
 function anilistRelatedFromMedia(m) {
@@ -619,6 +668,10 @@ function anilistDetails(ctx, cfg, params) {
     if (!meta) return hubFail('details', 'NOT_FOUND', 'anime ' + id + ' not found');
     var videos = anilistVideosFromMedia(media);
     if (videos.length) meta.videos = videos;
+    var characters = anilistCharactersFromMedia(media);
+    if (characters.length) meta.cast = characters;
+    var staff = anilistStaffFromMedia(media);
+    if (staff.length) meta.crew = staff;
     var related = anilistRelatedFromMedia(media);
     var recommendations = anilistRecommendationsFromMedia(media);
     var payload = { meta: meta };

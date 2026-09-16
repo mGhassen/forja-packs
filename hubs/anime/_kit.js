@@ -824,8 +824,21 @@ function hubApplyTmdbHit(meta, hit) {
   ) {
     meta.status = 'NOT_YET_RELEASED';
   }
-  if (Array.isArray(hit.cast) && hit.cast.length) meta.cast = hit.cast;
-  if (Array.isArray(hit.crew) && hit.crew.length) meta.crew = hit.crew;
+  // Pack-owned cast/crew (AniList Characters/Staff) wins over TMDB.
+  if (
+    Array.isArray(hit.cast) &&
+    hit.cast.length &&
+    !(Array.isArray(meta.cast) && meta.cast.length)
+  ) {
+    meta.cast = hit.cast;
+  }
+  if (
+    Array.isArray(hit.crew) &&
+    hit.crew.length &&
+    !(Array.isArray(meta.crew) && meta.crew.length)
+  ) {
+    meta.crew = hit.crew;
+  }
   if (Array.isArray(hit.trailers) && hit.trailers.length) {
     meta.trailers = hit.trailers;
   }
