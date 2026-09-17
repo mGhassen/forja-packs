@@ -109,6 +109,9 @@ function iptvLayout() {
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
                 pageSize: 48,
+                // Movies/Series posters — denser than hub rail defaults (190/32).
+                cardWidth: 140,
+                gap: 10,
                 emptyTitle: 'Choose a portal',
                 emptyDescription:
                   'Select a portal to browse Live TV, Movies, and Series.',
