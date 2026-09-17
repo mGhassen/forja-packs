@@ -19,6 +19,12 @@ function myListLayout() {
   return {
     pages: {
       mylist: {
+        focus: {
+          enter: 'kind',
+          restore: 'kind',
+          restoreMode: 'remembered',
+          pageBack: ['grid', 'status', 'kind'],
+        },
         widgets: [
           kitTabsCards('page', { expand: true }, [
             kitMenu('kind', MY_LIST_KIND_ITEMS, {

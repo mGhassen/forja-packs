@@ -80,6 +80,13 @@ function iptvLayout() {
   return {
     pages: {
       iptv: {
+        // TV: nav OK/→ land on category rail; Back: channels → cats → shell.
+        focus: {
+          enter: 'cats',
+          restore: 'cats',
+          restoreMode: 'remembered',
+          pageBack: ['items', 'cats'],
+        },
         widgets: [
           kitColumnsHeader('page', { expand: true }, [
             kitTopBar('chrome', {

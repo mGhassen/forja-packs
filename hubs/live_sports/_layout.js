@@ -139,6 +139,12 @@ function liveSportsLayout() {
   return {
     pages: {
       live_sports: {
+        focus: {
+          enter: 'kind',
+          restore: 'kind',
+          restoreMode: 'remembered',
+          pageBack: ['schedule', 'kind'],
+        },
         widgets: [
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
