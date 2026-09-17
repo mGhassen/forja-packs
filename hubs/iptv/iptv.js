@@ -551,10 +551,10 @@ async function iptvFeed(ctx) {
     }
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
-    if (!items.length) {
-      env.data.emptyTitle = 'No channels';
-      env.data.emptyDescription = 'Nothing in this category.';
-    }
+    // Portal active — never leave layout "Choose a portal" (host may
+    // paint-filter a category to empty while the feed still has items).
+    env.data.emptyTitle = 'No channels';
+    env.data.emptyDescription = 'Nothing in this category.';
     return [env];
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
