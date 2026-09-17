@@ -98,7 +98,9 @@ async function iptvFindPortalByKey(ctx, portalKey) {
   var portals = await iptvLoadPortals(ctx);
   if (!Array.isArray(portals)) return null;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === portalKey) return portals[i];
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), portalKey)) {
+      return portals[i];
+    }
   }
   return null;
 }

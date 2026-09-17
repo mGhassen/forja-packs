@@ -632,14 +632,51 @@ function iptvNormBase(url) {
   return u.replace(/\/player_api\.php$/i, '');
 }
 
+/** Pack form `url|user` — also strips legacy `platform|url|user|pass`. */
+function iptvPackKeyForm(raw) {
+  var s = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!s) return '';
+  var parts = s.split('|');
+  if (parts.length >= 4) {
+    return (
+      String(parts[1] || '').trim() + '|' + String(parts[2] || '').trim()
+    );
+  }
+  if (parts.length >= 2) {
+    return (
+      String(parts[0] || '').trim() + '|' + String(parts[1] || '').trim()
+    );
+  }
+  return s;
+}
+
+function iptvSamePortalKey(a, b) {
+  var x = iptvPackKeyForm(a);
+  var y = iptvPackKeyForm(b);
+  if (x && y && x !== '|' && y !== '|' && x === y) return true;
+  var aa = String(a || '')
+    .trim()
+    .toLowerCase();
+  var bb = String(b || '')
+    .trim()
+    .toLowerCase();
+  return !!(aa && bb && aa === bb);
+}
+
+/** Canonical `url|user`. Prefer url/username over a stale `portal.key`. */
 function iptvPortalKey(portal) {
   if (!portal) return '';
-  if (portal.key) return String(portal.key).trim();
-  return (
-    String(portal.url || '').trim().toLowerCase() +
-    '|' +
-    String(portal.username || '').trim().toLowerCase()
-  );
+  var url = String(portal.url || '')
+    .trim()
+    .toLowerCase();
+  var user = String(portal.username || '')
+    .trim()
+    .toLowerCase();
+  if (url) return url + '|' + user;
+  if (portal.key) return iptvPackKeyForm(portal.key);
+  return '';
 }
 
 function iptvPrefsKey(portalKey, section) {
@@ -1174,7 +1211,7 @@ async function iptvUpsertPortalRow(ctx, portal, opts) {
   var key = iptvPortalKey(portal);
   var found = false;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === key) {
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
       portals[i] = Object.assign({}, portals[i], portal, { key: key });
       found = true;
       break;
@@ -1220,7 +1257,9 @@ async function iptvResolveActive(ctx) {
   var active = await iptvGetActiveKey(ctx);
   if (!active) return null;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === active) return portals[i];
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), active)) {
+      return portals[i];
+    }
   }
   return null;
 }
@@ -1298,7 +1337,7 @@ function iptvPortalListItem(portal, activeKey) {
     description: pub.url || '',
     subtitle: pub.url || '',
     badge: pub.platform || '',
-    selected: pub.key === activeKey,
+    selected: iptvSamePortalKey(pub.key, activeKey),
     portalKey: pub.key,
     platform: pub.platform,
     activeConnections: pub.activeConnections,
@@ -1429,7 +1468,7 @@ async function iptvEditPortal(ctx, params) {
   var portals = await iptvLoadPortals(ctx);
   var idx = -1;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === key) {
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
       idx = i;
       break;
     }
@@ -1453,7 +1492,7 @@ async function iptvEditPortal(ctx, params) {
   portals.splice(idx, 1);
   var replaced = false;
   for (var j = 0; j < portals.length; j++) {
-    if (iptvPortalKey(portals[j]) === next.key) {
+    if (iptvSamePortalKey(iptvPortalKey(portals[j]), next.key)) {
       portals[j] = next;
       replaced = true;
       break;
@@ -1462,7 +1501,7 @@ async function iptvEditPortal(ctx, params) {
   if (!replaced) portals.push(next);
   await iptvSavePortals(ctx, portals);
   var active = await iptvGetActiveKey(ctx);
-  if (active === key) await iptvSetActiveKey(ctx, next.key);
+  if (iptvSamePortalKey(active, key)) await iptvSetActiveKey(ctx, next.key);
   return hubOk('editPortal', { portal: iptvPortalPublic(next) });
 }
 
@@ -1473,7 +1512,7 @@ async function iptvRemovePortal(ctx, params) {
   var next = [];
   var found = false;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === key) {
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
       found = true;
       continue;
     }
@@ -1482,7 +1521,7 @@ async function iptvRemovePortal(ctx, params) {
   if (!found) return hubFail('removePortal', 'NOT_FOUND', 'portal not found');
   await iptvSavePortals(ctx, next);
   var active = await iptvGetActiveKey(ctx);
-  if (active === key) {
+  if (iptvSamePortalKey(active, key)) {
     await iptvSetActiveKey(ctx, '');
   }
   return hubOk('removePortal', { key: key, remaining: next.length });
@@ -1492,16 +1531,17 @@ async function iptvSelectPortal(ctx, params) {
   var key = String((params && (params.key || params.portalKey)) || '').trim();
   if (!key) return hubFail('selectPortal', 'INVALID', 'key required');
   var portals = await iptvLoadPortals(ctx);
-  var ok = false;
+  var hit = null;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === key) {
-      ok = true;
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
+      hit = portals[i];
       break;
     }
   }
-  if (!ok) return hubFail('selectPortal', 'NOT_FOUND', 'portal not found');
-  await iptvSetActiveKey(ctx, key);
-  return hubOk('selectPortal', { key: key });
+  if (!hit) return hubFail('selectPortal', 'NOT_FOUND', 'portal not found');
+  var canon = iptvPortalKey(hit);
+  await iptvSetActiveKey(ctx, canon);
+  return hubOk('selectPortal', { key: canon });
 }
 
 async function iptvScrapePortals(ctx, params) {
@@ -1551,7 +1591,7 @@ async function iptvShareEncode(ctx, params) {
   if ((!portal || !portal.url) && key) {
     var portals = await iptvLoadPortals(ctx);
     for (var i = 0; i < portals.length; i++) {
-      if (iptvPortalKey(portals[i]) === key) {
+      if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
         portal = portals[i];
         break;
       }
@@ -1715,7 +1755,9 @@ async function iptvFindPortalByKey(ctx, portalKey) {
   var portals = await iptvLoadPortals(ctx);
   if (!Array.isArray(portals)) return null;
   for (var i = 0; i < portals.length; i++) {
-    if (iptvPortalKey(portals[i]) === portalKey) return portals[i];
+    if (iptvSamePortalKey(iptvPortalKey(portals[i]), portalKey)) {
+      return portals[i];
+    }
   }
   return null;
 }

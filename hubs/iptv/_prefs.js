@@ -45,12 +45,31 @@ function iptvNormBase(url) {
 
 function iptvPortalKey(portal) {
   if (!portal) return '';
-  if (portal.key) return String(portal.key).trim();
-  return (
-    String(portal.url || '').trim().toLowerCase() +
-    '|' +
-    String(portal.username || '').trim().toLowerCase()
-  );
+  var url = String(portal.url || '')
+    .trim()
+    .toLowerCase();
+  var user = String(portal.username || '')
+    .trim()
+    .toLowerCase();
+  if (url) return url + '|' + user;
+  if (portal.key) {
+    var s = String(portal.key || '')
+      .trim()
+      .toLowerCase();
+    var parts = s.split('|');
+    if (parts.length >= 4) {
+      return (
+        String(parts[1] || '').trim() + '|' + String(parts[2] || '').trim()
+      );
+    }
+    if (parts.length >= 2) {
+      return (
+        String(parts[0] || '').trim() + '|' + String(parts[1] || '').trim()
+      );
+    }
+    return s;
+  }
+  return '';
 }
 
 function iptvPrefsKey(portalKey, section) {
