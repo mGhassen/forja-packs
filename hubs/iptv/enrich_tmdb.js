@@ -1,6 +1,7 @@
 // TMDB enrich companion — not a data source.
 // Host runs this after iptv-hub details (`"enrich": "iptv-enrich-tmdb"`).
 // Portal meta stays primary; this pack owns match + apply only.
+// Details enrich fills cast / trailers / logo / facts + TMDB More Like This.
 
 var ENRICH_TMDB_DEFAULTS = {
   rails: ['spotlight'],
@@ -47,11 +48,11 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (params.meta && typeof params.meta === 'object') {
-    return hubEnrichTmdb(ctx, [params.meta], 1)
+    return hubEnrichTmdb(ctx, [params.meta], 1, { details: true })
       .then(function (items) {
         return hubOk(
           'enrich',
-          { meta: items[0] || params.meta },
+          hubIptvEnrichDetailsPayload(items[0] || params.meta),
           { maxAge: 900, swr: 3600 },
         );
       })
@@ -65,7 +66,7 @@ function extract(ctx) {
     return hubOk('enrich', { items: items });
   }
 
-  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg))
+  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg), { details: false })
     .then(function (out) {
       return hubOk('enrich', { items: out }, { maxAge: 600, swr: 3600 });
     })
