@@ -110,6 +110,7 @@ function iptvLayout() {
                 style: 'grid',
                 expand: true,
                 focusUp: 'cats',
+                focusLeft: 'cats',
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
