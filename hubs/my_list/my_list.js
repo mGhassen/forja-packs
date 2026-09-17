@@ -410,7 +410,17 @@ function myListLoadFeed(ctx, params) {
       var out = [];
       for (var i = 0; i < merged.length; i++) {
         var shaped = myListShapeRow(merged[i]);
-        if (shaped) out.push(shaped);
+        if (!shaped) continue;
+        if (shaped.rating == null && shaped.voteAverage != null) {
+          shaped.rating = Number(shaped.voteAverage);
+        }
+        if (
+          !shaped.releaseInfo &&
+          (shaped.releaseDate || shaped.year)
+        ) {
+          shaped.releaseInfo = String(shaped.releaseDate || shaped.year);
+        }
+        out.push(hubPaintPoster(shaped));
       }
       return out;
     }

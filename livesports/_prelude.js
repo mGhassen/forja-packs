@@ -606,10 +606,12 @@ async function resolveEpiEmbeds(ctx, embedUrl, cfg) {
     var m3u8 = await ctx.live.sniffEmbed(raw, ref);
     if (m3u8) {
       var origin = ref.replace(/\/$/, '');
+      var headers = { Referer: raw, Origin: origin, 'User-Agent': ua() };
+      if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
       return [
         {
           url: m3u8,
-          headers: { Referer: raw, Origin: origin, 'User-Agent': ua() },
+          headers: headers,
         },
       ];
     }
@@ -630,10 +632,13 @@ async function resolveEmbedIndia(ctx, embedUrl, cfg) {
     m3u8 = await ctx.live.sniffEmbed(embedUrl, embedUrl);
   }
   if (!m3u8) return null;
+  var headers = playbackHeadersForEmbedIndia(slot, embedUrl);
+  // Dead JW sniff / gated slots still yield a signed URL that EOFs in the player.
+  if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
   return [
     {
       url: m3u8,
-      headers: playbackHeadersForEmbedIndia(slot, embedUrl),
+      headers: headers,
     },
   ];
 }

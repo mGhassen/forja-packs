@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-      "version": "1.5.42",
+      "version": "1.5.43",
   "tags": [
     "iptv",
     "live"
@@ -50,66 +50,7 @@
       },
       "settings": {
         "addon": "iptv",
-        "group": "Portal",
-        "order": 10,
-        "fields": [
-          {
-            "id": "platform",
-            "type": "select",
-            "label": "Platform",
-            "subtitle": "Xtream Codes, M3U playlist, or Stalker / MAG",
-            "default": "xtream",
-            "options": [
-              {
-                "id": "xtream",
-                "label": "Xtream Codes"
-              },
-              {
-                "id": "m3u",
-                "label": "M3U"
-              },
-              {
-                "id": "stalker",
-                "label": "Stalker / MAG"
-              }
-            ]
-          },
-          {
-            "id": "portalUrl",
-            "type": "text",
-            "label": "Portal URL",
-            "subtitle": "Base URL or M3U playlist URL",
-            "default": ""
-          },
-          {
-            "id": "portalUsername",
-            "type": "text",
-            "label": "Username",
-            "subtitle": "Xtream user or Stalker MAC",
-            "default": ""
-          },
-          {
-            "id": "portalPassword",
-            "type": "password",
-            "label": "Password",
-            "subtitle": "Xtream password or Stalker serial (optional)",
-            "default": ""
-          },
-          {
-            "id": "portalLabel",
-            "type": "text",
-            "label": "Label",
-            "subtitle": "Optional display name",
-            "default": ""
-          },
-          {
-            "id": "forjaSportsEnabled",
-            "type": "toggle",
-            "label": "Forja Sports",
-            "subtitle": "Match portal channels on Live TV",
-            "default": true
-          }
-        ]
+        "order": 10
       },
       "prelude": "_prelude.js,_channels_data.js,_channels.js,_layout.js"
     },

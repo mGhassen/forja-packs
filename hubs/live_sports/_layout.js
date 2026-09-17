@@ -83,6 +83,7 @@ function liveSportsCatalogActions() {
       label: 'Catalog',
       icon: 'filter',
       dynamicCatalogs: true,
+      default: 'all',
       // Host remaps chips when these revision tokens bump (install/remove Live addons).
       deps: ['stremio'],
       items: [
@@ -132,6 +133,14 @@ function liveSportsCatalogActions() {
         { id: 'cards', label: 'Cards', icon: 'cards' },
       ],
     },
+    {
+      id: 'portals',
+      label: 'Portals',
+      action: 'portals',
+      hoistSource: 'live_schedule',
+      trailing: true,
+      width: 260,
+    },
   ];
 }
 
@@ -148,7 +157,7 @@ function liveSportsLayout() {
         widgets: [
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
-              // ↓ from Catalog restores last schedule row (not All).
+              // ↓ from Catalog / Portals restores last schedule row (not All).
               focusDown: 'schedule',
               actions: liveSportsCatalogActions(),
             }),

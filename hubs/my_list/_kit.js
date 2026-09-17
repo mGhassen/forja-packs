@@ -99,6 +99,36 @@ function hubNotModified(action) {
 }
 
 
+function hubPosterTypeLabel(meta) {
+  meta = meta || {};
+  var hint = String(meta.tmdbMediaType || '').trim().toLowerCase();
+  var kind = String(meta.kind || meta.type || meta.mediaType || '')
+    .trim()
+    .toLowerCase();
+  if (hint === 'tv' || kind === 'tv' || kind === 'series' || kind === 'shows') {
+    return 'TV';
+  }
+  if (hint === 'movie' || kind === 'movie' || kind === 'movies') return 'FILM';
+  if (kind === 'anime') return 'ANIME';
+  if (kind === 'asian_drama' || kind === 'drama') return 'DRAMA';
+  return null;
+}
+
+function hubPosterCardSubtitle(meta) {
+  meta = meta || {};
+  var release = String(
+    meta.releaseInfo || meta.releaseDate || meta.year || '',
+  ).trim();
+  if (release.indexOf(' • ') !== -1) return release || null;
+  var parts = [];
+  if (release) {
+    parts.push(release.indexOf('-') !== -1 ? release.split('-')[0] : release);
+  }
+  var typeLabel = hubPosterTypeLabel(meta);
+  if (typeLabel) parts.push(typeLabel);
+  return parts.length ? parts.join(' • ') : null;
+}
+
 function hubPaintPoster(item, opts) {
   opts = opts || {};
   var meta = item || {};
@@ -106,6 +136,14 @@ function hubPaintPoster(item, opts) {
   var imageUrl = String(
     meta.poster || meta.posterUrl || meta.imageUrl || opts.imageUrl || '',
   );
+  var rating =
+    meta.rating != null
+      ? Number(meta.rating)
+      : meta.voteAverage != null
+        ? Number(meta.voteAverage)
+        : opts.rating != null
+          ? Number(opts.rating)
+          : null;
   var paint = {
     type: 'posterCard',
     props: {
@@ -113,13 +151,24 @@ function hubPaintPoster(item, opts) {
       imageUrl: imageUrl,
     },
   };
-  if (meta.rating != null || opts.rating != null) {
-    paint.props.rating = Number(meta.rating != null ? meta.rating : opts.rating);
-  }
+  if (rating != null && rating > 0) paint.props.rating = rating;
   if (opts.rank != null) paint.props.rank = Number(opts.rank);
-  if (meta.badge || opts.badge) paint.props.badge = String(meta.badge || opts.badge);
-  if (opts.subtitle || meta.releaseInfo) {
-    paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
+  var typeLabel = hubPosterTypeLabel(meta);
+  var badge = String(meta.badge || opts.badge || '').trim();
+  if (badge && !(typeLabel && badge.toUpperCase() === typeLabel)) {
+    paint.props.badge = badge;
+  }
+  if (opts.subtitle) {
+    paint.props.subtitle = String(opts.subtitle);
+  } else {
+    var sub = hubPosterCardSubtitle(meta);
+    if (sub) paint.props.subtitle = sub;
+  }
+  var mediaType = String(meta.tmdbMediaType || meta.type || meta.mediaType || '')
+    .trim()
+    .toLowerCase();
+  if (mediaType === 'movie' || mediaType === 'tv') {
+    paint.props.mediaType = mediaType;
   }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
   if (meta.background || meta.backdrop || opts.backdropUrl) {
@@ -138,15 +187,34 @@ function hubPaintPoster(item, opts) {
   var out = Object.assign({}, meta);
   out.paint = paint;
   if (meta.open) out.open = meta.open;
-  if (!out.meta && (meta.id || meta.name)) {
-    out.meta = {
-      id: String(meta.id || ''),
-      type: String(meta.type || ''),
-      name: title,
-      poster: imageUrl,
-      open: meta.open || null,
-    };
-  }
+  var open = out.open || meta.metaOpen || meta.catalogOpen || null;
+  var tmdbRaw = meta.tmdbId;
+  var tmdb =
+    typeof tmdbRaw === 'number' && isFinite(tmdbRaw)
+      ? tmdbRaw | 0
+      : parseInt(String(tmdbRaw || ''), 10);
+  if (isNaN(tmdb)) tmdb = null;
+  var ids =
+    meta.ids && typeof meta.ids === 'object' ? Object.assign({}, meta.ids) : {};
+  if (tmdb != null && ids.tmdb == null) ids.tmdb = tmdb;
+  var metaId =
+    String(meta.id || (open && open.id) || tmdb || title || '').trim();
+  out.meta = {
+    id: metaId,
+    type: String(meta.type || meta.kind || meta.mediaType || ''),
+    name: title,
+    poster: imageUrl,
+    open: open,
+  };
+  if (Object.keys(ids).length) out.meta.ids = ids;
+  if (meta.tmdbMediaType) out.meta.tmdbMediaType = meta.tmdbMediaType;
+  if (meta.background) out.meta.background = meta.background;
+  if (badge) out.meta.badge = badge;
+  if (rating != null && rating > 0) out.meta.rating = rating;
+  var releaseInfo = String(
+    meta.releaseInfo || meta.releaseDate || meta.year || '',
+  ).trim();
+  if (releaseInfo) out.meta.releaseInfo = releaseInfo;
   return out;
 }
 
