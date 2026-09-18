@@ -14,7 +14,6 @@ var KISSKH_RAILS = {
   trending: '/DramaList/MostSearch?ispc=false',
   most_viewed: '/DramaList/MostView',
   upcoming: '/DramaList/Upcoming?ispc=false',
-  anime: '/DramaList/Animate?ispc=false',
 };
 
 function kisskhCover(raw) {
@@ -414,8 +413,6 @@ function extract(ctx) {
   }
 
   if (kisskhChromeFiltered(params)) {
-    var railId = String(params.rail || '');
-    if (railId === 'anime') return hubItems('rail', []);
     return kisskhList(ctx, cfg, kisskhExplorePath(params), params.limit)
       .then(function (items) {
         var pageSize = Number(params.limit) > 0 ? Number(params.limit) : 24;

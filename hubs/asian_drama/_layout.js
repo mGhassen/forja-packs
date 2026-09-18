@@ -54,14 +54,6 @@ function kisskhLayout() {
           ),
           hubWithLoad({
             type: 'rail',
-            id: 'anime',
-            title: 'Anime',
-            rail: 'anime',
-            aspect: 'landscape',
-            hideWhenTypeFilter: true,
-          }, 'rail', { rail: 'anime' }),
-          hubWithLoad({
-            type: 'rail',
             id: 'upcoming',
             title: 'Upcoming',
             rail: 'upcoming',
