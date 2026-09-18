@@ -551,9 +551,14 @@ async function iptvFeed(ctx) {
     }
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
-    // Portal active — never leave layout "Choose a portal" (host may
-    // paint-filter a category to empty while the feed still has items).
-    env.data.emptyTitle = 'No channels';
+    // Portal active — never leave layout "Choose a portal".
+    if (section === 'movies') {
+      env.data.emptyTitle = 'No movies';
+    } else if (section === 'series') {
+      env.data.emptyTitle = 'No series';
+    } else {
+      env.data.emptyTitle = 'No channels';
+    }
     env.data.emptyDescription = 'Nothing in this category.';
     return [env];
   } catch (e) {

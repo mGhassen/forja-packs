@@ -223,6 +223,49 @@ function hubNotModified(action) {
   ];
 }
 
+/// Card meta under the title: `2026 • FILM` / `TV` (same as Home).
+function hubPosterTypeLabel(meta) {
+  meta = meta || {};
+  if (String(meta.type || '').toLowerCase() === 'anime') return null;
+  var hint = String(meta.tmdbMediaType || '').trim().toLowerCase();
+  var kind = String(meta.type || '').trim().toLowerCase();
+  if (hint === 'tv' || kind === 'tv' || kind === 'series') return 'TV';
+  if (hint === 'movie' || kind === 'movie') return 'FILM';
+  if (kind === 'drama') {
+    var badge = String(meta.badge || '').trim().toUpperCase();
+    if (badge === 'MOVIE' || badge === 'FILM' || badge === 'HOLLYWOOD') {
+      return 'FILM';
+    }
+    return 'TV';
+  }
+  return null;
+}
+
+function hubPosterCardSubtitle(meta) {
+  meta = meta || {};
+  var release = String(meta.releaseInfo || '').trim();
+  if (release.indexOf(' • ') !== -1) return release || null;
+  var parts = [];
+  if (release) {
+    parts.push(release.indexOf('-') !== -1 ? release.split('-')[0] : release);
+  }
+  var typeLabel = hubPosterTypeLabel(meta);
+  if (typeLabel) parts.push(typeLabel);
+  return parts.length ? parts.join(' • ') : null;
+}
+
+function hubPosterBadgeRedundant(badge, typeLabel) {
+  if (!typeLabel || !badge) return false;
+  var b = String(badge).trim().toUpperCase();
+  if (b === typeLabel) return true;
+  // IPTV still stamps badge MOVIE; subtitle uses FILM.
+  if (typeLabel === 'FILM' && (b === 'MOVIE' || b === 'FILM' || b === 'HOLLYWOOD')) {
+    return true;
+  }
+  if (typeLabel === 'TV' && (b === 'TV' || b === 'SERIES')) return true;
+  return false;
+}
+
 function hubPaintPoster(item, opts) {
   opts = opts || {};
   var meta = item || {};
@@ -241,11 +284,37 @@ function hubPaintPoster(item, opts) {
     paint.props.rating = Number(meta.rating != null ? meta.rating : opts.rating);
   }
   if (opts.rank != null) paint.props.rank = Number(opts.rank);
-  if (meta.badge || opts.badge) paint.props.badge = String(meta.badge || opts.badge);
-  if (opts.subtitle || meta.releaseInfo) {
-    paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
+  var typeLabel = hubPosterTypeLabel(meta);
+  var badge = String(meta.badge || opts.badge || '').trim();
+  if (badge && !hubPosterBadgeRedundant(badge, typeLabel)) {
+    paint.props.badge = badge;
+  }
+  if (opts.subtitle) {
+    paint.props.subtitle = String(opts.subtitle);
+  } else {
+    var sub = hubPosterCardSubtitle(meta);
+    if (sub) paint.props.subtitle = sub;
+  }
+  var mediaType = String(meta.tmdbMediaType || meta.type || '')
+    .trim()
+    .toLowerCase();
+  if (mediaType === 'movie' || mediaType === 'tv') {
+    paint.props.mediaType = mediaType;
   }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
+  if (meta.background || meta.backdrop || opts.backdropUrl) {
+    paint.props.backdropUrl = String(
+      meta.background || meta.backdrop || opts.backdropUrl || '',
+    );
+  }
+  if (meta.logo || opts.logoUrl) {
+    paint.props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  }
+  if (meta.description || meta.overview || opts.overview) {
+    paint.props.overview = String(
+      meta.description || meta.overview || opts.overview || '',
+    );
+  }
   var out = Object.assign({}, meta);
   out.paint = paint;
   if (meta.open) out.open = meta.open;
@@ -257,6 +326,10 @@ function hubPaintPoster(item, opts) {
       poster: imageUrl,
       open: meta.open || null,
     };
+    if (meta.ids) out.meta.ids = meta.ids;
+    if (meta.tmdbMediaType) out.meta.tmdbMediaType = meta.tmdbMediaType;
+    if (meta.background) out.meta.background = meta.background;
+    if (meta.badge) out.meta.badge = meta.badge;
   }
   return out;
 }
