@@ -1,11 +1,14 @@
 // IPTV hub page layout — widgets tree for action:'layout'.
+//
+// Compact (host width < shellNavCompactMaxWidth): collapsed shelf, rail search,
+// hide view/sort/top-bar search. Wide desktop keeps the full chrome.
 
 function iptvCatalogActions() {
   return [
     {
       id: 'catalog',
       label: 'Section',
-      style: 'shelf',
+      expandOnHover: true,
       reload: true,
       default: 'live',
       items: [
@@ -33,6 +36,7 @@ function iptvCatalogActions() {
       id: 'view',
       label: 'View',
       style: 'group',
+      hideWhenCompact: true,
       default: 'cards',
       items: [
         { id: 'cards', label: 'Cards', icon: 'cards' },
@@ -44,6 +48,7 @@ function iptvCatalogActions() {
       label: 'Search',
       action: 'eventSearch',
       trailing: true,
+      hideWhenCompact: true,
       placeholder: 'Search channels or categories…',
     },
     {
@@ -52,6 +57,7 @@ function iptvCatalogActions() {
       icon: 'filter',
       style: 'icon',
       trailing: true,
+      hideWhenCompact: true,
       default: 'playlist',
       items: [
         { id: 'playlist', label: 'Playlist' },
@@ -65,7 +71,6 @@ function iptvCatalogActions() {
       action: 'portals',
       hoistSource: 'iptv',
       trailing: true,
-      width: 260,
     },
   ];
 }
@@ -93,6 +98,13 @@ function iptvLayout() {
               orientation: 'vertical',
               focusUp: 'chrome',
               focusDown: 'items',
+              // Always-open field above categories — compact shell only.
+              search: {
+                action: 'eventSearch',
+                open: true,
+                compactOnly: true,
+                placeholder: 'Search channels or categories…',
+              },
               features: {
                 pin: true,
                 reorder: true,
