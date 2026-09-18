@@ -8,6 +8,8 @@ function iptvCatalogActions() {
     {
       id: 'catalog',
       label: 'Section',
+      style: 'shelf',
+      // Compact shell only — collapsed to selected; hover expands (host).
       expandOnHover: true,
       reload: true,
       default: 'live',
