@@ -39,6 +39,8 @@ function iptvCatalogActions() {
       label: 'View',
       style: 'group',
       hideWhenCompact: true,
+      // Cards / EPG only apply to Live channels.
+      showWhen: { catalog: 'live' },
       default: 'cards',
       items: [
         { id: 'cards', label: 'Cards', icon: 'cards' },
