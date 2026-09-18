@@ -1169,6 +1169,67 @@ async function iptvFetchCatalog(ctx, portal, section, opts) {
   }
   return catalog || iptvEmptyCatalog();
 }
+
+/**
+ * Host-owned shelf + one page of streams (issue 290 / plan C).
+ * Never pulls the full VOD/series list into flutter_js.
+ */
+async function iptvFetchCatalogPage(ctx, portal, section, opts) {
+  var o = opts || {};
+  var request = iptvEngine(ctx);
+  if (!request) {
+    return iptvEmptyCatalog({
+      code: 'ENGINE_REQUIRED',
+      message: 'catalog_page needs ctx.host.engine.request',
+    });
+  }
+  var wire = iptvSectionWire(section);
+  var body = {
+    action: 'catalog_page',
+    platform: iptvPlatformOf(portal),
+    url: iptvNormBase(portal.url) || String(portal.url || '').trim(),
+    username: String(portal.username || portal.mac || ''),
+    password: String(portal.password || portal.serial || ''),
+    section: wire,
+    category_id: String(o.categoryId || o.category_id || '').trim(),
+    page: Number(o.page) > 0 ? Number(o.page) : 1,
+    page_size: Number(o.pageSize || o.page_size || o.limit) > 0
+      ? Number(o.pageSize || o.page_size || o.limit)
+      : 48,
+    sort: String(o.sort || 'playlist').trim() || 'playlist',
+    q: String(o.q || '').trim(),
+    refresh: !!(o.skipCache || o.refresh || o.force),
+    timeout_secs: wire === 'live' ? 90 : 60,
+  };
+  var ua = String(portal.userAgent || portal.user_agent || '').trim();
+  if (ua) body.user_agent = ua;
+  if (Array.isArray(o.streamIds) && o.streamIds.length) {
+    body.stream_ids = o.streamIds;
+  } else if (Array.isArray(o.stream_ids) && o.stream_ids.length) {
+    body.stream_ids = o.stream_ids;
+  }
+
+  var res = await request('iptv', body);
+  if (!res || res.ok === false || res.error) {
+    return iptvEmptyCatalog({
+      code: (res && res.error) || 'CATALOG_PAGE_FAILED',
+      message: String(
+        (res && (res.message || res.error)) || 'catalog_page failed',
+      ),
+    });
+  }
+  var kindFallback = wire === 'vod' ? 'vod' : wire;
+  return {
+    categories: iptvNormCategories(res.categories),
+    streams: iptvNormStreams(res.streams, kindFallback),
+    hasMore: !!(res.hasMore || res.has_more),
+    pageSize: Number(res.pageSize || res.page_size) || body.page_size,
+    total: Number(res.total) || 0,
+    categoryId: String(
+      res.categoryId || res.category_id || body.category_id || '',
+    ),
+  };
+}
 // IPTV portals — vault inventory + scrape / share via engine.request.
 // Vault keys: iptv.portals / iptv.active (same as host IptvVaultKeys).
 

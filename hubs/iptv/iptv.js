@@ -200,142 +200,50 @@ function iptvFeedQueryMatch(meta, q) {
 
 async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, params) {
   var cats = iptvCatNameMap(catalog.categories);
-  var sort = String((prefs && prefs.liveSort) || 'playlist').trim();
-  var streams = iptvSortStreams(catalog.streams || [], sort);
-  // Host store SoT (PortalLiveChannelListsStore) via feed params — not vault prefs.
-  var pinned =
-    (params && Array.isArray(params.pinnedCats) && params.pinnedCats) ||
-    (params && Array.isArray(params.categoryOrder) && params.categoryOrder) ||
-    [];
-  if (pinned.length && section === 'live') {
-    var pinSet = {};
-    for (var pi = 0; pi < pinned.length; pi++) {
-      pinSet[String(pinned[pi] || '').trim()] = pi;
-    }
-    streams = streams.slice().sort(function (a, b) {
-      var ca = String((a && a.categoryId) || '').trim();
-      var cb = String((b && b.categoryId) || '').trim();
-      var pa = Object.prototype.hasOwnProperty.call(pinSet, ca) ? pinSet[ca] : 9999;
-      var pb = Object.prototype.hasOwnProperty.call(pinSet, cb) ? pinSet[cb] : 9999;
-      if (pa !== pb) return pa - pb;
-      return 0;
-    });
-  }
-  var byId = {};
-  for (var i = 0; i < streams.length; i++) {
-    var s = streams[i];
-    if (!s) continue;
-    byId[String(s.id)] = s;
-  }
-
+  var streams = catalog.streams || [];
   var filterCat = String(
-    (params && (params.categoryId || params.kind)) || '',
+    (params && (params.categoryId || params.kind)) ||
+      catalog.categoryId ||
+      '',
   ).trim();
   var FAV = '__favorites__';
   var WATCHED = '__watched__';
+  var items = [];
 
-  if (section === 'live' && filterCat === FAV) {
-    var favIds =
-      (params && Array.isArray(params.favorites) && params.favorites) || [];
-    var favItems = [];
-    for (var f = 0; f < favIds.length; f++) {
-      var fs = byId[String(favIds[f])];
-      if (!fs) continue;
-      var favMeta = iptvLiveMeta(portal, fs, 'Favorites', FAV);
-      if (favMeta && favMeta.open && favMeta.open.url && iptvFeedQueryMatch(favMeta, q)) {
-        favItems.push(favMeta);
-      }
+  if (section === 'live' && (filterCat === FAV || filterCat === WATCHED)) {
+    var label = filterCat === FAV ? 'Favorites' : 'Already watched';
+    for (var i = 0; i < streams.length; i++) {
+      var s = streams[i];
+      if (!s) continue;
+      var meta = iptvLiveMeta(portal, s, label, filterCat);
+      if (!meta || !(meta.open && meta.open.url)) continue;
+      if (!iptvFeedQueryMatch(meta, q)) continue;
+      items.push(meta);
     }
-    return favItems;
+    return items;
   }
 
-  if (section === 'live' && filterCat === WATCHED) {
-    var watchedIds =
-      (params && Array.isArray(params.watched) && params.watched) || [];
-    var watchedItems = [];
-    for (var w = 0; w < watchedIds.length; w++) {
-      var ws = byId[String(watchedIds[w])];
-      if (!ws) continue;
-      var watchedMeta = iptvLiveMeta(portal, ws, 'Already watched', WATCHED);
-      if (
-        watchedMeta &&
-        watchedMeta.open &&
-        watchedMeta.open.url &&
-        iptvFeedQueryMatch(watchedMeta, q)
-      ) {
-        watchedItems.push(watchedMeta);
-      }
-    }
-    return watchedItems;
-  }
-
-  // VOD: collect matching streams first, page, then stamp metas — never
-  // JSON.stringify tens of thousands of posters on the flutter_js isolate.
-  if (section !== 'live') {
-    var matched = [];
+  if (section === 'live') {
     for (var j = 0; j < streams.length; j++) {
       var st = streams[j];
       if (!st) continue;
       var catId = String(st.categoryId || 'all').trim() || 'all';
-      if (
-        filterCat &&
-        filterCat !== 'all' &&
-        filterCat !== FAV &&
-        filterCat !== WATCHED &&
-        catId !== filterCat
-      ) {
-        continue;
-      }
-      var name = String(st.name || st.title || '').trim();
-      if (q) {
-        var needle = String(q).toLowerCase();
-        var hay = (name + ' ' + (cats[catId] || catId)).toLowerCase();
-        if (hay.indexOf(needle) < 0) continue;
-      }
-      matched.push(st);
+      var liveMeta = iptvLiveMeta(portal, st, cats[catId] || catId);
+      if (!liveMeta || !(liveMeta.open && liveMeta.open.url)) continue;
+      if (!iptvFeedQueryMatch(liveMeta, q)) continue;
+      items.push(liveMeta);
     }
-    var pageNum = Number(params && params.page);
-    if (!isFinite(pageNum) || pageNum < 1) pageNum = 1;
-    var pageSize = Number(
-      params && (params.limit || params.pageSize || params.perPage),
-    );
-    if (!(pageSize > 0)) pageSize = 48;
-    var start = (pageNum - 1) * pageSize;
-    var slice = matched.slice(start, start + pageSize);
-    var vodItems = [];
-    for (var k = 0; k < slice.length; k++) {
-      var vst = slice[k];
-      var vCat = String(vst.categoryId || 'all').trim() || 'all';
-      var vMeta = iptvVodMeta(portal, vst, section, cats[vCat] || vCat);
-      if (!vMeta) continue;
-      vodItems.push(vMeta);
-    }
-    vodItems._iptvPageSize = pageSize;
-    vodItems._iptvHasMore = start + slice.length < matched.length;
-    return vodItems;
+    return items;
   }
 
-  var items = [];
-  for (var j = 0; j < streams.length; j++) {
-    var st = streams[j];
-    if (!st) continue;
-    var catId = String(st.categoryId || 'all').trim() || 'all';
-    if (
-      filterCat &&
-      filterCat !== 'all' &&
-      filterCat !== FAV &&
-      filterCat !== WATCHED &&
-      catId !== filterCat
-    ) {
-      continue;
-    }
-    var meta = iptvLiveMeta(portal, st, cats[catId] || catId);
-    if (!meta) continue;
-    if (!(meta.open && meta.open.url)) continue;
-    if (!iptvFeedQueryMatch(meta, q)) continue;
-    items.push(meta);
+  for (var k = 0; k < streams.length; k++) {
+    var vst = streams[k];
+    if (!vst) continue;
+    var vCat = String(vst.categoryId || 'all').trim() || 'all';
+    var vMeta = iptvVodMeta(portal, vst, section, cats[vCat] || vCat);
+    if (!vMeta) continue;
+    items.push(vMeta);
   }
-
   return items;
 }
 
@@ -502,17 +410,6 @@ async function iptvFeed(ctx) {
 
   try {
     var skipCache = !!(params && (params.refresh || params.force));
-    var catalog = await iptvFetchCatalog(ctx, portal, section, {
-      skipCache: skipCache,
-    });
-    if (catalog && catalog.error && !(catalog.streams || []).length) {
-      return hubFail(
-        'feed',
-        catalog.error.code || 'UPSTREAM',
-        String(catalog.error.message || 'catalog failed'),
-        true,
-      );
-    }
     var prefs = await iptvPrefsLoad(ctx, iptvPortalKey(portal), section);
     var sortOverride = String((params && params.sort) || '').trim();
     if (
@@ -523,6 +420,47 @@ async function iptvFeed(ctx) {
       prefs = Object.assign({}, prefs, { liveSort: sortOverride });
     }
     var q = String((params && params.q) || '').trim();
+    var filterCat = String(
+      (params && (params.categoryId || params.kind)) || '',
+    ).trim();
+    var pageNum = Number(params && params.page);
+    if (!isFinite(pageNum) || pageNum < 1) pageNum = 1;
+    var pageSize = Number(
+      params && (params.limit || params.pageSize || params.perPage),
+    );
+    if (!(pageSize > 0)) pageSize = section === 'live' ? 96 : 48;
+
+    var pageOpts = {
+      skipCache: skipCache,
+      categoryId: filterCat,
+      page: pageNum,
+      pageSize: pageSize,
+      sort: String((prefs && prefs.liveSort) || 'playlist').trim(),
+      q: q,
+    };
+    var FAV = '__favorites__';
+    var WATCHED = '__watched__';
+    if (section === 'live' && filterCat === FAV) {
+      pageOpts.streamIds =
+        (params && Array.isArray(params.favorites) && params.favorites) || [];
+      pageOpts.categoryId = '';
+      pageOpts.q = '';
+    } else if (section === 'live' && filterCat === WATCHED) {
+      pageOpts.streamIds =
+        (params && Array.isArray(params.watched) && params.watched) || [];
+      pageOpts.categoryId = '';
+      pageOpts.q = '';
+    }
+
+    var catalog = await iptvFetchCatalogPage(ctx, portal, section, pageOpts);
+    if (catalog && catalog.error && !(catalog.streams || []).length) {
+      return hubFail(
+        'feed',
+        catalog.error.code || 'UPSTREAM',
+        String(catalog.error.message || 'catalog failed'),
+        true,
+      );
+    }
     var items = await iptvFeedFromCatalog(
       ctx,
       portal,
@@ -533,21 +471,13 @@ async function iptvFeed(ctx) {
       params,
     );
     var kinds = iptvFeedKinds(catalog, items);
-    var paging = { hasMore: false };
+    var paging = {
+      pageSize: Number(catalog.pageSize) || pageSize,
+      hasMore: !!catalog.hasMore,
+    };
     if (section === 'live') {
       // NOW/EPG is host-lazy (CatalogEpgGuideHost) — never block channel paint.
       items = iptvApplyLiveCardPaint(items);
-    } else {
-      var pageSize = Number(items && items._iptvPageSize);
-      if (!(pageSize > 0)) pageSize = 48;
-      paging = {
-        pageSize: pageSize,
-        hasMore: !!(items && items._iptvHasMore),
-      };
-      try {
-        delete items._iptvPageSize;
-        delete items._iptvHasMore;
-      } catch (e) {}
     }
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
@@ -607,37 +537,61 @@ async function iptvSearchChannels(ctx, params) {
     ? params.categoryIds
     : [];
   try {
-    var catalog = await iptvFetchCatalog(ctx, portal, 'live');
-    var prefs = await iptvPrefsLoad(ctx, iptvPortalKey(portal), 'live');
-    var items = await iptvFeedFromCatalog(
-      ctx,
-      portal,
-      'live',
-      catalog,
-      prefs,
-      '',
-    );
-    var sources = [];
-    for (var i = 0; i < items.length; i++) {
-      var ch = items[i];
-      if (ch.kind === '__favorites__' || ch.kind === '__watched__' || ch.kind === 'favorites' || ch.kind === 'watched') continue;
-      if (categoryIds.length) {
-        var cid = String(ch.categoryId || '');
-        if (categoryIds.indexOf(cid) < 0) continue;
+    var needles = [];
+    function pushNeedle(s) {
+      var t = String(s || '').trim();
+      if (!t) return;
+      var low = t.toLowerCase();
+      for (var i = 0; i < needles.length; i++) {
+        if (needles[i].toLowerCase() === low) return;
       }
-      if (!iptvChannelMatchesGame(ch.name, game)) continue;
-      var url = ch.open && ch.open.url;
-      if (!url) continue;
-      sources.push({
-        url: url,
-        label: ch.name,
-        logoUrl: ch.poster || '',
-        provider: portal.label || 'IPTV',
-        portalKey: ch.portalKey,
-        streamId: ch.streamId,
-        liveSourceKind:
-          iptvPlatformOf(portal) === 'stalker' ? 'iptvStalker' : 'iptvXtream',
+      needles.push(t);
+    }
+    pushNeedle(game.homeTeam);
+    pushNeedle(game.awayTeam);
+    pushNeedle(game.title);
+    var broadcasts = game.broadcastChannels || [];
+    if (Array.isArray(broadcasts)) {
+      for (var b = 0; b < broadcasts.length; b++) pushNeedle(broadcasts[b]);
+    }
+    if (!needles.length) {
+      return hubOk('searchChannels', { sources: [] }, { maxAge: 60, swr: 120 });
+    }
+
+    var seenUrl = {};
+    var sources = [];
+    for (var n = 0; n < needles.length; n++) {
+      var catalog = await iptvFetchCatalogPage(ctx, portal, 'live', {
+        q: needles[n],
+        page: 1,
+        pageSize: 96,
+        categoryId: '',
       });
+      var streams = (catalog && catalog.streams) || [];
+      for (var i = 0; i < streams.length; i++) {
+        var st = streams[i];
+        if (!st) continue;
+        if (categoryIds.length) {
+          var cid = String(st.categoryId || '');
+          if (categoryIds.indexOf(cid) < 0) continue;
+        }
+        if (!iptvChannelMatchesGame(st.name || st.title, game)) continue;
+        var meta = iptvLiveMeta(portal, st, st.categoryId || '');
+        if (!meta || !meta.open || !meta.open.url) continue;
+        var url = String(meta.open.url);
+        if (seenUrl[url]) continue;
+        seenUrl[url] = true;
+        sources.push({
+          url: url,
+          label: meta.name,
+          logoUrl: meta.poster || '',
+          provider: portal.label || 'IPTV',
+          portalKey: meta.portalKey,
+          streamId: meta.streamId,
+          liveSourceKind:
+            iptvPlatformOf(portal) === 'stalker' ? 'iptvStalker' : 'iptvXtream',
+        });
+      }
     }
     return hubOk('searchChannels', { sources: sources }, { maxAge: 60, swr: 120 });
   } catch (e) {

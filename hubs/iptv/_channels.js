@@ -101,28 +101,37 @@ async function iptvScanChannel(ctx, channel, opts) {
     var portal = toScan[i];
     if (!portal) continue;
     try {
-      var catalog = await iptvFetchCatalog(ctx, portal, 'live', {
-        skipCache: !!force,
-      });
-      var streams = (catalog && catalog.streams) || [];
-      for (var s = 0; s < streams.length; s++) {
-        var st = streams[s];
-        if (!st) continue;
-        var name = String(st.name || st.title || '');
-        if (!iptvChannelNameMatches(name, channel.keywords, channel.exclude)) {
-          continue;
+      var keywords = Array.isArray(channel.keywords) ? channel.keywords : [];
+      var exclude = Array.isArray(channel.exclude) ? channel.exclude : [];
+      // Host shelf + q page — never pull full live catalogs into JS (issue 290).
+      for (var ki = 0; ki < keywords.length; ki++) {
+        var kw = String(keywords[ki] || '').trim();
+        if (!kw) continue;
+        var catalog = await iptvFetchCatalogPage(ctx, portal, 'live', {
+          skipCache: !!force && ki === 0,
+          q: kw,
+          page: 1,
+          pageSize: 96,
+          categoryId: '',
+        });
+        var streams = (catalog && catalog.streams) || [];
+        for (var s = 0; s < streams.length; s++) {
+          var st = streams[s];
+          if (!st) continue;
+          var name = String(st.name || st.title || '');
+          if (!iptvChannelNameMatches(name, keywords, exclude)) continue;
+          var meta = iptvLiveMeta(
+            portal,
+            st,
+            channel.name || channelId,
+            channelId,
+          );
+          if (!meta || !meta.open || !meta.open.url) continue;
+          var url = String(meta.open.url);
+          if (seenUrl[url]) continue;
+          seenUrl[url] = true;
+          hits.push(meta);
         }
-        var meta = iptvLiveMeta(
-          portal,
-          st,
-          channel.name || channelId,
-          channelId,
-        );
-        if (!meta || !meta.open || !meta.open.url) continue;
-        var url = String(meta.open.url);
-        if (seenUrl[url]) continue;
-        seenUrl[url] = true;
-        hits.push(meta);
       }
     } catch (e) {}
   }
