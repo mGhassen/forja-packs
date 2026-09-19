@@ -157,8 +157,8 @@ function liveSportsLayout() {
         widgets: [
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
-              // ↓ from Catalog / Portals restores last schedule row (not All).
-              focusDown: 'schedule',
+              // ↓ from Catalog / Portals → sport circles (then ↓ again → matches).
+              focusDown: 'kind',
               actions: liveSportsCatalogActions(),
             }),
             kitCategoryBar('kind', {
@@ -190,6 +190,7 @@ function liveSportsLayout() {
                     action: 'liveTv',
                   },
                 ],
+                focusUp: 'kind',
                 focusRight: 'sources-kind',
                 loadingTitle: 'Loading schedule',
                 loadingDetail:
