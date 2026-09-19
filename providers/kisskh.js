@@ -42,7 +42,7 @@ function extract(ctx) {
       ' mirrors=' +
       ordered.length +
       ' hasKkey=' +
-      !!(ctx.crypto && ctx.crypto.kisskhKkey),
+      typeof kisskhKkey === 'function',
   );
 
   function headersFor(origin) {
@@ -211,10 +211,10 @@ function extract(ctx) {
   // Site player uses /api/Sub/{id}. HLS mux tracks are often mistimed — attach
   // decrypted Sub API rows so the host prefers them as generic sideloads.
   function fetchSubtitles(episodeId, origin) {
-    if (!(ctx.crypto && ctx.crypto.kisskhKkey && ctx.crypto.AES)) {
+    if (typeof kisskhKkey !== 'function' || !(ctx.crypto && ctx.crypto.AES)) {
       return Promise.resolve([]);
     }
-    var kkey = ctx.crypto.kisskhKkey(episodeId, 'subtitle');
+    var kkey = kisskhKkey(episodeId, 'subtitle');
     if (!kkey) return Promise.resolve([]);
     var path = '/api/Sub/' + episodeId + '?kkey=' + encodeURIComponent(kkey);
     return fetchJson(path)
@@ -301,14 +301,14 @@ function extract(ctx) {
 
   function episodePath(id, withKkey) {
     var q = '.png?err=false&ts=&time=';
-    if (withKkey && ctx.crypto && ctx.crypto.kisskhKkey) {
-      q += '&kkey=' + encodeURIComponent(ctx.crypto.kisskhKkey(id, 'video'));
+    if (withKkey && typeof kisskhKkey === 'function') {
+      q += '&kkey=' + encodeURIComponent(kisskhKkey(id, 'video'));
     }
     return '/api/DramaList/Episode/' + id + q;
   }
 
   function fetchEpisode(id) {
-    if (!(ctx.crypto && ctx.crypto.kisskhKkey)) {
+    if (typeof kisskhKkey !== 'function') {
       ctx.log('kisskh kkey missing — Episode API will return SPA HTML');
       return Promise.resolve([]);
     }

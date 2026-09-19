@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.5.41",
+  "version": "1.5.42",
   "tags": [
     "providers",
     "anime",
@@ -117,6 +117,7 @@
       "id": "kisskh",
       "name": "KissKh",
       "entry": "kisskh.js",
+      "prelude": "_kisskh_kkey.js",
       "types": [
         "drama"
       ],
@@ -1300,6 +1301,7 @@
     "vidzee.js",
     "multiembed.js",
     "kisskh.js",
+    "_kisskh_kkey.js",
     "larozaa.js",
     "_streamcrypto.js",
     "_arabic_stream_unpack.js",
