@@ -1791,10 +1791,13 @@ async function iptvShareDecode(ctx, params) {
 }
 // IPTV VOD details — portal movie/series meta (+ series episodes via vault + host http).
 
-/** Strip portal/release junk from VOD titles (parity with host cleanIptvMediaTitle). */
+/** Strip portal/release junk from VOD titles (parity with host cleanMediaTitle). */
 function iptvCleanMediaTitle(raw) {
   var s = String(raw || '').trim();
   if (!s) return { title: '', year: null, season: null, episode: null };
+
+  // Fullwidth / broken-bar / box-drawing pipes → ASCII `|`.
+  s = s.replace(/[\uFF5C\u00A6\u2502\u2503\u01C0\u2223]/g, '|');
 
   s = s.replace(/[_\.]+/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
@@ -1823,6 +1826,13 @@ function iptvCleanMediaTitle(raw) {
     );
     if (next === s) break;
     s = next;
+  }
+
+  // Empty pipe slots: `| | Title`, `|| Title`, leading `| Title`.
+  for (var j = 0; j < 6; j++) {
+    var emptied = s.replace(/^(?:\s*\|)+\s*/, '');
+    if (emptied === s) break;
+    s = emptied;
   }
 
   // Leading platform / lang tags: EN-, FR-, NETFLIX-, Disney+-, etc.
