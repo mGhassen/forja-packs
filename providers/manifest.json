@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.5.42",
+  "version": "1.5.43",
   "tags": [
     "providers",
     "anime",
@@ -253,6 +253,7 @@
       "id": "cinejoy",
       "name": "CineJoy",
       "entry": "cinejoy.js",
+      "prelude": "_cinejoy_pow.js",
       "types": [
         "movie",
         "tv"
@@ -1314,6 +1315,7 @@
     "vidcore.js",
     "animekai.js",
     "cinejoy.js",
+    "_cinejoy_pow.js",
     "meowtv.js",
     "playimdb.js",
     "yflix.js",

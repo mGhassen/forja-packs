@@ -128,7 +128,7 @@ function extract(ctx) {
         var token = validate(j);
         if (!token) return [];
         return fetchJson(api + '/challenge?rid=' + encodeURIComponent(token)).then(function (challenge) {
-          var xat = ctx.crypto.solveScryptPow(challenge);
+          var xat = cinejoySolveScryptPow(ctx.crypto, challenge);
           if (!xat) return [];
           var reqHeaders = Object.assign({}, headers, { 'x-at': xat });
           return ctx
