@@ -241,7 +241,7 @@ function extract(ctx) {
             if (!body || body.length < 50 || body.charAt(0) === '{' || body.charAt(0) === '<') {
               return [];
             }
-            var json = JSON.parse(ctx.crypto.streamDecrypt(body, seed, tmdbId));
+            var json = JSON.parse(__engineStreamDecrypt(body, seed, tmdbId));
             var srcs = (json && json.sources) || [];
             return srcs
               .map(function (s) {

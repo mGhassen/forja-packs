@@ -100,8 +100,9 @@ function iptvLayout() {
               dynamic: true,
               source: 'iptv',
               orientation: 'vertical',
+              // Vertical panels: ↑/↓ stay in cats; → enters channels (not ↓).
               focusUp: 'chrome',
-              focusDown: 'items',
+              focusRight: 'items',
               // Always-open field above categories — compact shell only.
               search: {
                 action: 'eventSearch',
@@ -119,7 +120,7 @@ function iptvLayout() {
               kitList('items', {
                 style: 'grid',
                 expand: true,
-                focusUp: 'cats',
+                // ← back to categories; ↑ stays in channel grid (no cats D-line).
                 focusLeft: 'cats',
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',

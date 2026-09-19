@@ -142,7 +142,7 @@ function extract(ctx) {
           return [];
         }
         try {
-          return parseSources(JSON.parse(ctx.crypto.streamDecrypt(body, seed, tmdbId)), mirror);
+          return parseSources(JSON.parse(__engineStreamDecrypt(body, seed, tmdbId)), mirror);
         } catch (e) {
           return [];
         }
