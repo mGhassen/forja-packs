@@ -18,8 +18,9 @@ function tmdbLayout() {
     pages: {
       home: {
         feed: true,
-        // First-paint only — new_releases / genre rows lazy-load when visible.
-        feedRails: ['spotlight', 'featured', 'popular', 'new_releases'],
+        // Match TMDB_FEED_CLAIM — first-paint batch only. new_releases / genre
+        // rows lazy-load via LazyViewportGate (not empty feed slots).
+        feedRails: ['spotlight', 'featured', 'popular'],
         pageSize: TMDB_HOME_RAIL_CAP,
         maxPages: 4,
         widgets: [
@@ -67,7 +68,7 @@ function tmdbLayout() {
               maxPages: 2,
             },
             'rail',
-            { rail: 'popular', maxPages: 2 },
+            { rail: 'popular' },
           ),
           { type: 'continue', id: 'continue_watching', mergeHomeWatchHistory: true },
           hubWithLoad(
