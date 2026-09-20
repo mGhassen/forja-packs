@@ -240,7 +240,7 @@ function extract(ctx) {
     if (!tmdbKey) return Promise.resolve('');
     var path = mediaType === 'tv' ? 'tv' : 'movie';
     return getJson(
-      'https://api.themoviedb.org/3/' + path + '/' + tmdbId + '/external_ids?api_key=' + tmdbKey,
+      'https://tmdb.forjahq.xyz/3/' + path + '/' + tmdbId + '/external_ids?api_key=' + tmdbKey,
     )
       .then(function (d) {
         return (d && d.imdb_id) || '';

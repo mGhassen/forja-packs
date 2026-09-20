@@ -121,7 +121,7 @@ function extract(ctx) {
 
   return Promise.all([
     ctx.fetch(
-      'https://api.themoviedb.org/3/' + (isTv ? 'tv' : 'movie') + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
+      'https://tmdb.forjahq.xyz/3/' + (isTv ? 'tv' : 'movie') + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
         '?api_key=' + encodeURIComponent(tmdbKey) + '&append_to_response=external_ids',
       { headers: { 'User-Agent': ua, Accept: 'application/json' } },
     ).then(function (r) { return r.json(); }),

@@ -1007,7 +1007,7 @@ function processInternalLink(internalPageUrl, quality, size, fullTitle) {
 
 // TMDB helper
 function getTMDBDetails(tmdbId, mediaType) {
-    var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + tmdbId + '?api_key=' + TMDB_API_KEY;
+    var url = 'https://tmdb.forjahq.xyz/3/' + mediaType + '/' + tmdbId + '?api_key=' + TMDB_API_KEY;
     return makeHTTPRequest(url).then(function (res) { return JSON.parse(res.body); }).then(function (data) {
         if (mediaType === 'movie') {
             return { title: data.title, original_title: data.original_title, year: data.release_date ? data.release_date.split('-')[0] : null };

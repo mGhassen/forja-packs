@@ -232,10 +232,10 @@ function hubTmdbHitFromMultiRow(row) {
   if (mt !== 'movie' && mt !== 'tv') return null;
   var name = hubTmdbMultiTitle(row);
   var poster = row.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + row.poster_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w500' + row.poster_path
     : '';
   var backdrop = row.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + row.backdrop_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w1280' + row.backdrop_path
     : '';
   var overview = String(row.overview || '').trim();
   var rating = Number(row.vote_average);
@@ -307,7 +307,7 @@ function hubTmdbMatchFetch(ctx, query) {
   var wantMovie = prefer === 'movie';
   var year = Number(query.year) > 0 ? Number(query.year) : 0;
   var url =
-    'https://api.themoviedb.org/3/search/multi?api_key=' +
+    'https://tmdb.forjahq.xyz/3/search/multi?api_key=' +
     encodeURIComponent(key) +
     '&query=' +
     encodeURIComponent(title) +
@@ -342,7 +342,7 @@ function hubTmdbFetchImdb(ctx, media, id) {
     return Promise.resolve('');
   }
   var url =
-    'https://api.themoviedb.org/3/' +
+    'https://tmdb.forjahq.xyz/3/' +
     kind +
     '/' +
     mid +
@@ -440,10 +440,10 @@ function hubEnrichMetaTmdbId(meta) {
 function hubTmdbHitFromDetails(json, media) {
   if (!json || !json.id) return null;
   var poster = json.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + json.poster_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w500' + json.poster_path
     : '';
   var backdrop = json.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + json.backdrop_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w1280' + json.backdrop_path
     : '';
   var name = String(
     media === 'movie' ? json.title || '' : json.name || '',
@@ -481,7 +481,7 @@ function hubTmdbById(ctx, id, preferType) {
 
   function fetchOne(media) {
     var url =
-      'https://api.themoviedb.org/3/' +
+      'https://tmdb.forjahq.xyz/3/' +
       media +
       '/' +
       tid +
@@ -531,7 +531,7 @@ function hubTmdbEpisodeStillUrl(path) {
   var p = String(path || '').trim();
   if (!p) return '';
   if (p.indexOf('http') === 0) return p;
-  return 'https://image.tmdb.org/t/p/w300' + p;
+  return 'https://tmdb.forjahq.xyz/t/p/w300' + p;
 }
 
 function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
@@ -541,7 +541,7 @@ function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
     return Promise.resolve({});
   }
   var url =
-    'https://api.themoviedb.org/3/tv/' +
+    'https://tmdb.forjahq.xyz/3/tv/' +
     Number(tvId) +
     '/season/' +
     Number(season) +

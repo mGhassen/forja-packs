@@ -38,7 +38,7 @@ function extract(ctx) {
     var kind = isMovie ? 'movie' : 'tv';
     return ctx
       .fetch(
-        'https://api.themoviedb.org/3/' +
+        'https://tmdb.forjahq.xyz/3/' +
           kind +
           '/' +
           encodeURIComponent(tmdbId) +

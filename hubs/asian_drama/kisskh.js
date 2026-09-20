@@ -85,7 +85,9 @@ function kisskhLayout() {
 function kisskhCover(raw) {
   var url = String(raw || '').trim();
   if (!url) return '';
-  return url.replace('media.themoviedb.org/t/p', 'image.tmdb.org/t/p');
+  url = url.replace('media.themoviedb.org/t/p', 'tmdb.forjahq.xyz/t/p');
+  url = url.replace('image.tmdb.org/t/p', 'tmdb.forjahq.xyz/t/p');
+  return url;
 }
 
 function kisskhInferMediaType(row) {

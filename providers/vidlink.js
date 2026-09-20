@@ -317,7 +317,7 @@ function extract(ctx) {
       return Promise.resolve({ title: ctx.title, year: ctx.year || '' });
     }
     var ep = isTv ? 'tv' : 'movie';
-    return req('https://api.themoviedb.org/3/' + ep + '/' + tmdbId + '?api_key=' + TMDB_KEY)
+    return req('https://tmdb.forjahq.xyz/3/' + ep + '/' + tmdbId + '?api_key=' + TMDB_KEY)
       .then(function (r) {
         return peekJson(r, 'tmdb');
       })

@@ -34,7 +34,7 @@ function extract(ctx) {
   function titleFromTmdb() {
     var kind = isTv ? 'tv' : 'movie';
     return fetchJson(
-      'https://api.themoviedb.org/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) + '?api_key=' + encodeURIComponent(tmdbKey),
+      'https://tmdb.forjahq.xyz/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) + '?api_key=' + encodeURIComponent(tmdbKey),
     ).then(function (d) {
       return (isTv ? d.name : d.title) || d.original_title || d.original_name || String(ctx.title || '');
     });

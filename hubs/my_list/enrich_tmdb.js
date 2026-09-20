@@ -87,7 +87,7 @@ function hubTmdbGetDetails(ctx, mediaType, id) {
   var key = String(cfg.apiKey || '').trim();
   if (!key) return Promise.resolve(null);
   var url =
-    'https://api.themoviedb.org/3/' +
+    'https://tmdb.forjahq.xyz/3/' +
     media +
     '/' +
     n +

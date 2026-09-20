@@ -38,7 +38,7 @@ function extract(ctx) {
   function getTmdb() {
     var kind = isTv ? 'tv' : 'movie';
     return fetchJson(
-      'https://api.themoviedb.org/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
+      'https://tmdb.forjahq.xyz/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
       '?api_key=' + encodeURIComponent(tmdbKey) + '&append_to_response=external_ids',
       { Accept: 'application/json', 'User-Agent': ua },
     ).then(function (d) {

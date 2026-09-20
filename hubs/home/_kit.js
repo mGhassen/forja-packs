@@ -175,10 +175,10 @@ function hubTmdbMatchFetch(ctx, query) {
   var title = String(query.title || '').trim();
   if (!title) return Promise.resolve(null);
   var cfg = hubConfig(ctx, {
-    base: 'https://db.speedracelight.com/3',
+    base: 'https://tmdb.forjahq.xyz/3',
     apiKey: '',
   });
-  var base = String(cfg.base || 'https://db.speedracelight.com/3').replace(/\/$/, '');
+  var base = String(cfg.base || 'https://tmdb.forjahq.xyz/3').replace(/\/$/, '');
   var key = String(cfg.apiKey || '').trim();
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) {
     return Promise.resolve(null);
@@ -243,10 +243,10 @@ function hubTmdbPick(results, media, year) {
     media === 'movie' ? chosen.title || '' : chosen.name || '',
   );
   var poster = chosen.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + chosen.poster_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w500' + chosen.poster_path
     : '';
   var backdrop = chosen.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + chosen.backdrop_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w1280' + chosen.backdrop_path
     : '';
   var overview = String(chosen.overview || '').trim();
   var rating = Number(chosen.vote_average);

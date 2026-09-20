@@ -136,7 +136,7 @@ function extract(ctx) {
     };
     if (!tmdbKey) return Promise.resolve(seeded);
     return getJson(
-      'https://api.themoviedb.org/3/' +
+      'https://tmdb.forjahq.xyz/3/' +
         tmdbKind() +
         '/' +
         encodeURIComponent(tmdbId) +

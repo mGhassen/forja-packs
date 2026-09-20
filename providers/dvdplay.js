@@ -26,7 +26,7 @@ function extract(ctx) {
     if (title) return Promise.resolve({ title: title, year: year });
     return ctx
       .fetch(
-        'https://api.themoviedb.org/3/' +
+        'https://tmdb.forjahq.xyz/3/' +
           (isTv ? 'tv' : 'movie') +
           '/' +
           encodeURIComponent(String(ctx.tmdbId || '')) +

@@ -184,7 +184,7 @@ function hubTmdbMatchFetch(ctx, query) {
 
   function search(media) {
     var url =
-      'https://api.themoviedb.org/3/search/' +
+      'https://tmdb.forjahq.xyz/3/search/' +
       media +
       '?api_key=' +
       encodeURIComponent(key) +
@@ -237,10 +237,10 @@ function hubTmdbPick(results, media, year) {
     media === 'movie' ? chosen.title || '' : chosen.name || '',
   );
   var poster = chosen.poster_path
-    ? 'https://image.tmdb.org/t/p/w500' + chosen.poster_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w500' + chosen.poster_path
     : '';
   var backdrop = chosen.backdrop_path
-    ? 'https://image.tmdb.org/t/p/w1280' + chosen.backdrop_path
+    ? 'https://tmdb.forjahq.xyz/t/p/w1280' + chosen.backdrop_path
     : '';
   var overview = String(chosen.overview || '').trim();
   var rating = Number(chosen.vote_average);

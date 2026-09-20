@@ -53,7 +53,7 @@ function extract(ctx) {
     }
     if (!isTv) {
       return getJson(
-        'https://api.themoviedb.org/3/movie/' +
+        'https://tmdb.forjahq.xyz/3/movie/' +
           encodeURIComponent(String(ctx.tmdbId || '')) +
           '?api_key=' +
           encodeURIComponent(tmdbKey),
@@ -64,7 +64,7 @@ function extract(ctx) {
     var imdbP = ctx.imdbId
       ? Promise.resolve(String(ctx.imdbId))
       : getJson(
-          'https://api.themoviedb.org/3/tv/' +
+          'https://tmdb.forjahq.xyz/3/tv/' +
             encodeURIComponent(String(ctx.tmdbId || '')) +
             '/external_ids?api_key=' +
             encodeURIComponent(tmdbKey),
