@@ -4,8 +4,8 @@
 // api.themoviedb.org still needs config.apiKey (host inject / pack).
 
 var TMDB_DEFAULTS = {
-  base: 'https://db.speedracelight.com/3',
-  imageBase: 'https://image.tmdb.org/t/p',
+  base: 'https://tmdb.forjahq.xyz/3',
+  imageBase: 'https://tmdb.forjahq.xyz/t/p',
   apiKey: '',
   language: 'en-US',
   region: '',

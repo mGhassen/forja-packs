@@ -119,17 +119,21 @@ function hubTmdbGetDetails(ctx, mediaType, id) {
   var n = Number(id);
   if (!(n > 0)) return Promise.resolve(null);
   var media = String(mediaType || 'movie') === 'tv' ? 'tv' : 'movie';
-  var cfg = hubConfig(ctx, {});
+  var cfg = hubConfig(ctx, {
+    base: 'https://tmdb.forjahq.xyz/3',
+    apiKey: '',
+  });
   var key = String(cfg.apiKey || '').trim();
-  if (!key) return Promise.resolve(null);
+  var base = String(cfg.base || 'https://tmdb.forjahq.xyz/3').replace(/\/$/, '');
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) return Promise.resolve(null);
   var url =
-    'https://api.themoviedb.org/3/' +
+    base +
+    '/' +
     media +
     '/' +
     n +
-    '?api_key=' +
-    encodeURIComponent(key) +
-    '&append_to_response=images';
+    '?append_to_response=images' +
+    (key ? '&api_key=' + encodeURIComponent(key) : '');
   return ctx
     .fetch(url)
     .then(function (res) {

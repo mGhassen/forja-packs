@@ -481,34 +481,62 @@ function hubTmdbSearchTitle(meta) {
   return hubNormalizeTitle(meta.name || '');
 }
 
+
+var HUB_TMDB_DEFAULTS = {
+  base: 'https://tmdb.forjahq.xyz/3',
+  imageBase: 'https://tmdb.forjahq.xyz/t/p',
+  apiKey: '',
+};
+
+function hubTmdbBuildUrl(cfg, path, queryObj) {
+  var base = String((cfg && cfg.base) || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
+  var p = String(path || '');
+  if (p.charAt(0) !== '/') p = '/' + p;
+  var url = base + p;
+  var qs = [];
+  var key = String((cfg && cfg.apiKey) || '').trim();
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) return null;
+  if (key) qs.push('api_key=' + encodeURIComponent(key));
+  if (queryObj) {
+    for (var k in queryObj) {
+      if (!Object.prototype.hasOwnProperty.call(queryObj, k)) continue;
+      var v = queryObj[k];
+      if (v === null || v === undefined || v === '') continue;
+      qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(String(v)));
+    }
+  }
+  if (qs.length) url += (url.indexOf('?') >= 0 ? '&' : '?') + qs.join('&');
+  return url;
+}
+
 function hubTmdbMatch(ctx, query) {
   query = query || {};
   var title = hubNormalizeTitle(query.title);
   if (!title) return Promise.resolve(null);
   var normalized = Object.assign({}, query, { title: title });
-  function fetchJs() {
-    return hubTmdbMatchFetch(ctx, normalized);
-  }
-  if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-    return Promise.resolve(ctx.host.tmdb.match(normalized))
-      .then(function (hit) {
-        if (hit && hit.id) return hit;
-        return fetchJs();
-      })
-      .catch(function () {
-        return fetchJs();
-      });
-  }
-  return fetchJs();
+  return hubTmdbMatchFetch(ctx, normalized).then(function (hit) {
+    if (hit && hit.id) return hit;
+    if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
+      return Promise.resolve(ctx.host.tmdb.match(normalized))
+        .then(function (h) {
+          return h && h.id ? h : null;
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+    return null;
+  });
 }
 
 function hubTmdbMatchFetch(ctx, query) {
   query = query || {};
   var title = String(query.title || '').trim();
   if (!title) return Promise.resolve(null);
-  var cfg = hubConfig(ctx, {});
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var key = String(cfg.apiKey || '').trim();
-  if (!key) return Promise.resolve(null);
+  var base = String(cfg.base || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) return Promise.resolve(null);
   var prefer = String(query.type || '').trim().toLowerCase();
   var primary = prefer === 'movie' ? 'movie' : 'tv';
   var secondary = primary === 'movie' ? 'tv' : 'movie';
@@ -516,13 +544,7 @@ function hubTmdbMatchFetch(ctx, query) {
 
   function search(media) {
     var url =
-      'https://api.themoviedb.org/3/search/' +
-      media +
-      '?api_key=' +
-      encodeURIComponent(key) +
-      '&query=' +
-      encodeURIComponent(title) +
-      '&include_adult=false';
+      base + '/search/' + media + '?query=' + encodeURIComponent(title) + '&include_adult=false' + (key ? '&api_key=' + encodeURIComponent(key) : '');
     return ctx.fetch(url).then(function (res) {
       if (!res.ok) return null;
       return res.json();
@@ -589,7 +611,7 @@ function hubTmdbAbsArt(path, size) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
-  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+  return HUB_TMDB_DEFAULTS.imageBase.replace(/\/$/, '') + '/' + (size || 'w500') + p;
 }
 
 // Prefer English title logo, then lang-null, then first available.
@@ -935,24 +957,17 @@ function hubTmdbById(ctx, id, preferType, details) {
   if (!(tid > 0)) return Promise.resolve(null);
   var primary = preferType === 'movie' ? 'movie' : 'tv';
   var secondary = primary === 'movie' ? 'tv' : 'movie';
-  var cfg = hubConfig(ctx, {});
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var key = String(cfg.apiKey || '').trim();
-  if (!key) return Promise.resolve(null);
+  var base = String(cfg.base || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) return Promise.resolve(null);
   var append = details
     ? 'external_ids,images,credits,videos,recommendations'
     : 'external_ids,images';
 
   function fetchOne(media) {
     var url =
-      'https://api.themoviedb.org/3/' +
-      media +
-      '/' +
-      tid +
-      '?api_key=' +
-      encodeURIComponent(key) +
-      '&append_to_response=' +
-      append +
-      (details ? '&include_image_language=en,null' : '');
+      base + '/' + media + '/' + tid + '?append_to_response=' + append + (details ? '&include_image_language=en,null' : '') + (key ? '&api_key=' + encodeURIComponent(key) : '');
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -977,18 +992,14 @@ function hubTmdbEpisodeStillUrl(path) {
 }
 
 function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
-  var cfg = hubConfig(ctx, {});
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var key = String(cfg.apiKey || '').trim();
-  if (!key || !(Number(tvId) > 0) || !(Number(season) > 0)) {
+  var base = String(cfg.base || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
+  if ((base.indexOf('api.themoviedb.org') >= 0 && !key) || !(Number(tvId) > 0) || !(Number(season) > 0)) {
     return Promise.resolve({});
   }
   var url =
-    'https://api.themoviedb.org/3/tv/' +
-    Number(tvId) +
-    '/season/' +
-    Number(season) +
-    '?api_key=' +
-    encodeURIComponent(key);
+    base + '/tv/' + Number(tvId) + '/season/' + Number(season) + (key ? '?api_key=' + encodeURIComponent(key) : '');
   return ctx
     .fetch(url)
     .then(function (res) {
@@ -1082,20 +1093,22 @@ function hubEnrichMetaVideos(ctx, meta, hit) {
 }
 
 function hubTmdbFetchImdb(ctx, media, id) {
-  var cfg = hubConfig(ctx, {});
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var key = String(cfg.apiKey || '').trim();
+  var base = String(cfg.base || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
   var mid = Number(id);
   var kind = String(media || '').toLowerCase();
-  if (!key || !(mid > 0) || (kind !== 'movie' && kind !== 'tv')) {
+  if ((base.indexOf('api.themoviedb.org') >= 0 && !key) || !(mid > 0) || (kind !== 'movie' && kind !== 'tv')) {
     return Promise.resolve('');
   }
   var url =
-    'https://api.themoviedb.org/3/' +
+    base +
+    '/' +
     kind +
     '/' +
     mid +
-    '/external_ids?api_key=' +
-    encodeURIComponent(key);
+    '/external_ids' +
+    (key ? '?api_key=' + encodeURIComponent(key) : '');
   return ctx
     .fetch(url)
     .then(function (res) {

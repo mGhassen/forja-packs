@@ -429,25 +429,51 @@ function hubTmdbSearchTitle(meta) {
   return hubNormalizeAnimeTitle(meta.name || '');
 }
 
+var HUB_TMDB_DEFAULTS = {
+  base: 'https://tmdb.forjahq.xyz/3',
+  imageBase: 'https://tmdb.forjahq.xyz/t/p',
+  apiKey: '',
+};
+
+function hubTmdbBuildUrl(cfg, path, queryObj) {
+  var base = String((cfg && cfg.base) || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
+  var p = String(path || '');
+  if (p.charAt(0) !== '/') p = '/' + p;
+  var url = base + p;
+  var qs = [];
+  var key = String((cfg && cfg.apiKey) || '').trim();
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) return null;
+  if (key) qs.push('api_key=' + encodeURIComponent(key));
+  if (queryObj) {
+    for (var k in queryObj) {
+      if (!Object.prototype.hasOwnProperty.call(queryObj, k)) continue;
+      var v = queryObj[k];
+      if (v === null || v === undefined || v === '') continue;
+      qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(String(v)));
+    }
+  }
+  if (qs.length) url += (url.indexOf('?') >= 0 ? '&' : '?') + qs.join('&');
+  return url;
+}
+
 function hubTmdbMatch(ctx, query) {
   query = query || {};
   var title = hubNormalizeAnimeTitle(query.title);
   if (!title) return Promise.resolve(null);
   var normalized = Object.assign({}, query, { title: title });
-  function fetchJs() {
-    return hubTmdbMatchFetch(ctx, normalized);
-  }
-  if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-    return Promise.resolve(ctx.host.tmdb.match(normalized))
-      .then(function (hit) {
-        if (hit && hit.id) return hit;
-        return fetchJs();
-      })
-      .catch(function () {
-        return fetchJs();
-      });
-  }
-  return fetchJs();
+  return hubTmdbMatchFetch(ctx, normalized).then(function (hit) {
+    if (hit && hit.id) return hit;
+    if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
+      return Promise.resolve(ctx.host.tmdb.match(normalized))
+        .then(function (h) {
+          return h && h.id ? h : null;
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+    return null;
+  });
 }
 
 function hubTmdbMultiTitle(hit) {
@@ -536,18 +562,15 @@ function hubTmdbMatchFetch(ctx, query) {
   query = query || {};
   var title = hubNormalizeAnimeTitle(query.title);
   if (!title) return Promise.resolve(null);
-  var cfg = hubConfig(ctx, {});
-  var key = String(cfg.apiKey || '').trim();
-  if (!key) return Promise.resolve(null);
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var prefer = String(query.type || '').trim().toLowerCase();
   var wantMovie = prefer === 'movie';
   var year = Number(query.year) > 0 ? Number(query.year) : 0;
-  var url =
-    'https://api.themoviedb.org/3/search/multi?api_key=' +
-    encodeURIComponent(key) +
-    '&query=' +
-    encodeURIComponent(title) +
-    '&include_adult=false';
+  var url = hubTmdbBuildUrl(cfg, '/search/multi', {
+    query: title,
+    include_adult: 'false',
+  });
+  if (!url) return Promise.resolve(null);
   return ctx
     .fetch(url)
     .then(function (res) {
@@ -570,20 +593,14 @@ function hubTmdbMatchFetch(ctx, query) {
 }
 
 function hubTmdbFetchImdb(ctx, media, id) {
-  var cfg = hubConfig(ctx, {});
-  var key = String(cfg.apiKey || '').trim();
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var mid = Number(id);
   var kind = String(media || '').toLowerCase();
-  if (!key || !(mid > 0) || (kind !== 'movie' && kind !== 'tv')) {
+  if (!(mid > 0) || (kind !== 'movie' && kind !== 'tv')) {
     return Promise.resolve('');
   }
-  var url =
-    'https://api.themoviedb.org/3/' +
-    kind +
-    '/' +
-    mid +
-    '/external_ids?api_key=' +
-    encodeURIComponent(key);
+  var url = hubTmdbBuildUrl(cfg, '/' + kind + '/' + mid + '/external_ids', {});
+  if (!url) return Promise.resolve('');
   return ctx
     .fetch(url)
     .then(function (res) {
@@ -619,7 +636,7 @@ function hubTmdbAbsArt(path, size) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
-  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+  return HUB_TMDB_DEFAULTS.imageBase.replace(/\/$/, '') + '/' + (size || 'w500') + p;
 }
 
 // Prefer English title logo, then lang-null, then first available.
@@ -951,24 +968,16 @@ function hubTmdbById(ctx, id, preferType, details) {
   if (!(tid > 0)) return Promise.resolve(null);
   var primary = preferType === 'movie' ? 'movie' : 'tv';
   var secondary = primary === 'movie' ? 'tv' : 'movie';
-  var cfg = hubConfig(ctx, {});
-  var key = String(cfg.apiKey || '').trim();
-  if (!key) return Promise.resolve(null);
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
   var append = details
     ? 'external_ids,images,credits,videos'
     : 'external_ids,images';
 
   function fetchOne(media) {
-    var url =
-      'https://api.themoviedb.org/3/' +
-      media +
-      '/' +
-      tid +
-      '?api_key=' +
-      encodeURIComponent(key) +
-      '&append_to_response=' +
-      append +
-      (details ? '&include_image_language=en,null' : '');
+    var q = { append_to_response: append };
+    if (details) q.include_image_language = 'en,null';
+    var url = hubTmdbBuildUrl(cfg, '/' + media + '/' + tid, q);
+    if (!url) return Promise.resolve(null);
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -994,18 +1003,16 @@ function hubTmdbEpisodeStillUrl(path) {
 }
 
 function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
-  var cfg = hubConfig(ctx, {});
-  var key = String(cfg.apiKey || '').trim();
-  if (!key || !(Number(tvId) > 0) || !(Number(season) > 0)) {
+  var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
+  if (!(Number(tvId) > 0) || !(Number(season) > 0)) {
     return Promise.resolve({});
   }
-  var url =
-    'https://api.themoviedb.org/3/tv/' +
-    Number(tvId) +
-    '/season/' +
-    Number(season) +
-    '?api_key=' +
-    encodeURIComponent(key);
+  var url = hubTmdbBuildUrl(
+    cfg,
+    '/tv/' + Number(tvId) + '/season/' + Number(season),
+    {},
+  );
+  if (!url) return Promise.resolve({});
   return ctx
     .fetch(url)
     .then(function (res) {

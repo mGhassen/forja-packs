@@ -384,9 +384,11 @@ async function iptvFetchCatalogPage(ctx, portal, section, opts) {
   };
   var ua = String(portal.userAgent || portal.user_agent || '').trim();
   if (ua) body.user_agent = ua;
-  if (Array.isArray(o.streamIds) && o.streamIds.length) {
+  // Always stamp stream_ids when the pack passes a list (Favorites / Watched),
+  // including empty — otherwise host falls back to the first category page.
+  if (Array.isArray(o.streamIds)) {
     body.stream_ids = o.streamIds;
-  } else if (Array.isArray(o.stream_ids) && o.stream_ids.length) {
+  } else if (Array.isArray(o.stream_ids)) {
     body.stream_ids = o.stream_ids;
   }
 

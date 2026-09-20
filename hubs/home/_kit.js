@@ -452,12 +452,20 @@ function hubStripHtml(html) {
 
 function hubTmdbMatch(ctx, query) {
   query = query || {};
-  if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-    return Promise.resolve(ctx.host.tmdb.match(query)).then(function (hit) {
-      return hit && hit.id ? hit : null;
-    }).catch(function () { return null; });
-  }
-  return hubTmdbMatchFetch(ctx, query);
+  // Pack-owned fetch first (cfg.base → gateway). Host Rust match is legacy fallback.
+  return hubTmdbMatchFetch(ctx, query).then(function (hit) {
+    if (hit && hit.id) return hit;
+    if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
+      return Promise.resolve(ctx.host.tmdb.match(query))
+        .then(function (h) {
+          return h && h.id ? h : null;
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+    return null;
+  });
 }
 
 function hubTmdbMatchFetch(ctx, query) {
@@ -465,10 +473,10 @@ function hubTmdbMatchFetch(ctx, query) {
   var title = String(query.title || '').trim();
   if (!title) return Promise.resolve(null);
   var cfg = hubConfig(ctx, {
-    base: 'https://db.speedracelight.com/3',
+    base: 'https://tmdb.forjahq.xyz/3',
     apiKey: '',
   });
-  var base = String(cfg.base || 'https://db.speedracelight.com/3').replace(/\/$/, '');
+  var base = String(cfg.base || 'https://tmdb.forjahq.xyz/3').replace(/\/$/, '');
   var key = String(cfg.apiKey || '').trim();
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) {
     return Promise.resolve(null);
@@ -553,7 +561,7 @@ function hubTmdbAbsArt(path, size) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
-  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+  return 'https://tmdb.forjahq.xyz/t/p/' + (size || 'w500') + p;
 }
 
 // Prefer English title logo, then lang-null, then first available.

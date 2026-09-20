@@ -562,37 +562,46 @@ async function iptvSearchChannels(ctx, params) {
 
     var seenUrl = {};
     var sources = [];
+    var force = !!(params && (params.force || params.refresh));
     for (var n = 0; n < needles.length; n++) {
-      var catalog = await iptvFetchCatalogPage(ctx, portal, 'live', {
-        q: needles[n],
-        page: 1,
-        pageSize: 96,
-        categoryId: '',
-      });
-      var streams = (catalog && catalog.streams) || [];
-      for (var i = 0; i < streams.length; i++) {
-        var st = streams[i];
-        if (!st) continue;
-        if (categoryIds.length) {
-          var cid = String(st.categoryId || '');
-          if (categoryIds.indexOf(cid) < 0) continue;
-        }
-        if (!iptvChannelMatchesGame(st.name || st.title, game)) continue;
-        var meta = iptvLiveMeta(portal, st, st.categoryId || '');
-        if (!meta || !meta.open || !meta.open.url) continue;
-        var url = String(meta.open.url);
-        if (seenUrl[url]) continue;
-        seenUrl[url] = true;
-        sources.push({
-          url: url,
-          label: meta.name,
-          logoUrl: meta.poster || '',
-          provider: portal.label || 'IPTV',
-          portalKey: meta.portalKey,
-          streamId: meta.streamId,
-          liveSourceKind:
-            iptvPlatformOf(portal) === 'stalker' ? 'iptvStalker' : 'iptvXtream',
+      var page = 1;
+      var hasMore = true;
+      while (hasMore && page <= 40) {
+        var catalog = await iptvFetchCatalogPage(ctx, portal, 'live', {
+          q: needles[n],
+          page: page,
+          pageSize: 128,
+          categoryId: '',
+          skipCache: force && page === 1,
         });
+        var streams = (catalog && catalog.streams) || [];
+        hasMore = !!(catalog && catalog.hasMore);
+        if (!streams.length) break;
+        for (var i = 0; i < streams.length; i++) {
+          var st = streams[i];
+          if (!st) continue;
+          if (categoryIds.length) {
+            var cid = String(st.categoryId || '');
+            if (categoryIds.indexOf(cid) < 0) continue;
+          }
+          if (!iptvChannelMatchesGame(st.name || st.title, game)) continue;
+          var meta = iptvLiveMeta(portal, st, st.categoryId || '');
+          if (!meta || !meta.open || !meta.open.url) continue;
+          var url = String(meta.open.url);
+          if (seenUrl[url]) continue;
+          seenUrl[url] = true;
+          sources.push({
+            url: url,
+            label: meta.name,
+            logoUrl: meta.poster || '',
+            provider: portal.label || 'IPTV',
+            portalKey: meta.portalKey,
+            streamId: meta.streamId,
+            liveSourceKind:
+              iptvPlatformOf(portal) === 'stalker' ? 'iptvStalker' : 'iptvXtream',
+          });
+        }
+        page++;
       }
     }
     return hubOk('searchChannels', { sources: sources }, { maxAge: 60, swr: 120 });
