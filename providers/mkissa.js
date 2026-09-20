@@ -135,7 +135,7 @@ function extract(ctx) {
 
   function resolveMal() {
     if (!isTv) {
-      return fetchJson('https://api.themoviedb.org/3/movie/' + encodeURIComponent(String(ctx.tmdbId || '')) + '?api_key=' + encodeURIComponent(tmdbKey))
+      return fetchJson('https://tmdb.forjahq.xyz/3/movie/' + encodeURIComponent(String(ctx.tmdbId || '')) + '?api_key=' + encodeURIComponent(tmdbKey))
         .then(function (d) {
           var title = d.title || d.original_title || '';
           if (!title) return null;
@@ -145,7 +145,7 @@ function extract(ctx) {
         }).catch(function () { return null; });
     }
     var imdbP = ctx.imdbId ? Promise.resolve(String(ctx.imdbId)) :
-      fetchJson('https://api.themoviedb.org/3/tv/' + encodeURIComponent(String(ctx.tmdbId || '')) + '/external_ids?api_key=' + encodeURIComponent(tmdbKey))
+      fetchJson('https://tmdb.forjahq.xyz/3/tv/' + encodeURIComponent(String(ctx.tmdbId || '')) + '/external_ids?api_key=' + encodeURIComponent(tmdbKey))
         .then(function (d) { return (d && d.imdb_id) || ''; }).catch(function () { return ''; });
     return imdbP.then(function (imdbId) {
       if (!imdbId) return null;
@@ -1209,7 +1209,7 @@ async function fetchTMDB(titles, year, format) {
   for (const title of titles) {
     if (!title) continue;
     try {
-      const searchUrl = `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&first_air_date_year=${year}&year=${year}`;
+      const searchUrl = `https://tmdb.forjahq.xyz/3/search/${tmdbType}?query=${encodeURIComponent(title)}&first_air_date_year=${year}&year=${year}`;
       const res = await fetch(searchUrl, { headers: { Authorization: `Bearer ${TMDB_TOKEN}`, Accept: "application/json" } });
       const json = await res.json();
       if (json.results?.length) {
@@ -1220,7 +1220,7 @@ async function fetchTMDB(titles, year, format) {
   }
   if (!result) return { themoviedbId: null, imdbId: null, thetvdbId: null };
   try {
-    const extUrl = `https://api.themoviedb.org/3/${tmdbType}/${result.id}/external_ids`;
+    const extUrl = `https://tmdb.forjahq.xyz/3/${tmdbType}/${result.id}/external_ids`;
     const extRes = await fetch(extUrl, { headers: { Authorization: `Bearer ${TMDB_TOKEN}`, Accept: "application/json" } });
     const externalIds = await extRes.json();
     return {

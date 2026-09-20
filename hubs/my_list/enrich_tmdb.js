@@ -6,7 +6,7 @@ function myListTmdbAbs(path, size) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
-  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+  return 'https://tmdb.forjahq.xyz/t/p/' + (size || 'w500') + p;
 }
 
 function myListPickTitleLogo(images) {

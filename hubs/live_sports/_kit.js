@@ -278,7 +278,7 @@ function hubTmdbMatchFetch(ctx, query) {
 
   function search(media) {
     var url =
-      'https://api.themoviedb.org/3/search/' +
+      'https://tmdb.forjahq.xyz/3/search/' +
       media +
       '?api_key=' +
       encodeURIComponent(key) +
@@ -351,7 +351,7 @@ function hubTmdbAbsArt(path, size) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
-  return 'https://image.tmdb.org/t/p/' + (size || 'w500') + p;
+  return 'https://tmdb.forjahq.xyz/t/p/' + (size || 'w500') + p;
 }
 
 // Prefer English title logo, then lang-null, then first available.

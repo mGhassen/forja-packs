@@ -24,7 +24,7 @@ function extract(ctx) {
 
   function getSyncInfo(id, season, episode) {
     var kind = isTv ? 'tv' : 'movie';
-    var tmdbBase = 'https://api.themoviedb.org/3/' + kind + '/' + encodeURIComponent(String(id));
+    var tmdbBase = 'https://tmdb.forjahq.xyz/3/' + kind + '/' + encodeURIComponent(String(id));
     return Promise.all([
       fetchJson(tmdbBase + (isTv ? '/external_ids' : '') + '?api_key=' + encodeURIComponent(tmdbKey)),
       fetchJson(tmdbBase + '?api_key=' + encodeURIComponent(tmdbKey)),

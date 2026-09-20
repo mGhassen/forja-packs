@@ -139,7 +139,7 @@ function extract(ctx) {
   function tmdbInfo() {
     var path = isTv ? 'tv' : 'movie';
     return getJson(
-      'https://api.themoviedb.org/3/' +
+      'https://tmdb.forjahq.xyz/3/' +
         path +
         '/' +
         encodeURIComponent(String(ctx.tmdbId || '')) +

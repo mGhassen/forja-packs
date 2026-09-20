@@ -73,7 +73,7 @@ function extract(ctx) {
   function fetchMeta() {
     var kind = isTv ? 'tv' : 'movie';
     return fetchJson(
-      'https://api.themoviedb.org/3/' +
+      'https://tmdb.forjahq.xyz/3/' +
         kind +
         '/' +
         encodeURIComponent(String(ctx.tmdbId || '')) +

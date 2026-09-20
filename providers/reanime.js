@@ -35,7 +35,7 @@ function extract(ctx) {
   function getTmdb() {
     var kind = isTv ? 'tv' : 'movie';
     return fetchJson(
-      'https://api.themoviedb.org/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
+      'https://tmdb.forjahq.xyz/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || '')) +
         '?api_key=' + encodeURIComponent(tmdbKey) + '&append_to_response=external_ids',
     ).then(function (d) {
       return {
@@ -62,7 +62,7 @@ function extract(ctx) {
 
   function getSyncInfo(season, episode) {
     var kind = isTv ? 'tv' : 'movie';
-    var tmdbBase = 'https://api.themoviedb.org/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || ''));
+    var tmdbBase = 'https://tmdb.forjahq.xyz/3/' + kind + '/' + encodeURIComponent(String(ctx.tmdbId || ''));
     return Promise.all([
       fetchJson(tmdbBase + (isTv ? '/external_ids' : '') + '?api_key=' + encodeURIComponent(tmdbKey)),
       fetchJson(tmdbBase + '?api_key=' + encodeURIComponent(tmdbKey)),

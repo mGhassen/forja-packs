@@ -42,7 +42,7 @@ function extract(ctx) {
   function getTmdbDetails() {
     var kind = isTv ? 'tv' : 'movie';
     return getJson(
-      'https://api.themoviedb.org/3/' +
+      'https://tmdb.forjahq.xyz/3/' +
         kind +
         '/' +
         encodeURIComponent(String(ctx.tmdbId || '')) +

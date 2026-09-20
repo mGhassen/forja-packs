@@ -1206,10 +1206,11 @@ function hubKisskhMetaFromRow(row) {
   var premiere = hubParseIsoDate(release);
   var cover = String(row.thumbnail || row.cover || '').trim();
   if (cover) {
-    cover = cover.replace('media.themoviedb.org/t/p', 'image.tmdb.org/t/p');
+    cover = cover.replace('media.themoviedb.org/t/p', 'tmdb.forjahq.xyz/t/p');
+    cover = cover.replace('image.tmdb.org/t/p', 'tmdb.forjahq.xyz/t/p');
     if (cover.indexOf('//') === 0) cover = 'https:' + cover;
     else if (cover.charAt(0) === '/') {
-      cover = 'https://image.tmdb.org/t/p/w500' + cover;
+      cover = 'https://tmdb.forjahq.xyz/t/p/w500' + cover;
     }
   }
   var meta = {
