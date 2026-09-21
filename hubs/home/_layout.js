@@ -3,7 +3,8 @@
 function tmdbLayout() {
   // Visual D-pad chain (host skips missing/empty via kit-edge miss):
   // featured → popular → continue_watching? → mood-chips → because-shuffle?
-  // → because → new_releases → genre_0 → genre_1 → genre_2
+  // → because? → new_releases → genre_0 → genre_1 → genre_2
+  // Empty Continue / empty Because (no seeds) / no shuffle: miss walks past.
   var genres = tmdbPickGenreRows(3);
   var firstGenreId = genres.length > 0 ? 'genre_' + genres[0].id : null;
   var genreWidgets = genres.map(function (g, i) {
@@ -127,7 +128,8 @@ function tmdbLayout() {
               // Host maps these onto mood-chips (not widget id `moods`).
               // Empty Continue → host kit-edge miss → popular.
               focusUp: 'continue_watching',
-              // No shuffle → host kit-edge miss → because.
+              // because-shuffle when canShuffle; else miss → because;
+              // empty Because (no seeds) → miss walk → new_releases.
               focusDown: 'because-shuffle',
             },
             'rail',
@@ -140,6 +142,7 @@ function tmdbLayout() {
               rail: 'because',
               // Host: when canShuffle, because ↑ lands on because-shuffle first;
               // shuffle ↑ uses this pack edge (mood-chips).
+              // Unmounted Because → new_releases ↑ miss walks to mood-chips.
               focusUp: 'mood-chips',
               focusDown: 'new_releases',
             },
@@ -153,6 +156,7 @@ function tmdbLayout() {
                 id: 'new_releases',
                 title: 'New Releases',
                 rail: 'new_releases',
+                // Empty Because → host kit-edge miss → mood-chips (or shuffle).
                 focusUp: 'because',
               },
               firstGenreId ? { focusDown: firstGenreId } : {},
