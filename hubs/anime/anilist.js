@@ -135,19 +135,10 @@ function anilistTmdbSearchTitle(m) {
 }
 
 function anilistCardMeta(m) {
-  // Same as pre-CatalogShell `_animeCardMeta`: year • FILM / year • N eps.
+  // Year • N eps — no format type (TV / ONA / FILM); that lived on the badge.
   var parts = [];
   if (m.seasonYear) parts.push(String(m.seasonYear));
-  var fmt = String(m.format || '').toUpperCase();
-  if (fmt === 'TV' || fmt === 'TV_SHORT') {
-    if (m.episodes) parts.push(String(m.episodes) + ' eps');
-  } else if (fmt === 'MOVIE') {
-    parts.push('FILM');
-  } else if (fmt) {
-    parts.push(fmt.replace(/_/g, ' '));
-  } else if (m.episodes) {
-    parts.push(String(m.episodes) + ' eps');
-  }
+  if (m.episodes) parts.push(String(m.episodes) + ' eps');
   return parts.join(' • ');
 }
 

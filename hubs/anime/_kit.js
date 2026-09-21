@@ -245,7 +245,8 @@ function hubPaintPoster(item, opts) {
     paint.props.rating = Number(meta.rating != null ? meta.rating : opts.rating);
   }
   if (opts.rank != null) paint.props.rank = Number(opts.rank);
-  if (meta.badge || opts.badge) paint.props.badge = String(meta.badge || opts.badge);
+  // Format (TV / ONA / MOVIE) stays on meta.badge for enrich / movie checks —
+  // do not paint it on catalog posters.
   if (opts.subtitle || meta.releaseInfo) {
     paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
   }
