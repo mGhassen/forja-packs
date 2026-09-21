@@ -8,11 +8,12 @@ function cartoonLayout() {
         feed: true,
         feedRails: CARTOON_FEED_RAILS.slice(),
         pageSize: 24,
+        // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
+        // Visual: latest → continue? → popular → episodes.
+        // Empty Continue: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
-        focus: {
-          restore: 'latest',
-          restoreMode: 'remembered',
-        },
+        // enter / restore omitted: hero View details owns first land
+        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
         widgets: [
           hubWithLoad(
             {

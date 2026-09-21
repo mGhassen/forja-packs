@@ -50,12 +50,11 @@ function arabicLayout() {
         feed: true,
         feedRails: ARABIC_FEED_RAILS.slice(),
         pageSize: 24,
+        // TV D-pad — vertical chain is pack focusUp/focusDown via `chain`.
+        // Empty Continue: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
-        // Vertical chain is pack focusUp/focusDown via `chain`.
-        focus: {
-          restore: 'latest',
-          restoreMode: 'remembered',
-        },
+        // enter / restore omitted: hero View details owns first land
+        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
         widgets: [
           hubWithLoad(
             {

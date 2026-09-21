@@ -16,13 +16,12 @@ function anilistLayout() {
       anime: {
         feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
-        // TV D-pad — vertical chain is pack focusUp/focusDown.
+        // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
+        // Visual: trending → continue? → mood-chips → this_season → …
+        // Empty Continue: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
-        // enter omitted: hero View details owns first land (defaultFocus).
-        focus: {
-          restore: 'trending',
-          restoreMode: 'remembered',
-        },
+        // enter / restore omitted: hero View details owns first land
+        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
         widgets: [
           hubWithLoad(
             {
@@ -47,6 +46,8 @@ function anilistLayout() {
               id: 'moods',
               title: 'Pick your vibe',
               options: ANILIST_MOODS,
+              // Host maps these onto mood-chips (not widget id `moods`).
+              // Empty Continue → host kit-edge miss → trending.
               focusUp: 'continue_watching',
               focusDown: 'this_season',
             },

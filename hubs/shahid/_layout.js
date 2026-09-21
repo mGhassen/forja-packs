@@ -69,11 +69,10 @@ function shahidLayout() {
         feed: true,
         feedRails: SHAHID_FEED_RAILS.slice(),
         pageSize: 20,
+        // TV D-pad — vertical chain is pack focusUp/focusDown on rails.
         // No pageBack: flat catalog — remote Back → nav rail.
-        focus: {
-          restore: bleedId,
-          restoreMode: 'remembered',
-        },
+        // enter / restore omitted: hero View details owns first land
+        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
         widgets: widgets,
       },
     },
