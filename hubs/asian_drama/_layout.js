@@ -13,6 +13,19 @@ function kisskhLayout() {
           'upcoming',
         ],
         pageSize: 24,
+        // TV D-pad — same contract as Home / IPTV.
+        // enter omitted: hero View details owns first land (defaultFocus).
+        focus: {
+          restore: 'latest',
+          restoreMode: 'remembered',
+          pageBack: [
+            'upcoming',
+            'popular',
+            'trending',
+            'continue_watching',
+            'latest',
+          ],
+        },
         widgets: [
           hubWithLoad(
             {
@@ -25,7 +38,12 @@ function kisskhLayout() {
             'rail',
             { rail: 'spotlight' },
           ),
-          { type: 'continue', id: 'continue_watching' },
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            focusUp: 'latest',
+            focusDown: 'trending',
+          },
           hubWithLoad({
             type: 'rail',
             id: 'latest',
@@ -33,6 +51,7 @@ function kisskhLayout() {
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'landscape',
+            focusDown: 'continue_watching',
           }, 'rail', { rail: 'latest' }),
           hubWithLoad({
             type: 'rail',
@@ -40,6 +59,8 @@ function kisskhLayout() {
             title: 'Trending',
             rail: 'trending',
             aspect: 'landscape',
+            focusUp: 'continue_watching',
+            focusDown: 'popular',
           }, 'rail', { rail: 'trending' }),
           hubWithLoad(
             {
@@ -48,6 +69,8 @@ function kisskhLayout() {
               title: 'Popular',
               rail: 'most_viewed',
               aspect: 'landscape',
+              focusUp: 'trending',
+              focusDown: 'upcoming',
             },
             'rail',
             { rail: 'most_viewed' },
@@ -58,6 +81,7 @@ function kisskhLayout() {
             title: 'Upcoming',
             rail: 'upcoming',
             aspect: 'landscape',
+            focusUp: 'popular',
           }, 'rail', { rail: 'upcoming' }),
         ],
       },

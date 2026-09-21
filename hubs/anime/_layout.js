@@ -16,6 +16,26 @@ function anilistLayout() {
       anime: {
         feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
+        // TV D-pad — same contract as Home / IPTV.
+        // enter omitted: hero View details owns first land (defaultFocus).
+        focus: {
+          restore: 'trending',
+          restoreMode: 'remembered',
+          pageBack: [
+            'latest_completed',
+            'most_favorited',
+            'top_rated',
+            'latest_episodes',
+            'popular',
+            'top_10',
+            'top_airing',
+            'this_season',
+            'mood-results',
+            'mood-chips',
+            'continue_watching',
+            'trending',
+          ],
+        },
         widgets: [
           hubWithLoad(
             {
@@ -28,22 +48,36 @@ function anilistLayout() {
             'rail',
             { rail: 'spotlight' },
           ),
-          { type: 'continue', id: 'continue_watching' },
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            focusUp: 'trending',
+            focusDown: 'mood-chips',
+          },
           hubWithLoad(
             {
               type: 'mood',
               id: 'moods',
               title: 'Pick your vibe',
               options: ANILIST_MOODS,
+              focusUp: 'continue_watching',
+              focusDown: 'this_season',
             },
             'rail',
             { rail: 'trending' },
           ),
           rail('trending', 'Trending Now', {
             hideWhenBleed: true,
+            focusDown: 'continue_watching',
           }),
-          rail('this_season', 'This Season'),
-          rail('top_airing', 'Top Airing'),
+          rail('this_season', 'This Season', {
+            focusUp: 'mood-chips',
+            focusDown: 'top_airing',
+          }),
+          rail('top_airing', 'Top Airing', {
+            focusUp: 'this_season',
+            focusDown: 'top_10',
+          }),
           hubWithLoad(
             {
               type: 'ranked',
@@ -52,15 +86,31 @@ function anilistLayout() {
               rail: 'top_10',
               style: 'numbered',
               pageSize: 10,
+              focusUp: 'top_airing',
+              focusDown: 'popular',
             },
             'rail',
             { rail: 'top_10' },
           ),
-          rail('popular', 'Most Popular'),
-          rail('latest_episodes', 'Recently Aired'),
-          rail('top_rated', 'Top Rated'),
-          rail('most_favorited', 'Most Favorited'),
-          rail('latest_completed', 'Recently Completed'),
+          rail('popular', 'Most Popular', {
+            focusUp: 'top_10',
+            focusDown: 'latest_episodes',
+          }),
+          rail('latest_episodes', 'Recently Aired', {
+            focusUp: 'popular',
+            focusDown: 'top_rated',
+          }),
+          rail('top_rated', 'Top Rated', {
+            focusUp: 'latest_episodes',
+            focusDown: 'most_favorited',
+          }),
+          rail('most_favorited', 'Most Favorited', {
+            focusUp: 'top_rated',
+            focusDown: 'latest_completed',
+          }),
+          rail('latest_completed', 'Recently Completed', {
+            focusUp: 'most_favorited',
+          }),
         ],
       },
     },
