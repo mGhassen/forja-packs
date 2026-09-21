@@ -68,7 +68,11 @@ function arabicLayout() {
             'rail',
             { rail: 'trending' },
           ),
-          rail('latest', 'أخر الاضافات', { hideWhenBleed: true }),
+          rail('latest', 'أخر الاضافات', {
+            hideWhenBleed: true,
+            // First catalog row ↑ → View details (not top menu).
+            focusUp: 'hero-details',
+          }),
           Object.assign(
             { type: 'continue', id: 'continue_watching' },
             edges('continue_watching'),

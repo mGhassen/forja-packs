@@ -45,6 +45,8 @@ function kisskhLayout() {
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'landscape',
+            // First catalog row ↑ → View details (not top menu).
+            focusUp: 'hero-details',
             focusDown: 'continue_watching',
           }, 'rail', { rail: 'latest' }),
           hubWithLoad({

@@ -55,6 +55,8 @@ function anilistLayout() {
           ),
           rail('trending', 'Trending Now', {
             hideWhenBleed: true,
+            // First catalog row ↑ → View details (not top menu).
+            focusUp: 'hero-details',
             focusDown: 'continue_watching',
           }),
           rail('this_season', 'This Season', {

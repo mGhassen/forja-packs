@@ -32,6 +32,8 @@ function shahidLayout() {
       hideWhenBleed: id === bleedId,
     };
     if (id === bleedId) {
+      // First catalog row ↑ → View details (not top menu).
+      extra.focusUp = 'hero-details';
       // Next painted rail after the bleed (skip self).
       for (var k = 0; k < railIds.length; k++) {
         if (railIds[k] !== bleedId) {
