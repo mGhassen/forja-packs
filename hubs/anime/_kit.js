@@ -634,6 +634,8 @@ function hubTmdbAttachImdb(ctx, meta, hit) {
 function hubTmdbAbsArt(path, size) {
   var p = String(path || '').trim();
   if (!p) return '';
+  // Android ImageDecoder cannot decode SVG; TMDB serves the same asset as PNG.
+  if (/\.svg$/i.test(p)) p = p.replace(/\.svg$/i, '.png');
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
   return HUB_TMDB_DEFAULTS.imageBase.replace(/\/$/, '') + '/' + (size || 'w500') + p;

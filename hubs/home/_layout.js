@@ -46,12 +46,10 @@ function tmdbLayout() {
         pageSize: TMDB_HOME_RAIL_CAP,
         maxPages: 4,
         // TV D-pad — same contract as IPTV / Live Sports.
-        // enter omitted: hero View details owns first land (defaultFocus).
-        // restore: remembered Featured when returning from nav RIGHT.
+        // enter / restore omitted: hero View details owns first land
+        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
         // pageBack: leaf → outer; missing/empty rows skip via _rowActive.
         focus: {
-          restore: 'featured',
-          restoreMode: 'remembered',
           pageBack: [
             'new_releases',
             'because',
@@ -144,6 +142,8 @@ function tmdbLayout() {
               type: 'because',
               id: 'because',
               rail: 'because',
+              // Same home WatchHistoryService pool as Continue Watching.
+              mergeHomeWatchHistory: true,
               // Shuffle chrome ↑ uses this (mood-chips). Rail ↑ host→shuffle
               // when canShuffle; else this pack edge.
               focusUp: 'mood-chips',

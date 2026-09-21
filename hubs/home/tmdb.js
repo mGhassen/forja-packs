@@ -561,27 +561,48 @@ function tmdbBecause(ctx, cfg, params) {
 function tmdbImage(cfg, path, size) {
   var p = String(path || '').trim();
   if (!p) return '';
+  // Android ImageDecoder cannot decode SVG; TMDB serves the same asset as PNG.
+  if (/\.svg$/i.test(p)) p = p.replace(/\.svg$/i, '.png');
   if (/^https?:\/\//i.test(p)) return p;
   if (p.charAt(0) !== '/') p = '/' + p;
   return String(cfg.imageBase).replace(/\/$/, '') + '/' + size + p;
 }
 
-// Prefer English title logo, then lang-null, then first.
+// Prefer English title logo, then lang-null, then first. Prefer raster over SVG.
 function tmdbPickTitleLogo(cfg, images) {
   var logos = images && Array.isArray(images.logos) ? images.logos : [];
   if (!logos.length) return '';
   var en = null;
   var nul = null;
   var first = null;
+  var enSvg = null;
+  var nulSvg = null;
+  var firstSvg = null;
   for (var i = 0; i < logos.length; i++) {
     var L = logos[i];
     if (!L || !L.file_path) continue;
-    if (!first) first = L;
+    var svg = /\.svg$/i.test(String(L.file_path));
     var lang = L.iso_639_1;
-    if (lang === 'en' && !en) en = L;
-    if ((lang == null || lang === '') && !nul) nul = L;
+    if (lang === 'en') {
+      if (svg) {
+        if (!enSvg) enSvg = L;
+      } else if (!en) {
+        en = L;
+      }
+    } else if (lang == null || lang === '') {
+      if (svg) {
+        if (!nulSvg) nulSvg = L;
+      } else if (!nul) {
+        nul = L;
+      }
+    }
+    if (svg) {
+      if (!firstSvg) firstSvg = L;
+    } else if (!first) {
+      first = L;
+    }
   }
-  var chosen = en || nul || first;
+  var chosen = en || nul || first || enSvg || nulSvg || firstSvg;
   return chosen ? tmdbImage(cfg, chosen.file_path, 'w500') : '';
 }
 
