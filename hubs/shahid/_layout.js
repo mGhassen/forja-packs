@@ -6,7 +6,6 @@ function shahidLayout() {
   for (var i = 0; i < SHAHID_FEED_RAILS.length; i++) {
     railIds.push(SHAHID_FEED_RAILS[i]);
   }
-  var pageBack = railIds.slice().reverse();
 
   var widgets = [
     hubWithLoad(
@@ -68,10 +67,10 @@ function shahidLayout() {
         feed: true,
         feedRails: SHAHID_FEED_RAILS.slice(),
         pageSize: 20,
+        // No pageBack: flat catalog — remote Back → nav rail.
         focus: {
           restore: bleedId,
           restoreMode: 'remembered',
-          pageBack: pageBack,
         },
         widgets: widgets,
       },

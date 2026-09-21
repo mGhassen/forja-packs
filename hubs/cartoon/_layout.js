@@ -8,15 +8,10 @@ function cartoonLayout() {
         feed: true,
         feedRails: CARTOON_FEED_RAILS.slice(),
         pageSize: 24,
+        // No pageBack: flat catalog — remote Back → nav rail.
         focus: {
           restore: 'latest',
           restoreMode: 'remembered',
-          pageBack: [
-            'episodes',
-            'popular',
-            'continue_watching',
-            'latest',
-          ],
         },
         widgets: [
           hubWithLoad(

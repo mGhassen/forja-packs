@@ -8,10 +8,10 @@ function brstejLayout() {
         feed: true,
         feedRails: BRSTEJ_FEED_RAILS.slice(),
         pageSize: 24,
+        // No pageBack: flat catalog — remote Back → nav rail.
         focus: {
           restore: 'latest',
           restoreMode: 'remembered',
-          pageBack: ['series', 'continue_watching', 'latest'],
         },
         widgets: [
           hubWithLoad(

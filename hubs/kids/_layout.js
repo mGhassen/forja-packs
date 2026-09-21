@@ -8,15 +8,10 @@ function kidsLayout() {
         feed: true,
         feedRails: KIDS_FEED_RAILS.slice(),
         pageSize: 24,
+        // No pageBack: flat catalog — remote Back → nav rail.
         focus: {
           restore: 'latest',
           restoreMode: 'remembered',
-          pageBack: [
-            'episodes',
-            'movies',
-            'continue_watching',
-            'latest',
-          ],
         },
         widgets: [
           hubWithLoad(

@@ -50,10 +50,11 @@ function arabicLayout() {
         feed: true,
         feedRails: ARABIC_FEED_RAILS.slice(),
         pageSize: 24,
+        // No pageBack: flat catalog — remote Back → nav rail.
+        // Vertical chain is pack focusUp/focusDown via `chain`.
         focus: {
           restore: 'latest',
           restoreMode: 'remembered',
-          pageBack: chain.slice().reverse(),
         },
         widgets: [
           hubWithLoad(
