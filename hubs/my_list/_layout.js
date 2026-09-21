@@ -40,6 +40,8 @@ function myListLayout() {
               kitList('grid', {
                 kindMenu: 'kind',
                 statusTab: 'status',
+                // ↑ from top-row posters → status tabs (status↓ already → grid).
+                focusUp: 'status',
                 emptyTitle: 'Nothing in this list yet',
                 emptyDescription:
                   'Open a title and tap + to set a watch status.',
