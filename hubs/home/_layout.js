@@ -1,17 +1,33 @@
 // Home hub page layout — widgets tree for action:'layout'.
 
 function tmdbLayout() {
-  var genreWidgets = tmdbPickGenreRows(3).map(function (g) {
+  // Visual D-pad chain (host skips missing/empty via kit-edge miss):
+  // featured → popular → continue_watching? → mood-chips → because-shuffle?
+  // → because → new_releases → genre_0 → genre_1 → genre_2
+  var genres = tmdbPickGenreRows(3);
+  var firstGenreId = genres.length > 0 ? 'genre_' + genres[0].id : null;
+  var genreWidgets = genres.map(function (g, i) {
+    var id = 'genre_' + g.id;
+    var edges = {};
+    if (i === 0) {
+      edges.focusUp = 'new_releases';
+    } else {
+      edges.focusUp = 'genre_' + genres[i - 1].id;
+    }
+    if (i + 1 < genres.length) {
+      edges.focusDown = 'genre_' + genres[i + 1].id;
+    }
     return hubWithLoad(
-      {
-        type: 'rail',
-        id: 'genre_' + g.id,
-        title: g.label,
-        rail: 'genre',
-        params: { genreRow: g.id },
-        // ↑ back to New Releases; further ↑ uses pageBack / sort walk.
-        focusUp: 'new_releases',
-      },
+      Object.assign(
+        {
+          type: 'rail',
+          id: id,
+          title: g.label,
+          rail: 'genre',
+          params: { genreRow: g.id },
+        },
+        edges,
+      ),
       'rail',
       { rail: 'genre', genreRow: g.id },
     );
@@ -89,7 +105,7 @@ function tmdbLayout() {
               style: 'numbered',
               maxPages: 2,
               focusUp: 'featured',
-              // Empty Continue → host kit-edge miss → walk to mood-chips.
+              // Empty Continue → host kit-edge miss → mood-chips.
               focusDown: 'continue_watching',
             },
             'rail',
@@ -109,7 +125,9 @@ function tmdbLayout() {
               title: "What's your mood?",
               options: TMDB_MOODS,
               // Host maps these onto mood-chips (not widget id `moods`).
+              // Empty Continue → host kit-edge miss → popular.
               focusUp: 'continue_watching',
+              // No shuffle → host kit-edge miss → because.
               focusDown: 'because-shuffle',
             },
             'rail',
@@ -120,19 +138,28 @@ function tmdbLayout() {
               type: 'because',
               id: 'because',
               rail: 'because',
+              // Host: when canShuffle, because ↑ lands on because-shuffle first;
+              // shuffle ↑ uses this pack edge (mood-chips).
               focusUp: 'mood-chips',
               focusDown: 'new_releases',
             },
             'rail',
             { rail: 'because' },
           ),
-          hubWithLoad({
-            type: 'rail',
-            id: 'new_releases',
-            title: 'New Releases',
-            rail: 'new_releases',
-            focusUp: 'because',
-          }, 'rail', { rail: 'new_releases' }),
+          hubWithLoad(
+            Object.assign(
+              {
+                type: 'rail',
+                id: 'new_releases',
+                title: 'New Releases',
+                rail: 'new_releases',
+                focusUp: 'because',
+              },
+              firstGenreId ? { focusDown: firstGenreId } : {},
+            ),
+            'rail',
+            { rail: 'new_releases' },
+          ),
         ].concat(genreWidgets),
       },
     },

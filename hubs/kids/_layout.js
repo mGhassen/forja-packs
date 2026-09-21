@@ -8,6 +8,16 @@ function kidsLayout() {
         feed: true,
         feedRails: KIDS_FEED_RAILS.slice(),
         pageSize: 24,
+        focus: {
+          restore: 'latest',
+          restoreMode: 'remembered',
+          pageBack: [
+            'episodes',
+            'movies',
+            'continue_watching',
+            'latest',
+          ],
+        },
         widgets: [
           hubWithLoad(
             {
@@ -20,7 +30,12 @@ function kidsLayout() {
             'rail',
             { rail: 'spotlight' },
           ),
-          { type: 'continue', id: 'continue_watching' },
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            focusUp: 'latest',
+            focusDown: 'movies',
+          },
           hubWithLoad({
             type: 'rail',
             id: 'latest',
@@ -28,6 +43,7 @@ function kidsLayout() {
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'portrait',
+            focusDown: 'continue_watching',
           }, 'rail', { rail: 'latest' }),
           hubWithLoad({
             type: 'rail',
@@ -35,6 +51,8 @@ function kidsLayout() {
             title: 'أفلام جديدة',
             rail: 'movies',
             aspect: 'portrait',
+            focusUp: 'continue_watching',
+            focusDown: 'episodes',
           }, 'rail', { rail: 'movies' }),
           hubWithLoad({
             type: 'rail',
@@ -42,6 +60,7 @@ function kidsLayout() {
             title: 'الحلقات الجديدة',
             rail: 'episodes',
             aspect: 'portrait',
+            focusUp: 'movies',
           }, 'rail', { rail: 'episodes' }),
         ],
       },

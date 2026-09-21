@@ -1,6 +1,48 @@
 // Arabic hub page layout — widgets tree for action:'layout'.
 
 function arabicLayout() {
+  // Visual order under the hero bleed (`latest`).
+  var chain = [
+    'latest',
+    'continue_watching',
+    'series',
+    'movies',
+    'turkish',
+    'foreign_series',
+    'foreign_movies',
+    'indian_series',
+    'indian',
+    'asian_series',
+    'asian_movies',
+    'anime_series',
+    'anime_movies',
+    'dubbed',
+    'turkish_movies',
+    'ramadan',
+    'tv_programs',
+    'plays',
+  ];
+
+  function edges(id) {
+    var i = chain.indexOf(id);
+    var out = {};
+    if (i > 0) out.focusUp = chain[i - 1];
+    if (i >= 0 && i + 1 < chain.length) out.focusDown = chain[i + 1];
+    return out;
+  }
+
+  function rail(id, title, extra) {
+    return hubWithLoad(
+      Object.assign(
+        { type: 'rail', id: id, title: title, rail: id },
+        edges(id),
+        extra || {},
+      ),
+      'rail',
+      { rail: id },
+    );
+  }
+
   return {
     dir: 'rtl',
     pages: {
@@ -8,6 +50,11 @@ function arabicLayout() {
         feed: true,
         feedRails: ARABIC_FEED_RAILS.slice(),
         pageSize: 24,
+        focus: {
+          restore: 'latest',
+          restoreMode: 'remembered',
+          pageBack: chain.slice().reverse(),
+        },
         widgets: [
           hubWithLoad(
             {
@@ -20,95 +67,27 @@ function arabicLayout() {
             'rail',
             { rail: 'trending' },
           ),
-          hubWithLoad({
-            type: 'rail',
-            id: 'latest',
-            title: 'أخر الاضافات',
-            rail: 'latest',
-            hideWhenBleed: true,
-          }, 'rail', { rail: 'latest' }),
-          { type: 'continue', id: 'continue_watching' },
-          hubWithLoad({
-            type: 'rail',
-            id: 'series',
-            title: 'مسلسلات عربية',
-            rail: 'series',
-          }, 'rail', { rail: 'series' }),
-          hubWithLoad({ type: 'rail', id: 'movies', title: 'أفلام عربية', rail: 'movies' }, 'rail', { rail: 'movies' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'turkish',
-            title: 'مسلسلات تركية',
-            rail: 'turkish',
-          }, 'rail', { rail: 'turkish' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'foreign_series',
-            title: 'مسلسلات أجنبية',
-            rail: 'foreign_series',
-          }, 'rail', { rail: 'foreign_series' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'foreign_movies',
-            title: 'أفلام أجنبية',
-            rail: 'foreign_movies',
-          }, 'rail', { rail: 'foreign_movies' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'indian_series',
-            title: 'مسلسلات هندية',
-            rail: 'indian_series',
-          }, 'rail', { rail: 'indian_series' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'indian',
-            title: 'أفلام هندية',
-            rail: 'indian',
-          }, 'rail', { rail: 'indian' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'asian_series',
-            title: 'مسلسلات آسيوية',
-            rail: 'asian_series',
-          }, 'rail', { rail: 'asian_series' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'asian_movies',
-            title: 'أفلام آسيوية',
-            rail: 'asian_movies',
-          }, 'rail', { rail: 'asian_movies' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'anime_series',
-            title: 'أنمي · مسلسلات',
-            rail: 'anime_series',
-          }, 'rail', { rail: 'anime_series' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'anime_movies',
-            title: 'أنمي · أفلام',
-            rail: 'anime_movies',
-          }, 'rail', { rail: 'anime_movies' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'dubbed',
-            title: 'أفلام مدبلجة',
-            rail: 'dubbed',
-          }, 'rail', { rail: 'dubbed' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'turkish_movies',
-            title: 'أفلام تركية',
-            rail: 'turkish_movies',
-          }, 'rail', { rail: 'turkish_movies' }),
-          hubWithLoad({ type: 'rail', id: 'ramadan', title: 'رمضان 2026', rail: 'ramadan' }, 'rail', { rail: 'ramadan' }),
-          hubWithLoad({
-            type: 'rail',
-            id: 'tv_programs',
-            title: 'برامج تلفزيونية',
-            rail: 'tv_programs',
-          }, 'rail', { rail: 'tv_programs' }),
-          hubWithLoad({ type: 'rail', id: 'plays', title: 'مسرحيات', rail: 'plays' }, 'rail', { rail: 'plays' }),
+          rail('latest', 'أخر الاضافات', { hideWhenBleed: true }),
+          Object.assign(
+            { type: 'continue', id: 'continue_watching' },
+            edges('continue_watching'),
+          ),
+          rail('series', 'مسلسلات عربية'),
+          rail('movies', 'أفلام عربية'),
+          rail('turkish', 'مسلسلات تركية'),
+          rail('foreign_series', 'مسلسلات أجنبية'),
+          rail('foreign_movies', 'أفلام أجنبية'),
+          rail('indian_series', 'مسلسلات هندية'),
+          rail('indian', 'أفلام هندية'),
+          rail('asian_series', 'مسلسلات آسيوية'),
+          rail('asian_movies', 'أفلام آسيوية'),
+          rail('anime_series', 'أنمي · مسلسلات'),
+          rail('anime_movies', 'أنمي · أفلام'),
+          rail('dubbed', 'أفلام مدبلجة'),
+          rail('turkish_movies', 'أفلام تركية'),
+          rail('ramadan', 'رمضان 2026'),
+          rail('tv_programs', 'برامج تلفزيونية'),
+          rail('plays', 'مسرحيات'),
         ],
       },
     },

@@ -8,6 +8,11 @@ function brstejLayout() {
         feed: true,
         feedRails: BRSTEJ_FEED_RAILS.slice(),
         pageSize: 24,
+        focus: {
+          restore: 'latest',
+          restoreMode: 'remembered',
+          pageBack: ['series', 'continue_watching', 'latest'],
+        },
         widgets: [
           hubWithLoad(
             {
@@ -26,8 +31,14 @@ function brstejLayout() {
             title: 'أخر الاضافات',
             rail: 'latest',
             hideWhenBleed: true,
+            focusDown: 'continue_watching',
           }, 'rail', { rail: 'latest' }),
-          { type: 'continue', id: 'continue_watching' },
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            focusUp: 'latest',
+            focusDown: 'series',
+          },
           hubWithLoad(
             {
               type: 'ranked',
@@ -35,6 +46,7 @@ function brstejLayout() {
               title: 'مسلسلات',
               rail: 'series',
               style: 'numbered',
+              focusUp: 'continue_watching',
             },
             'rail',
             { rail: 'series' },

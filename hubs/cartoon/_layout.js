@@ -8,6 +8,16 @@ function cartoonLayout() {
         feed: true,
         feedRails: CARTOON_FEED_RAILS.slice(),
         pageSize: 24,
+        focus: {
+          restore: 'latest',
+          restoreMode: 'remembered',
+          pageBack: [
+            'episodes',
+            'popular',
+            'continue_watching',
+            'latest',
+          ],
+        },
         widgets: [
           hubWithLoad(
             {
@@ -20,7 +30,12 @@ function cartoonLayout() {
             'rail',
             { rail: 'spotlight' },
           ),
-          { type: 'continue', id: 'continue_watching' },
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            focusUp: 'latest',
+            focusDown: 'popular',
+          },
           hubWithLoad({
             type: 'rail',
             id: 'latest',
@@ -28,6 +43,7 @@ function cartoonLayout() {
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'portrait',
+            focusDown: 'continue_watching',
           }, 'rail', { rail: 'latest' }),
           hubWithLoad(
             {
@@ -36,6 +52,8 @@ function cartoonLayout() {
               title: 'الأكثر حلقات',
               rail: 'popular',
               aspect: 'portrait',
+              focusUp: 'continue_watching',
+              focusDown: 'episodes',
             },
             'rail',
             { rail: 'popular' },
@@ -46,6 +64,7 @@ function cartoonLayout() {
             title: 'أحدث الحلقات',
             rail: 'episodes',
             aspect: 'portrait',
+            focusUp: 'popular',
           }, 'rail', { rail: 'episodes' }),
         ],
       },
