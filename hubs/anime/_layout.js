@@ -16,25 +16,12 @@ function anilistLayout() {
       anime: {
         feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
-        // TV D-pad — same contract as Home / IPTV.
+        // TV D-pad — vertical chain is pack focusUp/focusDown.
+        // No pageBack: flat catalog — remote Back → nav rail.
         // enter omitted: hero View details owns first land (defaultFocus).
         focus: {
           restore: 'trending',
           restoreMode: 'remembered',
-          pageBack: [
-            'latest_completed',
-            'most_favorited',
-            'top_rated',
-            'latest_episodes',
-            'popular',
-            'top_10',
-            'top_airing',
-            'this_season',
-            'mood-results',
-            'mood-chips',
-            'continue_watching',
-            'trending',
-          ],
         },
         widgets: [
           hubWithLoad(

@@ -13,18 +13,12 @@ function kisskhLayout() {
           'upcoming',
         ],
         pageSize: 24,
-        // TV D-pad — same contract as Home / IPTV.
+        // TV D-pad — vertical chain is pack focusUp/focusDown.
+        // No pageBack: flat catalog — remote Back → nav rail.
         // enter omitted: hero View details owns first land (defaultFocus).
         focus: {
           restore: 'latest',
           restoreMode: 'remembered',
-          pageBack: [
-            'upcoming',
-            'popular',
-            'trending',
-            'continue_watching',
-            'latest',
-          ],
         },
         widgets: [
           hubWithLoad(

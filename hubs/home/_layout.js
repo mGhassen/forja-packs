@@ -45,22 +45,12 @@ function tmdbLayout() {
         feedRails: ['spotlight', 'featured', 'popular'],
         pageSize: TMDB_HOME_RAIL_CAP,
         maxPages: 4,
-        // TV D-pad — same contract as IPTV / Live Sports.
+        // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
+        // No pageBack: flat catalog — remote Back leaves the page to the
+        // nav rail (same as shell tab-root). Keep pageBack for real panes
+        // (IPTV items→cats, My List grid→status→kind).
         // enter / restore omitted: hero View details owns first land
         // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
-        // pageBack: leaf → outer; missing/empty rows skip via _rowActive.
-        focus: {
-          pageBack: [
-            'new_releases',
-            'because',
-            'because-shuffle',
-            'mood-results',
-            'mood-chips',
-            'continue_watching',
-            'popular',
-            'featured',
-          ],
-        },
         widgets: [
           {
             type: 'vertical_filters',
@@ -96,6 +86,9 @@ function tmdbLayout() {
             title: 'Featured This Month',
             rail: 'featured',
             hideWhenBleed: true,
+            // First catalog row ↑ → top menu (Search / Films), not hero CTAs.
+            // Menu ↓ still lands on View details via host focusHero.
+            focusUp: 'top-bar',
             focusDown: 'popular',
           }, 'rail', { rail: 'featured' }),
           hubWithLoad(
