@@ -18,7 +18,7 @@ var MY_LIST_STATUS_TABS = [
 function myListLayout() {
   return {
     pages: {
-      mylist: {
+      my_list: {
         focus: {
           enter: 'kind',
           restore: 'kind',
