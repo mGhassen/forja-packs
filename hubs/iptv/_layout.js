@@ -102,7 +102,8 @@ function iptvLayout() {
               source: 'iptv',
               orientation: 'vertical',
               // Vertical panels: ↑/↓ stay in cats; → enters channels (not ↓).
-              focusUp: 'chrome',
+              // ↑ → selected Live/Movies/Series shelf (not bare chrome row).
+              focusUp: 'catalog',
               focusRight: 'items',
               // Always-open field above categories — compact shell only.
               search: {
@@ -121,11 +122,11 @@ function iptvLayout() {
               kitList('items', {
                 style: 'grid',
                 expand: true,
-                // ← categories; ↑ top-row halves → shelf / Portals chip;
+                // ← categories; ↑ top-row halves → selected shelf / Portals chip;
                 // → remembered portal when the panel row is mounted.
                 focusLeft: 'cats',
-                focusUpLeft: 'chrome',
-                focusUpRight: 'chrome',
+                focusUpLeft: 'catalog',
+                focusUpRight: 'portals',
                 focusRight: 'portals',
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
