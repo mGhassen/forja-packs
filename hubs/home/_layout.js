@@ -86,9 +86,9 @@ function tmdbLayout() {
             title: 'Featured This Month',
             rail: 'featured',
             hideWhenBleed: true,
-            // First catalog row ↑ → top menu (Search / Films), not hero CTAs.
-            // Menu ↓ still lands on View details via host focusHero.
-            focusUp: 'top-bar',
+            // First catalog row ↑ → View details (host hero-details / focusHero).
+            // Gallery ↑ still reaches the top menu; menu ↓ lands on View details.
+            focusUp: 'hero-details',
             focusDown: 'popular',
           }, 'rail', { rail: 'featured' }),
           hubWithLoad(
