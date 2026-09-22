@@ -119,6 +119,8 @@
       "entry": "kisskh.js",
       "prelude": "_kisskh_kkey.js",
       "types": [
+        "movie",
+        "tv",
         "drama"
       ],
       "kind": "http",

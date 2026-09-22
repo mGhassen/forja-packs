@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.61",
+  "version": "1.0.64",
   "tags": [
     "home",
     "movies",
@@ -32,7 +32,8 @@
         "search_helpers",
         "structured_search",
         "filters",
-        "details"
+        "details",
+        "settings"
       ],
       "nav": {
         "label": "Home",
@@ -41,6 +42,29 @@
         "page": {
           "action": "layout"
         }
+      },
+      "settings": {
+        "group": "Details",
+        "order": 20,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ]
       },
       "config": {
         "base": "https://tmdb.forjahq.xyz/3",
