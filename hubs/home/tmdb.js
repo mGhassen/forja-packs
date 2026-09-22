@@ -335,6 +335,9 @@ function tmdbListPool(ctx, cfg, params, railId) {
 }
 
 function tmdbHomeFeed(ctx, cfg, params) {
+  // Boot prefetch / legacy callers. First paint on the host fans out
+  // action:'rail' per feedRails id and publishes each slice as it lands
+  // (Spotlight must not wait on a hung Popular).
   var ids = TMDB_FEED_CLAIM.map(function (s) {
     return s.id;
   });
