@@ -318,10 +318,10 @@ function tmdbListPool(ctx, cfg, params, railId) {
     railId === 'spotlight' || railId === 'popular' || railId === 'new_releases';
   var pageNums = preserveRank
     ? (function () {
-        var fixed = [];
-        for (var fp = 1; fp <= TMDB_HOME_FETCH_PAGES; fp++) fixed.push(fp);
-        return fixed;
-      })()
+      var fixed = [];
+      for (var fp = 1; fp <= TMDB_HOME_FETCH_PAGES; fp++) fixed.push(fp);
+      return fixed;
+    })()
     : tmdbPickFetchPages(railId, TMDB_HOME_FETCH_PAGES, TMDB_HOME_ROTATE_MAX_PAGE);
   var pages = [];
   var pi;
@@ -381,11 +381,11 @@ function tmdbHomeFeed(ctx, cfg, params) {
         painted[rid] =
           rid === 'spotlight'
             ? list.map(function (m) {
-                return hubPaintHero(m);
-              })
+              return hubPaintHero(m);
+            })
             : list.map(function (m) {
-                return hubPaintPoster(m);
-              });
+              return hubPaintPoster(m);
+            });
       }
       return hubOk(
         'feed',
@@ -407,7 +407,7 @@ var TMDB_GENRE_ROWS = [
   { id: 'family', label: 'Family', movieGenres: [10751], tvGenres: [10751] },
   { id: 'fantasy', label: 'Fantasy', movieGenres: [14], tvGenres: [10765] },
   // TMDB has no Game Show genre — keyword 4325 (game-show).
-  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [], keywords: [4325] },
+  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [10768] },
   { id: 'horror', label: 'Horror', movieGenres: [27], tvGenres: [9648] },
   { id: 'music', label: 'Music', movieGenres: [10402], tvGenres: [10402] },
   { id: 'mystery', label: 'Mystery', movieGenres: [9648], tvGenres: [9648] },
@@ -851,7 +851,7 @@ function tmdbAttachLogos(ctx, cfg, items, limit) {
               }
             }
           })
-          .catch(function () {}),
+          .catch(function () { }),
       );
     })(i);
   }
@@ -1399,8 +1399,8 @@ function tmdbDetailsMediaType(params, typeFromId) {
   if (fromId === 'movie' || fromId === 'tv') return fromId;
   var hint = String(
     (params && params.mediaType) ||
-      (params && params.extract && params.extract.resolveType) ||
-      '',
+    (params && params.extract && params.extract.resolveType) ||
+    '',
   ).toLowerCase();
   if (hint === 'series') hint = 'tv';
   if (hint === 'movie' || hint === 'tv') return hint;
@@ -1918,20 +1918,20 @@ function tmdbStructuredSearch(ctx, cfg, params) {
   var parsed = trimmed
     ? tmdbParseSearchQuery(trimmed)
     : {
-        raw: '',
-        remainder: '',
-        year: null,
-        yearStart: null,
-        yearEnd: null,
-        movieGenreIds: [],
-        tvGenreIds: [],
-        matchedGenreLabel: null,
-        mediaType: null,
-        minScore: null,
-        maxScore: null,
-        originCountry: null,
-        originalLanguage: null,
-      };
+      raw: '',
+      remainder: '',
+      year: null,
+      yearStart: null,
+      yearEnd: null,
+      movieGenreIds: [],
+      tvGenreIds: [],
+      matchedGenreLabel: null,
+      mediaType: null,
+      minScore: null,
+      maxScore: null,
+      originCountry: null,
+      originalLanguage: null,
+    };
   var typeFilter = hubFilterValue(filter, 'type');
   if (typeFilter === 'movie' || typeFilter === 'tv') {
     parsed.mediaType = typeFilter;
@@ -2183,8 +2183,8 @@ function extract(ctx) {
         var painted =
           railId === 'spotlight'
             ? withLogos.map(function (m) {
-                return hubPaintHero(m);
-              })
+              return hubPaintHero(m);
+            })
             : withLogos;
         return hubItems(
           'rail',
