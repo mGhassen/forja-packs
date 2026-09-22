@@ -68,17 +68,18 @@ function anilistHelperTitleItems(titles) {
   return hubItems('search_helpers', items, { maxAge: 900, swr: 3600 });
 }
 
-function anilistHelperTitlesFromMedia(list) {
+function anilistHelperTitlesFromMedia(list, preferred) {
   var out = [];
   var rows = Array.isArray(list) ? list : [];
   for (var i = 0; i < rows.length; i++) {
-    var meta = anilistMeta(rows[i]);
+    var meta = anilistMeta(rows[i], preferred);
     if (meta && meta.name) out.push(meta.name);
   }
   return out;
 }
 
 function anilistHelperPage(ctx, cfg, sort) {
+  var preferred = anilistTitleLang(cfg);
   var query =
     'query ($page: Int, $perPage: Int, $sort: [MediaSort]) {' +
     '  Page(page: $page, perPage: $perPage) {' +
@@ -93,7 +94,7 @@ function anilistHelperPage(ctx, cfg, sort) {
     sort: sort,
   }).then(function (data) {
     var media = (data && data.Page && data.Page.media) || [];
-    return anilistHelperTitlesFromMedia(media);
+    return anilistHelperTitlesFromMedia(media, preferred);
   });
 }
 
@@ -155,7 +156,8 @@ function anilistSearchHelpersContextual(ctx, cfg, params, seed) {
     .then(function (data) {
       var media = data && data.Media ? data.Media : null;
       if (!media) return anilistSearchHelpersIdle(ctx, cfg, params);
-      var recs = anilistRecommendationsFromMedia(media);
+      var preferred = anilistTitleLang(cfg);
+      var recs = anilistRecommendationsFromMedia(media, preferred);
       var recTitles = [];
       for (var i = 0; i < recs.length; i++) {
         if (recs[i] && recs[i].name) recTitles.push(recs[i].name);

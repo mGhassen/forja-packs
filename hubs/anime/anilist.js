@@ -122,16 +122,31 @@ var ANILIST_MOODS = [
   { id: 'horror', label: 'Horror', genre: 'Horror', icon: 'bedtime', accent: '#7C3AED' },
 ];
 
-function anilistTitle(t) {
+function anilistTitleLang(cfg) {
+  var raw = String((cfg && cfg.titleLanguage) || 'romaji')
+    .trim()
+    .toLowerCase();
+  if (raw === 'english' || raw === 'native' || raw === 'romaji') return raw;
+  return 'romaji';
+}
+
+function anilistTitle(t, preferred) {
   if (!t) return '';
-  return String(t.romaji || t.english || t.native || '').trim();
+  var pref = String(preferred || 'romaji').trim().toLowerCase();
+  var romaji = String(t.romaji || '').trim();
+  var english = String(t.english || '').trim();
+  var native = String(t.native || '').trim();
+  if (pref === 'english') return english || romaji || native;
+  if (pref === 'native') return native || romaji || english;
+  return romaji || english || native;
 }
 
 function anilistTmdbSearchTitle(m) {
-  if (!m || !m.title) return anilistTitle(m && m.title);
+  // TMDB match prefers English then romaji — independent of display language.
+  if (!m || !m.title) return '';
   var english = String(m.title.english || '').trim();
   var romaji = String(m.title.romaji || '').trim();
-  return english || romaji || anilistTitle(m.title);
+  return english || romaji || anilistTitle(m.title, 'romaji');
 }
 
 function anilistCardMeta(m) {
@@ -150,9 +165,9 @@ function anilistAbsUrl(raw) {
   return u;
 }
 
-function anilistMeta(m) {
+function anilistMeta(m, preferred) {
   if (!m || !m.id) return null;
-  var name = anilistTitle(m.title);
+  var name = anilistTitle(m.title, preferred);
   if (!name) return null;
   var cover = m.coverImage || {};
   var ids = { anilist: String(m.id) };
@@ -278,7 +293,7 @@ function anilistStaffFromMedia(m) {
   return out;
 }
 
-function anilistRelatedFromMedia(m) {
+function anilistRelatedFromMedia(m, preferred) {
   var edges =
     m &&
     m.relations &&
@@ -298,7 +313,7 @@ function anilistRelatedFromMedia(m) {
     var id = Number(node.id);
     if (!(id > 0) || seen[id]) continue;
     seen[id] = true;
-    var meta = anilistMeta(node);
+    var meta = anilistMeta(node, preferred);
     if (!meta) continue;
     meta.relationType = type;
     out.push(meta);
@@ -312,7 +327,7 @@ function anilistRelatedFromMedia(m) {
   return out;
 }
 
-function anilistRecommendationsFromMedia(m) {
+function anilistRecommendationsFromMedia(m, preferred) {
   var nodes =
     m &&
     m.recommendations &&
@@ -330,7 +345,7 @@ function anilistRecommendationsFromMedia(m) {
     var id = Number(node.id);
     if (!(id > 0) || seen[id]) continue;
     seen[id] = true;
-    var meta = anilistMeta(node);
+    var meta = anilistMeta(node, preferred);
     if (!meta) continue;
     out.push(meta);
   }
@@ -395,10 +410,10 @@ function anilistQuery(ctx, cfg, query, variables) {
     });
 }
 
-function anilistRailItemsFromList(railId, list) {
+function anilistRailItemsFromList(railId, list, preferred) {
   var out = [];
   for (var i = 0; i < list.length; i++) {
-    var meta = anilistMeta(list[i]);
+    var meta = anilistMeta(list[i], preferred);
     if (!meta) continue;
     if (railId === 'spotlight') {
       var st = String(meta.status || '').toUpperCase();
@@ -408,7 +423,7 @@ function anilistRailItemsFromList(railId, list) {
   }
   if (railId === 'spotlight' && !out.length) {
     for (var j = 0; j < list.length; j++) {
-      var m2 = anilistMeta(list[j]);
+      var m2 = anilistMeta(list[j], preferred);
       if (m2) out.push(m2);
     }
   }
@@ -417,7 +432,7 @@ function anilistRailItemsFromList(railId, list) {
   return out;
 }
 
-function anilistAiringItemsFromSchedules(schedules, params, limit) {
+function anilistAiringItemsFromSchedules(schedules, params, limit, preferred) {
   var genre = hubFilterValue(params && params.filter, 'genre');
   var format = hubFilterValue(params && params.filter, 'format');
   var formatNot = hubFilterValue(params && params.filter, 'format_not');
@@ -446,7 +461,7 @@ function anilistAiringItemsFromSchedules(schedules, params, limit) {
       if (!hit) continue;
     }
     seen[m.id] = true;
-    var meta = anilistMeta(m);
+    var meta = anilistMeta(m, preferred);
     if (!meta) continue;
     var ep = Number(row.episode);
     if (ep > 0) {
@@ -534,6 +549,7 @@ function anilistFeedVariables(params) {
 }
 
 function anilistFeed(ctx, cfg, params) {
+  var preferred = anilistTitleLang(cfg);
   return anilistQuery(ctx, cfg, anilistFeedQuery(cfg, params), anilistFeedVariables(params))
     .then(function (data) {
       var rails = {};
@@ -548,9 +564,14 @@ function anilistFeed(ctx, cfg, params) {
             page.airingSchedules || [],
             params,
             perPage,
+            preferred,
           );
         } else {
-          rails[railId] = anilistRailItemsFromList(railId, page.media || []);
+          rails[railId] = anilistRailItemsFromList(
+            railId,
+            page.media || [],
+            preferred,
+          );
         }
       }
       for (var aliasId in ANILIST_RAILS) {
@@ -569,6 +590,7 @@ function anilistFeed(ctx, cfg, params) {
 function anilistPage(ctx, cfg, params) {
   var railId = String(params.rail || 'trending');
   var spec = ANILIST_RAILS[railId] || ANILIST_RAILS.trending;
+  var preferred = anilistTitleLang(cfg);
   var genre = hubFilterValue(params.filter, 'genre');
   var format = hubFilterValue(params.filter, 'format');
   var formatNot = hubFilterValue(params.filter, 'format_not');
@@ -603,7 +625,12 @@ function anilistPage(ctx, cfg, params) {
       airTo: nowSec,
     }).then(function (data) {
       var schedules = (data.Page && data.Page.airingSchedules) || [];
-      return anilistAiringItemsFromSchedules(schedules, params, perPage);
+      return anilistAiringItemsFromSchedules(
+        schedules,
+        params,
+        perPage,
+        preferred,
+      );
     });
   }
 
@@ -638,7 +665,7 @@ function anilistPage(ctx, cfg, params) {
 
   return anilistQuery(ctx, cfg, query, variables).then(function (data) {
     var list = (data.Page && data.Page.media) || [];
-    return anilistRailItemsFromList(railId, list);
+    return anilistRailItemsFromList(railId, list, preferred);
   });
 }
 
@@ -649,13 +676,14 @@ function anilistDetails(ctx, cfg, params) {
       hubFail('details', 'INVALID_PARAMS', 'details needs params.id'),
     );
   }
+  var preferred = anilistTitleLang(cfg);
   var query =
     'query ($id: Int) { Media(id: $id, type: ANIME) { ' +
     ANILIST_DETAILS_FIELDS +
     ' } }';
   return anilistQuery(ctx, cfg, query, { id: id }).then(function (data) {
     var media = data.Media;
-    var meta = anilistMeta(media);
+    var meta = anilistMeta(media, preferred);
     if (!meta) return hubFail('details', 'NOT_FOUND', 'anime ' + id + ' not found');
     var videos = anilistVideosFromMedia(media);
     if (videos.length) meta.videos = videos;
@@ -663,8 +691,8 @@ function anilistDetails(ctx, cfg, params) {
     if (characters.length) meta.cast = characters;
     var staff = anilistStaffFromMedia(media);
     if (staff.length) meta.crew = staff;
-    var related = anilistRelatedFromMedia(media);
-    var recommendations = anilistRecommendationsFromMedia(media);
+    var related = anilistRelatedFromMedia(media, preferred);
+    var recommendations = anilistRecommendationsFromMedia(media, preferred);
     var payload = {
       meta: meta,
       layout: {
