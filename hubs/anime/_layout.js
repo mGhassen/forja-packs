@@ -17,8 +17,9 @@ function anilistLayout() {
         feed: true,
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
         // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
-        // Visual: trending → continue? → mood-chips → this_season → …
-        // Empty Continue: host kit-edge miss walks past.
+        // Visual: trending → continue? → mood-chips → mood-results?
+        // → this_season → …
+        // Empty Continue / empty mood posters: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
         // enter / restore omitted: hero View details owns first land
         // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
@@ -61,7 +62,8 @@ function anilistLayout() {
             focusDown: 'continue_watching',
           }),
           rail('this_season', 'This Season', {
-            focusUp: 'mood-chips',
+            // ↑ mood posters first, then chips (empty results → miss).
+            focusUp: 'mood-results',
             focusDown: 'top_airing',
           }),
           rail('top_airing', 'Top Airing', {

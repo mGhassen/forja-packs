@@ -2,12 +2,14 @@
 
 function tmdbLayout() {
   // Visual D-pad chain (host skips missing/empty via kit-edge miss):
-  // featured → popular → continue_watching? → mood-chips
+  // featured → popular → continue_watching? → mood-chips → mood-results?
   // → because-shuffle? → because (poster rail) → new_releases
   // → genre_0 → genre_1 → genre_2
-  // Empty Continue / empty Because (no seeds) / no shuffle: miss walks past.
+  // Empty Continue / empty Because (no seeds) / no shuffle / empty mood
+  // posters: miss walks past.
   // Pack names the because RAIL (`focusDown: 'because'`). Host ↓ prefers
   // `because-shuffle` chrome when that row is mounted.
+  // ↑ from shuffle/rail: mood-results (posters) then mood-chips.
   var genres = tmdbPickGenreRows(3);
   var firstGenreId = genres.length > 0 ? 'genre_' + genres[0].id : null;
   var genreWidgets = genres.map(function (g, i) {
@@ -137,9 +139,10 @@ function tmdbLayout() {
               rail: 'because',
               // Same home WatchHistoryService pool as Continue Watching.
               mergeHomeWatchHistory: true,
-              // Shuffle chrome ↑ uses this (mood-chips). Rail ↑ host→shuffle
+              // Shuffle chrome ↑ → mood posters, then chips. Empty mood
+              // results → kit-edge miss → mood-chips. Rail ↑ host→shuffle
               // when canShuffle; else this pack edge.
-              focusUp: 'mood-chips',
+              focusUp: 'mood-results',
               focusDown: 'new_releases',
             },
             'rail',
