@@ -1203,7 +1203,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (railId === 'popular') {
-    if (watchProviders || tmdbHasMoodFilter(filter)) {
+    if (watchProviders || tmdbHasMoodFilter(filter) || genres.length) {
       var popularQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -1256,7 +1256,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (typeFilter) {
-    if (watchProviders) {
+    if (watchProviders || genres.length) {
       var typedQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -1282,7 +1282,7 @@ function tmdbList(ctx, cfg, params) {
   if (!spec || !spec.path) {
     return Promise.reject(new Error('unknown rail ' + railId));
   }
-  if (watchProviders && railId === 'spotlight') {
+  if ((watchProviders || genres.length) && railId === 'spotlight') {
     var spotlightQ = {
       sort_by: 'popularity.desc',
       page: page,
