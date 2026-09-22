@@ -402,6 +402,14 @@ async function iptvFetchCatalogPage(ctx, portal, section, opts) {
     });
   }
   var kindFallback = wire === 'vod' ? 'vod' : wire;
+  var hitRaw = res.hitCategoryIds || res.hit_category_ids;
+  var hitCategoryIds = [];
+  if (Array.isArray(hitRaw)) {
+    for (var hi = 0; hi < hitRaw.length; hi++) {
+      var hid = String(hitRaw[hi] || '').trim();
+      if (hid) hitCategoryIds.push(hid);
+    }
+  }
   var out = {
     categories: iptvNormCategories(res.categories),
     streams: iptvNormStreams(res.streams, kindFallback),
@@ -409,6 +417,7 @@ async function iptvFetchCatalogPage(ctx, portal, section, opts) {
     pageSize: Number(res.pageSize || res.page_size) || body.page_size,
     total: Number(res.total) || 0,
     categoryId: String(res.categoryId || res.category_id || body.category_id || ''),
+    hitCategoryIds: hitCategoryIds,
   };
   return out;
 }

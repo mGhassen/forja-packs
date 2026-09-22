@@ -483,6 +483,12 @@ async function iptvFeed(ctx) {
     }
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
+    // Shelf-wide category ids that match `q` (host catalog_page) — category
+    // rail search filter; not limited to the current stream page.
+    var hitCats = catalog && catalog.hitCategoryIds;
+    if (Array.isArray(hitCats) && hitCats.length) {
+      env.data.hitCategoryIds = hitCats;
+    }
     // Portal active — never leave layout "Choose a portal".
     if (section === 'live' && filterCat === FAV) {
       env.data.emptyTitle = 'No favorites';
