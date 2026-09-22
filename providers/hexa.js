@@ -127,8 +127,12 @@ function extract(ctx) {
     .then(function (j) {
       var token = (validate(j) || {}).token;
       if (!token) {
-        ctx.error('hexa: no enc token');
-        return null;
+        var detail =
+          (j && (j.error || j.hint || j.result)) ||
+          (j && j.status != null ? 'status ' + j.status : 'no token');
+        ctx.error('hexa: enc-hexa failed (' + detail + ')');
+        // Cap token is required; stop before the images call so logs stay one-shot.
+        return Promise.reject({ __hexaSilent: true });
       }
       apiHeaders['X-Cap-Token'] = token;
       return ctx.fetch(api + path, { headers: apiHeaders }).then(function (r) {
@@ -157,13 +161,17 @@ function extract(ctx) {
         .then(function (dj) {
           var payload = validate(dj);
           if (!payload) {
-            ctx.error('hexa: decrypt failed');
+            var detail =
+              (dj && (dj.error || dj.hint)) ||
+              (dj && dj.status != null ? 'status ' + dj.status : 'no payload');
+            ctx.error('hexa: decrypt failed (' + detail + ')');
             return [];
           }
           return rowsFromPayload(payload);
         });
     })
     .catch(function (e) {
+      if (e && e.__hexaSilent) return [];
       ctx.error(e && e.message ? e.message : e);
       return [];
     });
