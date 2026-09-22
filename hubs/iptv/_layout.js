@@ -84,10 +84,10 @@ function iptvLayout() {
   return {
     pages: {
       iptv: {
-        // TV: nav OK/→ land on category rail; Back: channels → cats → shell.
+        // TV: nav OK/→ land on last selected category; Back: channels → cats → shell.
         focus: {
-          enter: 'items',
-          restore: 'items',
+          enter: 'cats',
+          restore: 'cats',
           restoreMode: 'remembered',
           pageBack: ['items', 'cats'],
         },
@@ -122,11 +122,11 @@ function iptvLayout() {
               kitList('items', {
                 style: 'grid',
                 expand: true,
-                // ← categories; ↑ top-row halves → selected shelf / Portals chip;
+                // ← categories; ↑ selected Live/Movies/Series (host splits
+                // left/right of the viewport: left = shelf, right = Portals);
                 // → remembered portal when the panel row is mounted.
                 focusLeft: 'cats',
-                focusUpLeft: 'catalog',
-                focusUpRight: 'portals',
+                focusUp: 'catalog',
                 focusRight: 'portals',
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
