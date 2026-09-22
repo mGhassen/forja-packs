@@ -484,14 +484,24 @@ async function iptvFeed(ctx) {
     var env = hubItems('feed', items, null, paging)[0];
     if (kinds.length) env.data.kinds = kinds;
     // Portal active — never leave layout "Choose a portal".
-    if (section === 'movies') {
+    if (section === 'live' && filterCat === FAV) {
+      env.data.emptyTitle = 'No favorites';
+      env.data.emptyDescription =
+        'Star a live channel to keep it here.';
+    } else if (section === 'live' && filterCat === WATCHED) {
+      env.data.emptyTitle = 'Nothing watched yet';
+      env.data.emptyDescription =
+        'Channels you play on Live land here (last 30).';
+    } else if (section === 'movies') {
       env.data.emptyTitle = 'No movies';
+      env.data.emptyDescription = 'Nothing in this category.';
     } else if (section === 'series') {
       env.data.emptyTitle = 'No series';
+      env.data.emptyDescription = 'Nothing in this category.';
     } else {
       env.data.emptyTitle = 'No channels';
+      env.data.emptyDescription = 'Nothing in this category.';
     }
-    env.data.emptyDescription = 'Nothing in this category.';
     return [env];
   } catch (e) {
     return hubFail('feed', 'UPSTREAM', String((e && e.message) || e), true);
