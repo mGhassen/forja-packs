@@ -140,6 +140,22 @@ function tmdbHasMoodFilter(filter) {
   return !!hubFilterValue(filter, 'mood');
 }
 
+function tmdbMoodHasKeywords(filter) {
+  return (
+    tmdbKeywordsForDiscover(filter, 'tv').length > 0 ||
+    tmdbKeywordsForDiscover(filter, 'movie').length > 0
+  );
+}
+
+// Chrome mood / genre / provider — must use discover, not trending lists.
+function tmdbFilterNeedsDiscover(filter, genres) {
+  return (
+    !!tmdbWatchProviderQuery(filter) ||
+    tmdbHasMoodFilter(filter) ||
+    (genres && genres.length > 0)
+  );
+}
+
 function tmdbFilterWithoutMood(filter) {
   if (!filter || typeof filter !== 'object') return filter;
   var op = String(filter.op || '');
@@ -412,8 +428,9 @@ var TMDB_GENRE_ROWS = [
   { id: 'drama', label: 'Drama', movieGenres: [18], tvGenres: [18] },
   { id: 'family', label: 'Family', movieGenres: [10751], tvGenres: [10751] },
   { id: 'fantasy', label: 'Fantasy', movieGenres: [14], tvGenres: [10765] },
-  // TMDB has no Game Show genre — keyword OR set (pipe-joined in discover).
-  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [], keywords: [4325 | 6784 | 160311 | 250845] },
+  // TMDB has no Game Show genre — list keyword ids with commas; discover joins with |.
+  // Do NOT write `4325 | 6784` here — `|` is JS bitwise OR and collapses to one id.
+  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [], keywords: [4325, 6784, 160311, 250845] },
   { id: 'horror', label: 'Horror', movieGenres: [27], tvGenres: [9648] },
   { id: 'music', label: 'Music', movieGenres: [10402], tvGenres: [10402] },
   { id: 'mystery', label: 'Mystery', movieGenres: [9648], tvGenres: [9648] },
@@ -1045,6 +1062,9 @@ function tmdbFeaturedForPage(
 ) {
   var win = tmdbMonthWindow();
   var hasProvider = !!watchProviders;
+  // Keyword categories (Game Show, …): first_air_date is the show premiere,
+  // not "aired this month" — Jeopardy! etc. never match the month window.
+  var skipMonthWindow = tmdbMoodHasKeywords(filter);
 
   function loadFeatured(dateGte, dateLte, minRating) {
     var movieQ = { sort_by: 'popularity.desc', page: page };
@@ -1060,6 +1080,10 @@ function tmdbFeaturedForPage(
       tvQ['vote_average.gte'] = minRating;
     }
     return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit);
+  }
+
+  if (skipMonthWindow) {
+    return loadFeatured(null, null, null);
   }
 
   return loadFeatured(win.gte, win.lte, hasProvider ? null : 6).then(function (month) {
@@ -1096,7 +1120,7 @@ function tmdbNewReleasesForPage(
   };
   return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit).then(
     function (discover) {
-      if (watchProviders || typeFilter) {
+      if (watchProviders || typeFilter || tmdbHasMoodFilter(filter)) {
         return tmdbSortMetasByReleaseDesc(discover);
       }
       return Promise.all([
@@ -1203,7 +1227,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (railId === 'popular') {
-    if (watchProviders || tmdbHasMoodFilter(filter) || genres.length) {
+    if (tmdbFilterNeedsDiscover(filter, genres)) {
       var popularQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -1256,7 +1280,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (typeFilter) {
-    if (watchProviders || genres.length) {
+    if (tmdbFilterNeedsDiscover(filter, genres)) {
       var typedQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -1282,29 +1306,13 @@ function tmdbList(ctx, cfg, params) {
   if (!spec || !spec.path) {
     return Promise.reject(new Error('unknown rail ' + railId));
   }
-  if ((watchProviders || genres.length) && railId === 'spotlight') {
+  if (tmdbFilterNeedsDiscover(filter, genres) && railId === 'spotlight') {
     var spotlightQ = {
       sort_by: 'popularity.desc',
       page: page,
       'vote_count.gte': 50,
     };
     return tmdbFetchMixed(ctx, cfg, filter, typeFilter, spotlightQ, spotlightQ, limit);
-  }
-  if (tmdbHasMoodFilter(filter) && railId === 'spotlight') {
-    var moodSpotlightQ = {
-      sort_by: 'popularity.desc',
-      page: page,
-      'vote_count.gte': 50,
-    };
-    return tmdbFetchMixed(
-      ctx,
-      cfg,
-      filter,
-      typeFilter,
-      moodSpotlightQ,
-      moodSpotlightQ,
-      limit,
-    );
   }
   return tmdbGet(ctx, cfg, spec.path, { page: page }).then(function (json) {
     return tmdbMetas(cfg, json, spec.type, limit);
