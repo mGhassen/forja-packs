@@ -173,6 +173,7 @@ function tmdbGenresForDiscover(filter, mediaType) {
 }
 
 // Optional pack keywords on genre / mood specs (TMDB with_keywords).
+// Pipe = OR (any keyword). Comma would be AND (must match every id).
 function tmdbKeywordsForDiscover(filter, mediaType) {
   var moodId = hubFilterValue(filter, 'mood');
   if (!moodId) return [];
@@ -185,6 +186,11 @@ function tmdbKeywordsForDiscover(filter, mediaType) {
   return (ids || []).map(String);
 }
 
+function tmdbKeywordsQuery(ids) {
+  if (!ids || !ids.length) return '';
+  return ids.map(String).join('|');
+}
+
 function tmdbDiscoverMovie(ctx, cfg, query, filter) {
   var q = Object.assign({ include_adult: 'false' }, query || {});
   var providers = tmdbWatchProviderQuery(filter);
@@ -194,8 +200,8 @@ function tmdbDiscoverMovie(ctx, cfg, query, filter) {
   }
   var genres = tmdbGenresForDiscover(filter, 'movie');
   if (genres.length) q.with_genres = genres.join(',');
-  var keywords = tmdbKeywordsForDiscover(filter, 'movie');
-  if (keywords.length) q.with_keywords = keywords.join(',');
+  var keywords = tmdbKeywordsQuery(tmdbKeywordsForDiscover(filter, 'movie'));
+  if (keywords) q.with_keywords = keywords;
   return tmdbGet(ctx, cfg, '/discover/movie', q);
 }
 
@@ -205,8 +211,8 @@ function tmdbDiscoverTv(ctx, cfg, query, filter) {
   var networks = tmdbTvNetworkQuery(filter);
   var genres = tmdbGenresForDiscover(filter, 'tv');
   if (genres.length) q.with_genres = genres.join(',');
-  var keywords = tmdbKeywordsForDiscover(filter, 'tv');
-  if (keywords.length) q.with_keywords = keywords.join(',');
+  var keywords = tmdbKeywordsQuery(tmdbKeywordsForDiscover(filter, 'tv'));
+  if (keywords) q.with_keywords = keywords;
   if (providers) {
     q.with_watch_providers = providers;
     q.watch_region = String(cfg.region || 'US');
@@ -406,8 +412,8 @@ var TMDB_GENRE_ROWS = [
   { id: 'drama', label: 'Drama', movieGenres: [18], tvGenres: [18] },
   { id: 'family', label: 'Family', movieGenres: [10751], tvGenres: [10751] },
   { id: 'fantasy', label: 'Fantasy', movieGenres: [14], tvGenres: [10765] },
-  // TMDB has no Game Show genre — keyword 4325 (game-show).
-  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [10768] },
+  // TMDB has no Game Show genre — keyword OR set (pipe-joined in discover).
+  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [], keywords: [4325 | 6784 | 160311 | 250845] },
   { id: 'horror', label: 'Horror', movieGenres: [27], tvGenres: [9648] },
   { id: 'music', label: 'Music', movieGenres: [10402], tvGenres: [10402] },
   { id: 'mystery', label: 'Mystery', movieGenres: [9648], tvGenres: [9648] },
@@ -508,14 +514,16 @@ function tmdbGenreDiscover(ctx, cfg, params, filter, spec, typeFilter) {
     'vote_count.gte': 50,
   };
   if (movieGenres.length) movieQ.with_genres = movieGenres.join(',');
-  if (movieKeywords.length) movieQ.with_keywords = movieKeywords.join(',');
+  var movieKw = tmdbKeywordsQuery(movieKeywords);
+  if (movieKw) movieQ.with_keywords = movieKw;
   var tvQ = {
     sort_by: 'popularity.desc',
     page: page,
     'vote_count.gte': 50,
   };
   if (tvGenres.length) tvQ.with_genres = tvGenres.join(',');
-  if (tvKeywords.length) tvQ.with_keywords = tvKeywords.join(',');
+  var tvKw = tmdbKeywordsQuery(tvKeywords);
+  if (tvKw) tvQ.with_keywords = tvKw;
   if (typeFilter === 'movie') {
     return tmdbDiscoverMovie(ctx, cfg, movieQ, rowFilter).then(function (json) {
       return tmdbMetas(cfg, json, 'movie', limit);
@@ -1155,7 +1163,8 @@ function tmdbList(ctx, cfg, params) {
       'vote_count.gte': 50,
     };
     if (g.length) discoverQ.with_genres = g.join(',');
-    if (kw.length) discoverQ.with_keywords = kw.join(',');
+    var discoverKw = tmdbKeywordsQuery(kw);
+    if (discoverKw) discoverQ.with_keywords = discoverKw;
     if (mediaType === 'tv') {
       return tmdbDiscoverTv(ctx, cfg, discoverQ, filter).then(function (json) {
         return tmdbMetas(cfg, json, 'tv', limit);
