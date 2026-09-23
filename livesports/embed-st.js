@@ -908,9 +908,35 @@ function nestExtractOkRuHls(html) {
   return nestUniq(out);
 }
 
+/** syria-player etc. hide the player HTML inside document.write("\\x3c…"). */
+function nestDecodeJsStringEscapes(s) {
+  return String(s || '')
+    .replace(/\\x([0-9a-fA-F]{2})/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\u([0-9a-fA-F]{4})/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\(["'\\])/g, '$1');
+}
+
+function nestExpandDocumentWrites(html) {
+  var text = String(html || '');
+  var out = [text];
+  var re = /document\.write\(\s*(["'])([\s\S]*?)\1\s*\)/gi;
+  var m;
+  while ((m = re.exec(text))) {
+    out.push(nestDecodeJsStringEscapes(m[2]));
+  }
+  return out.join('\n');
+}
+
 function nestExtractM3u8(html) {
   var out = nestExtractOkRuHls(html);
-  var text = nestHtmlUnescape(html);
+  var text = nestHtmlUnescape(nestExpandDocumentWrites(html));
   var re = /https?:\/\/[^\s"'<>\\]+?\.m3u8[^\s"'<>\\]*/gi;
   var m;
   while ((m = re.exec(text))) {
@@ -958,6 +984,8 @@ function nestNestedEmbedUrls(html, baseUrl) {
       continue;
     }
     if (!/^https?:\/\//i.test(abs)) continue;
+    // YouTube embeds are not native HLS — skip (no WebView fallback).
+    if (/youtube\.com|youtu\.be|googlevideo\.com/i.test(abs)) continue;
     try {
       var nestU = new URL(abs);
       if (!nestU.hostname || nestU.hostname.indexOf('.') < 0) continue;
