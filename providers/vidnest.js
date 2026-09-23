@@ -20,17 +20,20 @@ function extract(ctx) {
   var tmdbId = String(ctx.tmdbId || '');
   var isMovie = ctx.type === 'movie';
   var isAnime = ctx.type === 'anime';
+  // Paths match vidnest.fun player (2026-09): Lamda/Zeta/Filxer/Ophim/…
   var servers = cfg.servers || [
-    { id: 'hexa', name: 'Hexa', movie: 'vidlink/movie', tv: 'vidlink/tv' },
-    { id: 'lamda', name: 'Lamda', movie: 'allmovies/movie', tv: 'allmovies/tv' },
-    { id: 'delta', name: 'Delta', movie: 'allmovies/movie', tv: 'allmovies/tv' },
-    { id: 'beta', name: 'Beta', movie: 'videasy/movie', tv: 'videasy/tv' },
-    { id: 'prime', name: 'Prime', movie: 'hollymoviehd/movie', tv: 'hollymoviehd/tv' },
-    { id: 'sigma', name: 'Sigma', movie: 'hollymoviehd', tv: 'hollymoviehd' },
-    { id: 'alfa', name: 'Alfa', movie: 'moviesapi/movie', tv: 'moviesapi/tv' },
-    { id: 'catflix', name: 'Catflix', movie: 'movies5f/movie', tv: 'movies5f/tv' },
+    { id: 'lamda', name: 'Lamda', movie: 'allmovies/movie', tv: 'allmovies/tv', preferLang: 'english' },
+    { id: 'zeta', name: 'Zeta', movie: 'nextgencloudfabric/movie', tv: 'nextgencloudfabric/tv' },
+    { id: 'filxer', name: 'Filxer', movie: 'rogflix/movie', tv: 'rogflix/tv' },
     { id: 'ophim', name: 'Ophim', movie: 'klikxxi/movie', tv: 'klikxxi/tv' },
-    { id: 'gama', name: 'Gama', movie: 'moviebox/movie', tv: 'moviebox/tv' },
+    { id: 'prime', name: 'Prime', movie: 'vidrock/movie', tv: 'vidrock/tv' },
+    { id: 'alfa', name: 'Alfa', movie: 'videasy/movie', tv: 'videasy/tv' },
+    { id: 'beta', name: 'Beta', movie: 'vidxyz/movie', tv: 'vidxyz/tv' },
+    { id: 'sigma', name: 'Sigma', movie: 'hollymoviehd/movie', tv: 'hollymoviehd/tv' },
+    { id: 'gama', name: 'Gama', movie: 'vidzee/movie', tv: 'vidzee/tv' },
+    { id: 'catflix', name: 'Catflix', movie: 'yflix/movie', tv: 'yflix/tv' },
+    { id: 'hexa', name: 'Hexa', movie: 'vidlink/movie', tv: 'vidlink/tv' },
+    { id: 'delta', name: 'Delta', movie: 'allmovies/movie', tv: 'allmovies/tv', preferLang: 'hindi' },
   ];
 
   function decryptCipher(data) {
@@ -76,10 +79,20 @@ function extract(ctx) {
     return /\.m3u8(\?|$)/i.test(u) || /\.mp4(\?|$)/i.test(u) || /\/mp4\//i.test(u);
   }
 
+  function preferLangMatch(want, language) {
+    if (!want) return true;
+    var w = String(want).toLowerCase();
+    var l = String(language || '').toLowerCase();
+    if (!l) return true;
+    return l === w || l.indexOf(w) === 0;
+  }
+
   function emit(json, server) {
     var rows = [];
+    var prefer = server && server.preferLang;
     function push(u, name, quality, language, hdrs) {
       if (!u) return;
+      if (prefer && !preferLangMatch(prefer, language)) return;
       rows.push({
         url: u,
         name: name || server.name,
@@ -212,6 +225,7 @@ function extract(ctx) {
 
   var tasks = servers.map(function (server) {
     var path = isMovie ? server.movie : server.tv;
+    if (!path) return Promise.resolve([]);
     var suffix = isMovie
       ? '/' + tmdbId
       : '/' + tmdbId + '/' + (ctx.season || 1) + '/' + (ctx.episode || 1);
