@@ -612,6 +612,8 @@ async function resolveEpiEmbeds(ctx, embedUrl, cfg) {
         {
           url: m3u8,
           headers: headers,
+          // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
+          directPlayback: preferDirectPlayback(m3u8),
         },
       ];
     }
@@ -639,6 +641,8 @@ async function resolveEmbedIndia(ctx, embedUrl, cfg) {
     {
       url: m3u8,
       headers: headers,
+      // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
+      directPlayback: preferDirectPlayback(m3u8),
     },
   ];
 }

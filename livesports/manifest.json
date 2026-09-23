@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.14",
+  "version": "2.0.15",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -41,7 +41,6 @@
           "admin",
           "delta",
           "golf",
-          "ppv",
           "bravo"
         ],
         "catalogCap": false
@@ -72,6 +71,9 @@
       "config": {
         "webOrigin": "https://ppv.st",
         "nativeUnlock": "ppv",
+        "ownedSources": [
+          "ppv"
+        ],
         "catalogLayout": "iframe",
         "apis": [
           "https://api.ppv.st/api/streams",

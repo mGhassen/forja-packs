@@ -83,7 +83,6 @@ function isGoatSourceToken(source) {
     case 'admin':
     case 'delta':
     case 'golf':
-    case 'ppv':
     case 'bravo':
       return true;
     default:
@@ -187,7 +186,6 @@ function isGoatSource(source) {
     case 'admin':
     case 'delta':
     case 'golf':
-    case 'ppv':
     case 'bravo':
       return true;
     default:
