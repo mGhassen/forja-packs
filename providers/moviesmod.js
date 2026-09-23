@@ -57,6 +57,17 @@ function extract(ctx) {
     return domain + '/' + url;
   }
 
+  function isSidLink(url) {
+    if (!url) return false;
+    if (/[?&]sid=/i.test(url)) return true;
+    return /unblockedgames|examzculture|creativeexpressionsblog|thenaukriadda/i.test(url);
+  }
+
+  function metaRefreshUrl(html) {
+    var m = String(html || '').match(/url=([^"'>\s]+)/i);
+    return m ? m[1].replace(/['"]/g, '') : null;
+  }
+
   function bypassHrefli(url) {
     var host = getBaseUrl(url);
     return fetchText(url).then(function (html1) {
@@ -68,7 +79,7 @@ function extract(ctx) {
       });
       if (!formUrl1) return null;
       return ctx.fetch(formUrl1, {
-        method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded' }),
+        method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url }),
         body: Object.keys(formData1).map(function (k) { return k + '=' + encodeURIComponent(formData1[k]); }).join('&'),
       }).then(function (r) { return r.text(); }).then(function (html2) {
         var $2 = ctx.html(html2);
@@ -79,20 +90,30 @@ function extract(ctx) {
         });
         if (!formUrl2) return null;
         return ctx.fetch(formUrl2, {
-          method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded' }),
+          method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: formUrl1 }),
           body: Object.keys(formData2).map(function (k) { return k + '=' + encodeURIComponent(formData2[k]); }).join('&'),
         }).then(function (r) { return r.text(); }).then(function (html3) {
-          var skM = String(html3 || '').match(/\?go=([^"]+)/);
+          var body = String(html3 || '');
+          var cookieM = body.match(/s_\d+\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
+          var linkM = body.match(/setAttribute\(\s*["']href["']\s*,\s*["']([^"']+)["']\)/);
+          if (cookieM && linkM) {
+            var goUrl = fixUrl(linkM[1], host);
+            return fetchText(goUrl, { Cookie: cookieM[1] + '=' + cookieM[2], Referer: formUrl2 }).then(function (html4) {
+              return metaRefreshUrl(html4);
+            });
+          }
+          var skM = body.match(/\?go=([^"'\s]+)/);
           if (!skM) return null;
           var skToken = skM[1];
           var wpHttp2 = formData2['_wp_http2'] || '';
           return fetchText(host + '?go=' + skToken, { Cookie: skToken + '=' + wpHttp2 }).then(function (html4) {
-            var metaM = String(html4 || '').match(/url=(.+)/i);
+            var metaM = metaRefreshUrl(html4);
             if (!metaM) return null;
-            return fetchText(metaM[1]).then(function (html5) {
+            if (/driveseed|driveleech|video-seed/i.test(metaM)) return metaM;
+            return fetchText(metaM).then(function (html5) {
               var pm = String(html5 || '').match(/replace\("([^"]+)"\)/);
-              if (!pm || pm[1] === '/404') return null;
-              return fixUrl(pm[1], getBaseUrl(metaM[1]));
+              if (!pm || pm[1] === '/404') return metaM;
+              return fixUrl(pm[1], getBaseUrl(metaM));
             });
           });
         });
@@ -144,14 +165,14 @@ function extract(ctx) {
     return fetchText(url, { Referer: referer }).then(function (html) {
       var $ = ctx.html(html);
       var hrefs = [];
-      $('a[href*="driveseed.org"], a[href*="tech.unblockedgames.world"]').each(function () {
+      $('a[href*="driveseed.org"], a[href*="driveleech"], a[href*="unblockedgames"], a[href*="examzculture"], a[href*="creativeexpressionsblog"], a[href*="thenaukriadda"], a[href*="?sid="]').each(function () {
         hrefs.push($(this).attr('href'));
       });
-      var unique = hrefs.filter(function (u, i) { return hrefs.indexOf(u) === i; });
+      var unique = hrefs.filter(function (u, i) { return u && hrefs.indexOf(u) === i; });
       return Promise.all(unique.map(function (link) {
-        var p = /unblockedgames/i.test(link) ? bypassHrefli(link) : Promise.resolve(link);
+        var p = isSidLink(link) ? bypassHrefli(link) : Promise.resolve(link);
         return p.then(function (final) {
-          if (!final || !/driveseed/i.test(final)) return [];
+          if (!final || isSidLink(final) || !/driveseed|driveleech/i.test(final)) return [];
           return extractDriveseed(final).then(function (streams) {
             return streams.map(function (s) {
               return {

@@ -146,20 +146,58 @@ function addDaysLocal(d, n) {
   return x;
 }
 
-/** ESPN `dates=` — single YYYYMMDD or START-END range. */
-function espnDatesQuery(cfg) {
+function parseYmdLocal(ymd) {
+  var s = String(ymd || '');
+  if (!/^\d{8}$/.test(s)) return null;
+  var y = Number(s.slice(0, 4));
+  var m = Number(s.slice(4, 6)) - 1;
+  var d = Number(s.slice(6, 8));
+  var dt = new Date(y, m, d);
+  if (
+    dt.getFullYear() !== y ||
+    dt.getMonth() !== m ||
+    dt.getDate() !== d
+  ) {
+    return null;
+  }
+  return dt;
+}
+
+/** Expand `YYYYMMDD-YYYYMMDD` into daily stamps (inclusive). Cap 14 days. */
+function expandYmdRange(range) {
+  var parts = String(range || '').split('-');
+  if (parts.length !== 2) return [];
+  var start = parseYmdLocal(parts[0]);
+  var end = parseYmdLocal(parts[1]);
+  if (!start || !end || end.getTime() < start.getTime()) return [];
+  var out = [];
+  var cur = start;
+  for (var i = 0; i < 14; i++) {
+    out.push(ymdLocal(cur));
+    if (ymdLocal(cur) === ymdLocal(end)) break;
+    cur = addDaysLocal(cur, 1);
+  }
+  return out;
+}
+
+/**
+ * ESPN scoreboard `dates=` — **single** YYYYMMDD only.
+ * START-END ranges return HTTP 400 on site.api.espn.com; fetch each day.
+ */
+function espnDateList(cfg) {
   var explicit = String((cfg && cfg.date) || '').trim();
-  if (/^\d{8}$/.test(explicit)) return explicit;
-  if (/^\d{8}-\d{8}$/.test(explicit)) return explicit;
+  if (/^\d{8}$/.test(explicit)) return [explicit];
+  if (/^\d{8}-\d{8}$/.test(explicit)) return expandYmdRange(explicit);
   // Pinning to "today" only empties most soccer boards on off-days.
-  // Default: local today → today+N (fullDay scoreboard window).
   var daysAhead = Number((cfg && cfg.daysAhead) || 7);
   if (!(daysAhead >= 0)) daysAhead = 7;
+  if (daysAhead > 14) daysAhead = 14;
   var start = new Date();
-  var end = addDaysLocal(start, daysAhead);
-  var a = ymdLocal(start);
-  var b = ymdLocal(end);
-  return a === b ? a : a + '-' + b;
+  var out = [];
+  for (var i = 0; i <= daysAhead; i++) {
+    out.push(ymdLocal(addDaysLocal(start, i)));
+  }
+  return out;
 }
 
 function teamField(team, keys) {
@@ -236,15 +274,14 @@ function mapGame(league, event, pluginId) {
   };
 }
 
-async function fetchLeague(ctx, league, datesQuery, pluginId) {
+async function fetchLeagueDay(ctx, league, dateYmd, pluginId) {
   var url = LEAGUE_ENDPOINTS[String(league || '').toUpperCase()];
   if (!url) return [];
-  var fetchUrl = url;
-  if (datesQuery) {
-    fetchUrl += (url.indexOf('?') >= 0 ? '&' : '?') + 'dates=' + datesQuery;
-  }
+  var day = String(dateYmd || '').trim();
+  if (!/^\d{8}$/.test(day)) return [];
+  var fetchUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'dates=' + day;
   if (NCAA_LEAGUES[String(league || '').toUpperCase()]) {
-    fetchUrl += (fetchUrl.indexOf('?') >= 0 ? '&' : '?') + 'groups=50&limit=500';
+    fetchUrl += '&groups=50&limit=500';
   }
   var res = await ctx.fetch(fetchUrl, {
     headers: { 'User-Agent': ua(), Accept: 'application/json' },
@@ -260,6 +297,22 @@ async function fetchLeague(ctx, league, datesQuery, pluginId) {
   return out;
 }
 
+async function fetchLeague(ctx, league, dates, pluginId) {
+  var days = Array.isArray(dates) ? dates : [];
+  if (!days.length) return [];
+  // Sequential days per league — parallel leagues still fan out in extract().
+  // Avoid ~league×day concurrent hits (ESPN rate-limits / flakes).
+  var byId = {};
+  for (var i = 0; i < days.length; i++) {
+    var rows = await fetchLeagueDay(ctx, league, days[i], pluginId);
+    rows.forEach(function (row) {
+      var id = String((row && row.id) || '');
+      if (id) byId[id] = row;
+    });
+  }
+  return Object.keys(byId).map(function (k) { return byId[k]; });
+}
+
 async function extract(ctx) {
   var action = String(ctx.action || 'catalog');
   if (action !== 'catalog') return [];
@@ -270,9 +323,9 @@ async function extract(ctx) {
   var leagues = leaguesRaw && leaguesRaw.length
     ? leaguesRaw
     : Object.keys(LEAGUE_ENDPOINTS);
-  var datesQuery = espnDatesQuery(cfg);
+  var dates = espnDateList(cfg);
   var chunks = await Promise.all(leagues.map(function (lg) {
-    return fetchLeague(ctx, lg, datesQuery, pluginId);
+    return fetchLeague(ctx, lg, dates, pluginId);
   }));
   return chunks.reduce(function (a, b) { return a.concat(b); }, []);
 }
