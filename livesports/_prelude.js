@@ -959,17 +959,27 @@ function nestExpandDocumentWrites(html) {
 function nestExtractM3u8(html) {
   var out = nestExtractOkRuHls(html);
   var text = nestHtmlUnescape(nestExpandDocumentWrites(html));
+  // syria-player uses JS escapes inside document.write (`https:\/\/…`).
+  text = text.replace(/\\\//g, '/');
   var re = /https?:\/\/[^\s"'<>\\]+?\.m3u8[^\s"'<>\\]*/gi;
   var m;
   while ((m = re.exec(text))) {
     var url = m[0].replace(/\\+$/, '').replace(/&amp;/g, '&');
     if (nestIsCleanPlayUrl(url)) out.push(url);
   }
-  var srcRe = /(?:source|file|src)\s*[:=]\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/gi;
+  var srcRe = /(?:source|file|src|streamUrl)\s*[:=]\s*["'](https?:\/\/[^"']+)["']/gi;
   while ((m = srcRe.exec(text))) {
-    if (nestIsCleanPlayUrl(m[1])) out.push(m[1]);
+    var cand = String(m[1] || '').replace(/\\+$/, '').replace(/&amp;/g, '&');
+    if (nestIsSyriaPlayerProxy(cand) || /\.m3u8(\?|$)/i.test(cand)) {
+      if (nestIsCleanPlayUrl(cand)) out.push(cand);
+    }
   }
   return nestUniq(out);
+}
+
+function nestIsSyriaPlayerProxy(url) {
+  var u = String(url || '');
+  return /syria-player\./i.test(u) && /proxy\.php/i.test(u) && /[?&]stream=/i.test(u);
 }
 
 function nestExtractIframeSrcs(html) {
