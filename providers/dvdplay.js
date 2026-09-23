@@ -1,29 +1,78 @@
 var SPECS = {
-  "base": "https://dvdplay.xyz",
+  "base": "https://mallumv.space",
   "name": "DVDPlay",
-  "searchBase": "https://dvdplay.xyz/search.php?q=",
+  "domainsUrl": "https://raw.githubusercontent.com/mGhassen/forja-packs/main/domains.json",
   "tmdbKey": "439c478a771f35c05022f9feabcca01c"
 };
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var base = cfg.base.replace(/\/$/, '');
-  var searchBase = String(cfg.searchBase).replace(/\/$/, '');
+  var fallback = String(cfg.base || '').replace(/\/$/, '');
+  var domainsUrl = cfg.domainsUrl;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
   var headers = {
     'User-Agent': ua,
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
-    Referer: base + '/',
   };
   var isTv = ctx.type !== 'movie';
   var tmdbKey = cfg.tmdbKey;
+  var title = '';
+  var year = '';
+  var base = fallback;
+
+  function abs(url, from) {
+    if (!url) return '';
+    if (/^https?:/i.test(url)) return url;
+    try {
+      return new URL(url, from || base + '/').toString();
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function encodePathUrl(url) {
+    try {
+      var u = new URL(url);
+      u.pathname = u.pathname
+        .split('/')
+        .map(function (seg) {
+          return encodeURIComponent(decodeURIComponent(seg));
+        })
+        .join('/');
+      return u.toString();
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function fetchText(url, extraHeaders) {
+    return ctx
+      .fetch(encodePathUrl(url), { headers: Object.assign({}, headers, extraHeaders || {}) })
+      .then(function (r) {
+        return r.text();
+      });
+  }
+
+  function latestDomain() {
+    return ctx
+      .fetch(domainsUrl, { headers: { 'User-Agent': ua } })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (j) {
+        return String((j && (j.dvdplay || j.mallumv)) || fallback).replace(/\/$/, '');
+      })
+      .catch(function () {
+        return fallback;
+      });
+  }
 
   function titleMeta() {
-    var title = String(ctx.title || '').trim();
-    var year = String(ctx.year || '').trim();
-    if (title) return Promise.resolve({ title: title, year: year });
+    var t = String(ctx.title || '').trim();
+    var y = String(ctx.year || '').trim();
+    if (t) return Promise.resolve({ title: t, year: y });
     return ctx
       .fetch(
         'https://tmdb.forjahq.xyz/3/' +
@@ -43,25 +92,6 @@ function extract(ctx) {
           year: String((isTv ? d.first_air_date : d.release_date) || '').substring(0, 4),
         };
       });
-  }
-
-  var title = '';
-  var year = '';
-
-  function abs(url, from) {
-    if (!url) return '';
-    if (/^https?:/i.test(url)) return url;
-    try {
-      return new URL(url, from || base).toString();
-    } catch (e) {
-      return url;
-    }
-  }
-
-  function fetchText(url, extraHeaders) {
-    return ctx.fetch(url, { headers: Object.assign({}, headers, extraHeaders || {}) }).then(function (r) {
-      return r.text();
-    });
   }
 
   function normalize(text) {
@@ -87,7 +117,7 @@ function extract(ctx) {
 
   function scoreCandidate(label) {
     var score = similarity(title, label);
-    if (year && String(label).indexOf(year) >= 0) score += 0.2;
+    if (year && String(label).indexOf(year) >= 0) score += 0.25;
     if (isTv) {
       var seasonToken = 'season ' + String(ctx.season || 1);
       if (normalize(label).indexOf(seasonToken) >= 0) score += 0.3;
@@ -95,104 +125,68 @@ function extract(ctx) {
     return score;
   }
 
-  function decodeB64(s) {
-    try {
-      return decodeURIComponent(escape(atob(s)));
-    } catch (e) {
-      try {
-        return atob(s);
-      } catch (e2) {
-        return '';
-      }
-    }
+  function qualityOf(str) {
+    if (/2160|4k|uhd/i.test(str)) return '4K';
+    if (/1080/i.test(str)) return '1080p';
+    if (/720/i.test(str)) return '720p';
+    if (/480/i.test(str)) return '480p';
+    return 'Unknown';
   }
 
-  function rot13(s) {
-    return String(s || '').replace(/[A-Za-z]/g, function (ch) {
-      var start = ch <= 'Z' ? 65 : 97;
-      return String.fromCharCode(((ch.charCodeAt(0) - start + 13) % 26) + start);
-    });
-  }
-
-  function getRedirectLink(url) {
-    return fetchText(url)
-      .then(function (html) {
-        var regex = /s\('o','([A-Za-z0-9+/=]+)'|ck\('_wp_http_\d+','([^']+)'/g;
-        var combined = '';
-        var m;
-        while ((m = regex.exec(html)) !== null) combined += m[1] || m[2] || '';
-        if (!combined) return '';
-        try {
-          var decoded = decodeB64(rot13(decodeB64(decodeB64(combined))));
-          var obj = JSON.parse(decoded);
-          var encodedurl = decodeB64(obj.o || '').trim();
-          var data = decodeB64(obj.data || '').trim();
-          var blog = String(obj.blog_url || '').trim();
-          if (encodedurl) return encodedurl;
-          if (blog && data) return fetchText(blog + '?re=' + encodeURIComponent(data)).then(function (txt) { return String(txt || '').trim(); });
-        } catch (e) {}
-        return '';
-      })
-      .catch(function () {
-        return '';
-      });
-  }
-
-  function directize(url) {
-    if (!url) return Promise.resolve('');
-    var decoded = abs(url).replace(/&amp;/g, '&');
-    var linkMatch = decoded.match(/[?&]link=([^&]+)/);
-    if (linkMatch) {
-      try {
-        decoded = decodeURIComponent(linkMatch[1]);
-      } catch (e) {}
-    }
-    var pixel = decoded.match(/pixeldrain\.(?:net|dev)\/u\/([a-zA-Z0-9]+)/i);
-    if (pixel) return Promise.resolve('https://pixeldrain.net/api/file/' + pixel[1]);
-    if (/r2\.cloudflarestorage\.com|video-downloads\.googleusercontent\.com|pixeldrain\.net\/api\/file\//i.test(decoded)) {
-      return Promise.resolve(decoded);
-    }
-    if (/hubcloud\.php|\/dl\.php\?/i.test(decoded)) {
-      return resolveHubCloud(decoded);
-    }
-    if (/workers\.dev|r2\.dev|buzzheavier|10gbps|download/i.test(decoded)) {
-      return getRedirectLink(decoded).then(function (redir) {
-        return redir || decoded;
-      });
-    }
-    return Promise.resolve(decoded);
-  }
-
-  function scrapeUrls(html, pageUrl) {
-    var urls = [];
-    var $ = ctx.html ? ctx.html(html) : null;
-    if ($) {
-      $('a[href], iframe[src], button[data-url]').each(function () {
-        var href = $(this).attr('href') || $(this).attr('src') || $(this).attr('data-url') || '';
-        if (href) urls.push(abs(href, pageUrl));
-      });
-      var dl = $('#download').attr('href') || $('.download-btn').attr('href') || $('a[href*="hubcloud.php"]').attr('href');
-      if (dl) urls.push(abs(dl, pageUrl));
-    }
-    String(html || '').replace(/https?:\/\/[^"'\s<>]+/gi, function (u) {
-      urls.push(u);
-      return u;
-    });
-    var seen = {};
-    return urls.filter(function (u) {
-      if (!u || seen[u]) return false;
-      seen[u] = true;
-      return /(hubcloud|hubdrive|pixeldrain|buzz|10gbps|workers\.dev|r2\.dev|download|api\/file|cloudflarestorage)/i.test(u);
-    });
+  function pixelize(url) {
+    var m = String(url || '').match(/pixeldrain\.(?:net|dev)\/(?:u|api\/file)\/([A-Za-z0-9]+)/i);
+    if (m) return 'https://pixeldrain.net/api/file/' + m[1];
+    return url;
   }
 
   function resolveHubCloud(url) {
-    return fetchText(url)
+    return fetchText(url, { Referer: base + '/' })
       .then(function (html) {
-        var candidates = scrapeUrls(html, url);
-        if (!candidates.length) return [];
-        return Promise.all(candidates.slice(0, 8).map(directize)).then(function (resolved) {
-          return resolved.filter(Boolean);
+        var $ = ctx.html ? ctx.html(html) : null;
+        var next = '';
+        if ($) {
+          $('a[href]').each(function () {
+            if (next) return;
+            var href = $(this).attr('href') || '';
+            var text = ($(this).text() || '').toLowerCase();
+            if (/hubcloud\.php/i.test(href) || /generate direct download/i.test(text)) {
+              next = abs(href, url);
+            }
+          });
+        }
+        if (!next) {
+          var m = String(html || '').match(/https?:\/\/[^"'<\s]+hubcloud\.php[^"'<\s]*/i);
+          if (m) next = m[0];
+        }
+        var page = next ? fetchText(next, { Referer: url }) : Promise.resolve(html);
+        return page.then(function (pageHtml) {
+          var out = [];
+          var seen = {};
+          function push(u, label) {
+            u = pixelize(u);
+            if (!u || seen[u]) return;
+            if (!/pixeldrain\.net\/api\/file\/|r2\.cloudflarestorage\.com|workers\.dev|r2\.dev|pixel\.hubcloud/i.test(u)) {
+              return;
+            }
+            seen[u] = true;
+            out.push({ url: u, label: label || 'HubCloud' });
+          }
+          var $p = ctx.html ? ctx.html(pageHtml) : null;
+          if ($p) {
+            $p('a[href]').each(function () {
+              var href = $p(this).attr('href') || '';
+              var text = ($p(this).text() || '').trim();
+              if (!href) return;
+              if (/download|pixel|10gbps|fsl|s3|server|r2/i.test(text) || /pixeldrain|r2\.|workers\.dev|hubcloud|cloudflarestorage/i.test(href)) {
+                push(abs(href, next || url), text || 'HubCloud');
+              }
+            });
+          }
+          String(pageHtml || '').replace(/https?:\/\/[^"'<\s]+/gi, function (u) {
+            push(u, 'HubCloud');
+            return u;
+          });
+          return out;
         });
       })
       .catch(function () {
@@ -200,66 +194,160 @@ function extract(ctx) {
       });
   }
 
+  function directize(url, qualityHint) {
+    if (!url) return Promise.resolve([]);
+    var decoded = abs(url).replace(/&amp;/g, '&');
+    var q = qualityOf(qualityHint || decoded);
+    if (/pixeldrain\.(?:net|dev)\//i.test(decoded)) {
+      return Promise.resolve([
+        {
+          url: pixelize(decoded),
+          name: 'DVDPlay - Pixeldrain - ' + q,
+          quality: q,
+          headers: { 'User-Agent': ua, Referer: base + '/' },
+        },
+      ]);
+    }
+    if (/r2\.cloudflarestorage\.com|video-downloads\.googleusercontent\.com|pixeldrain\.net\/api\/file\//i.test(decoded)) {
+      return Promise.resolve([
+        {
+          url: decoded,
+          name: 'DVDPlay - Direct - ' + q,
+          quality: q,
+          headers: { 'User-Agent': ua, Referer: base + '/' },
+        },
+      ]);
+    }
+    if (/hubcloud\./i.test(decoded) || /hubcloud\.php/i.test(decoded)) {
+      return resolveHubCloud(decoded).then(function (items) {
+        return items.map(function (it) {
+          var label = /pixel/i.test(it.label)
+            ? 'Pixeldrain'
+            : /10gbps/i.test(it.label)
+              ? '10Gbps'
+              : /fsl/i.test(it.label)
+                ? 'FSLv2'
+                : 'HubCloud';
+          return {
+            url: it.url,
+            name: 'DVDPlay - ' + label + ' - ' + q,
+            quality: q,
+            headers: { 'User-Agent': ua, Referer: base + '/' },
+          };
+        });
+      });
+    }
+    return Promise.resolve([]);
+  }
+
   function search() {
-    var q = title.replace(/\s+/g, '+');
-    return fetchText(searchBase + q).then(function (html) {
+    var q = encodeURIComponent(title.trim());
+    return fetchText(base + '/search.php?q=' + q, { Referer: base + '/' }).then(function (html) {
+      if (/No Result Found\. Showing Recent Movies/i.test(html)) return [];
       var candidates = [];
       var $ = ctx.html ? ctx.html(html) : null;
       if ($) {
-        $('a[href]').each(function () {
+        $('a[href*="movie/"]').each(function () {
           var href = $(this).attr('href') || '';
-          var text = ($(this).text() || '').trim();
+          var text = ($(this).text() || '').replace(/\s+/g, ' ').trim();
           if (!href || !text) return;
-          var url = abs(href, base);
-          if (/search\.php/i.test(url)) return;
-          if (url.indexOf(base) !== 0) return;
+          var url = abs(href, base + '/');
+          if (!/\/movie\/\d+\//i.test(url)) return;
           var score = scoreCandidate(text);
-          if (score > 0.15) candidates.push({ url: url, title: text, score: score });
+          if (score > 0.2) candidates.push({ url: url, title: text, score: score });
         });
       }
-      candidates.sort(function (a, b) { return b.score - a.score; });
+      if (!candidates.length) {
+        var re = /href=["'](movie\/\d+\/[^"']+\.xhtml)["'][^>]*>[\s\S]*?»\s*([^<]+)/gi;
+        var m;
+        while ((m = re.exec(html)) !== null) {
+          var url2 = abs(m[1], base + '/');
+          var text2 = String(m[2] || '').replace(/\s+/g, ' ').trim();
+          var score2 = scoreCandidate(text2);
+          if (score2 > 0.2) candidates.push({ url: url2, title: text2, score: score2 });
+        }
+      }
+      candidates.sort(function (a, b) {
+        return b.score - a.score;
+      });
       return candidates.slice(0, 3);
     });
   }
 
   function extractFromPage(pageUrl) {
-    return fetchText(pageUrl).then(function (html) {
-      var links = scrapeUrls(html, pageUrl);
+    return fetchText(pageUrl, { Referer: base + '/' }).then(function (html) {
+      var internals = [];
+      var $ = ctx.html ? ctx.html(html) : null;
+      if ($) {
+        $('a[href*="/internal/"]').each(function () {
+          var href = $(this).attr('href') || '';
+          var text = ($(this).text() || '').replace(/\s+/g, ' ').trim();
+          if (!href) return;
+          internals.push({ url: abs(href, pageUrl), label: text || href });
+        });
+      }
+      if (!internals.length) {
+        String(html || '').replace(/href=["'](\/internal\/[^"']+)["']/gi, function (_, p) {
+          internals.push({ url: abs(p, pageUrl), label: p });
+          return _;
+        });
+      }
+      var limited = internals.slice(0, 8);
       return Promise.all(
-        links.slice(0, 12).map(function (u) {
-          return directize(u);
+        limited.map(function (item) {
+          return fetchText(item.url, { Referer: pageUrl })
+            .then(function (innerHtml) {
+              var hosts = [];
+              var $i = ctx.html ? ctx.html(innerHtml) : null;
+              if ($i) {
+                $i('a[href]').each(function () {
+                  var href = $i(this).attr('href') || '';
+                  if (/pixeldrain\.|hubcloud\.|hubcloud\.php/i.test(href)) {
+                    hosts.push(abs(href, item.url));
+                  }
+                });
+              }
+              String(innerHtml || '').replace(/https?:\/\/[^"'<\s]+/gi, function (u) {
+                if (/pixeldrain\.|hubcloud\./i.test(u)) hosts.push(u);
+                return u;
+              });
+              var seenH = {};
+              hosts = hosts.filter(function (u) {
+                if (!u || seenH[u]) return false;
+                seenH[u] = true;
+                return true;
+              });
+              return Promise.all(
+                hosts.slice(0, 4).map(function (u) {
+                  return directize(u, item.label);
+                }),
+              ).then(function (chunks) {
+                return [].concat.apply([], chunks);
+              });
+            })
+            .catch(function () {
+              return [];
+            });
         }),
-      ).then(function (resolved) {
+      ).then(function (chunks) {
         var out = [];
         var seen = {};
-        resolved.forEach(function (u) {
-          if (!u || seen[u]) return;
-          seen[u] = true;
-          var q = /2160/i.test(u)
-            ? '4K'
-            : /1080/i.test(u)
-              ? '1080p'
-              : /720/i.test(u)
-                ? '720p'
-                : /480/i.test(u)
-                  ? '480p'
-                  : 'Unknown';
-          out.push({
-            url: u,
-            name: 'DVDPlay - ' + q,
-            quality: q,
-            headers: { 'User-Agent': ua, Referer: pageUrl },
-          });
+        [].concat.apply([], chunks).forEach(function (s) {
+          if (!s || !s.url || seen[s.url]) return;
+          seen[s.url] = true;
+          out.push(s);
         });
         return out;
       });
     });
   }
 
-  return titleMeta()
-    .then(function (meta) {
-      title = meta.title;
-      year = meta.year;
+  return Promise.all([titleMeta(), latestDomain()])
+    .then(function (pair) {
+      title = pair[0].title;
+      year = pair[0].year;
+      base = pair[1] || fallback;
+      headers.Referer = base + '/';
       if (!title) return [];
       return search();
     })

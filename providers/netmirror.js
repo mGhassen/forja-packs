@@ -64,6 +64,12 @@ function extract(ctx) {
     Accept: 'application/json, text/plain, */*',
   };
 
+  function log(msg) {
+    try {
+      if (typeof ctx.log === 'function') ctx.log(String(msg));
+    } catch (_) {}
+  }
+
   function safeAtob(encoded) {
     return ctx.crypto.enc.Utf8.stringify(ctx.crypto.enc.Base64.parse(encoded));
   }
@@ -80,13 +86,17 @@ function extract(ctx) {
 
   function isPlayableLink(url) {
     if (!url || typeof url !== 'string') return false;
-    var u = url.toLowerCase();
+    var u = url.trim();
+    if (!/^https?:\/\//i.test(u)) return false;
+    var lower = u.toLowerCase();
     return (
-      u.indexOf('.m3u8') >= 0 ||
-      u.indexOf('.mp4') >= 0 ||
-      u.indexOf('.mkv') >= 0 ||
-      u.indexOf('/hls/') >= 0 ||
-      u.indexOf('/resource/') >= 0
+      lower.indexOf('.m3u8') >= 0 ||
+      lower.indexOf('.mp4') >= 0 ||
+      lower.indexOf('.mkv') >= 0 ||
+      lower.indexOf('/hls/') >= 0 ||
+      lower.indexOf('/resource/') >= 0 ||
+      lower.indexOf('/bt/') >= 0 ||
+      lower.indexOf('sign=') >= 0
     );
   }
 
@@ -105,18 +115,28 @@ function extract(ctx) {
     return out;
   }
 
+  function hasDirectStreams(data) {
+    if (!data || data.ok !== true) return false;
+    if (data.error) return false;
+    if (data.mp4) return true;
+    return Array.isArray(data.streams) && data.streams.length > 0;
+  }
+
   // D3adly / All-in-One-Nuvio primary path — net27 embed API (not NewTV).
+  // Live embed-tmdb requires `se`/`ep` for TV — `s`/`e` are ignored (always S1E1).
   function fetchFromNetflixDirect() {
     var tmdbId = String(ctx.tmdbId || '').trim();
     if (!tmdbId) return Promise.resolve([]);
+    var season = ctx.season || 1;
+    var episode = ctx.episode || 1;
     var apiUrl =
       ctx.type !== 'movie'
         ? embedApi +
           encodeURIComponent(tmdbId) +
-          '?type=tv&s=' +
-          encodeURIComponent(String(ctx.season || 1)) +
-          '&e=' +
-          encodeURIComponent(String(ctx.episode || 1))
+          '?type=tv&se=' +
+          encodeURIComponent(String(season)) +
+          '&ep=' +
+          encodeURIComponent(String(episode))
         : embedApi + encodeURIComponent(tmdbId);
     return getJson(apiUrl, {
       Accept: 'application/json, text/plain, */*',
@@ -124,7 +144,14 @@ function extract(ctx) {
       'User-Agent': directUa,
     })
       .then(function (data) {
-        if (!data || data.ok !== true) return [];
+        if (!hasDirectStreams(data)) {
+          log(
+            'embed miss tmdb=' +
+              tmdbId +
+              (data && data.error ? ' err=' + data.error : ''),
+          );
+          return [];
+        }
         var playHeaders = {
           Referer: playReferer,
           'User-Agent': directUa,
@@ -152,41 +179,75 @@ function extract(ctx) {
             subtitles: subtitles.length ? subtitles : undefined,
           });
         }
+        log('embed ok tmdb=' + tmdbId + ' streams=' + rows.length);
         return rows;
       })
-      .catch(function () {
+      .catch(function (e) {
+        log('embed fail ' + (e && e.message ? e.message : e));
         return [];
+      });
+  }
+
+  function decodeApiOrigin(tokenHash) {
+    if (!tokenHash) return '';
+    try {
+      var decoded = safeAtob(tokenHash).replace(/\/$/, '');
+      // check.php → https://net52.cc/mobile/home?app=1
+      // checknewtv.php → https://tv.imgcdn.kim
+      var m = String(decoded).match(/^(https?:\/\/[^\/\s?#]+)/i);
+      return m ? m[1].replace(/\/$/, '') : decoded;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function probeDiscovery(url, headers) {
+    return getJson(url, headers)
+      .then(function (data) {
+        return data && data.token_hash ? decodeApiOrigin(data.token_hash) : '';
+      })
+      .catch(function () {
+        return '';
       });
   }
 
   function resolveApiUrl() {
     var cached = globalThis.__netmirrorApiBase;
     if (cached) return Promise.resolve(cached);
-    var chain = Promise.resolve('');
-    domains.forEach(function (encoded) {
-      chain = chain.then(function (resolved) {
-        if (resolved) return resolved;
-        var base = safeAtob(encoded).replace(/\/$/, '');
-        return getJson(
-          base + '/checknewtv.php',
-          Object.assign({}, baseHeaders, {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          }),
-        )
-          .then(function (data) {
-            return data && data.token_hash
-              ? safeAtob(data.token_hash).replace(/\/$/, '')
-              : '';
-          })
-          .catch(function () {
-            return '';
-          });
-      });
+
+    // Prefer app check.php (live → net52.cc). checknewtv.php still points at
+    // dead tv.imgcdn.kim — probe only a few hosts, in parallel, fail fast.
+    var probes = [
+      probeDiscovery('https://mobiledetect.app/check.php', {
+        'User-Agent': 'okhttp/4.9.2',
+        Accept: 'application/json',
+      }),
+      probeDiscovery('https://mobiledetects.com/check.php', {
+        'User-Agent': 'okhttp/4.9.2',
+        Accept: 'application/json',
+      }),
+    ];
+    var ntvHeaders = Object.assign({}, baseHeaders, {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     });
-    return chain.then(function (resolved) {
-      if (resolved) globalThis.__netmirrorApiBase = resolved;
-      return resolved;
+    domains.slice(0, 4).forEach(function (encoded) {
+      try {
+        var base = safeAtob(encoded).replace(/\/$/, '');
+        probes.push(probeDiscovery(base + '/checknewtv.php', ntvHeaders));
+      } catch (_) {}
+    });
+
+    return Promise.all(probes).then(function (results) {
+      for (var i = 0; i < results.length; i++) {
+        if (results[i]) {
+          globalThis.__netmirrorApiBase = results[i];
+          log('newtv base=' + results[i]);
+          return results[i];
+        }
+      }
+      log('newtv discovery miss');
+      return '';
     });
   }
 
@@ -345,12 +406,8 @@ function extract(ctx) {
         });
       })
       .then(function (response) {
-        if (
-          !response ||
-          !response.video_link ||
-          response.status !== 'ok' ||
-          !isPlayableLink(response.video_link)
-        ) {
+        // Live player may return status=otp (or other) while still providing video_link.
+        if (!response || !response.video_link || !isPlayableLink(response.video_link)) {
           return [];
         }
         return [

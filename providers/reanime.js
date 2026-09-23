@@ -178,37 +178,81 @@ function extract(ctx) {
     });
   }
 
+  function onlyFlix(urls) {
+    var out = [];
+    var seen = {};
+    (urls || []).forEach(function (u) {
+      var n = normalizeFlix(u);
+      if (!n || !/flixcloud\./i.test(n) || seen[n]) return;
+      seen[n] = true;
+      out.push(n);
+    });
+    return out;
+  }
+
+  function embedsFromFlixApi(json) {
+    var embeds = [];
+    if (!json || typeof json !== 'object') return embeds;
+    var servers = json.servers || json.sub || json.dub || [];
+    if (!Array.isArray(servers)) servers = [];
+    // Prefer language buckets when present.
+    ['sub', 'dub'].forEach(function (k) {
+      if (Array.isArray(json[k])) servers = servers.concat(json[k]);
+    });
+    servers.forEach(function (s) {
+      if (!s) return;
+      if (typeof s === 'string') embeds.push(s);
+      else if (s.dataLink) embeds.push(s.dataLink);
+      else if (s.link) embeds.push(s.link);
+      else if (s.url) embeds.push(s.url);
+    });
+    if (json.dataLink) embeds.push(json.dataLink);
+    var text = JSON.stringify(json);
+    var re = /https?:\/\/flixcloud\.[a-z]+\/e\/[A-Za-z0-9_-]+[^"'\\\s<]*/gi;
+    var m;
+    while ((m = re.exec(text)) !== null) embeds.push(m[0]);
+    return embeds;
+  }
+
   function flixEmbeds(slug, episode, language, alId) {
     var watchPath = '/watch/' + slug + '?ep=' + episode + '&lang=' + language;
-    return fetchText(watchPath).then(function (html) {
+    // API first when AniList id is known — watch HTML often has non-FlixCloud
+    // data-links that used to skip this path and leave hops empty.
+    var apiPromise = alId
+      ? fetchJson(base + '/api/flix/' + alId + '/' + episode)
+          .then(embedsFromFlixApi)
+          .catch(function () {
+            return [];
+          })
+      : Promise.resolve([]);
+    var htmlPromise = fetchText(watchPath).then(function (html) {
       var embeds = [];
-      var re = /https?:\/\/flixcloud\.cc\/e\/[A-Za-z0-9_-]+[^"'\\\s<]*/g;
+      var re = /https?:\/\/flixcloud\.[a-z]+\/e\/[A-Za-z0-9_-]+[^"'\\\s<]*/gi;
       var m;
       while ((m = re.exec(html)) !== null) embeds.push(m[0]);
-      // Anivault-style dataLink / data-an-video attributes on watch pages.
-      var attrRe = /data-(?:an-video|link|src)=["'](https?:\/\/[^"']+)["']/gi;
+      var attrRe = /data-(?:an-video|link|src)=["'](https?:\/\/[^"']*flixcloud[^"']+)["']/gi;
       while ((m = attrRe.exec(html)) !== null) embeds.push(m[1]);
-      var dataLinkRe = /"dataLink"\s*:\s*"(https?:\\\/\\\/[^"]+|https?:\/\/[^"]+)"/g;
+      var dataLinkRe =
+        /"dataLink"\s*:\s*"(https?:\\\/\\\/[^"]*flixcloud[^"]+|https?:\/\/[^"]*flixcloud[^"]+)"/gi;
       while ((m = dataLinkRe.exec(html)) !== null) {
         embeds.push(m[1].replace(/\\\//g, '/'));
       }
-      if (!embeds.length && alId) {
-        return fetchJson(base + '/api/flix/' + alId + '/' + episode).then(function (json) {
-          var text = JSON.stringify(json);
-          while ((m = re.exec(text)) !== null) embeds.push(m[0]);
-          var dl = json && (json.dataLink || (json.sub && json.sub[0] && json.sub[0].dataLink));
-          if (dl) embeds.push(dl);
-          return embeds;
-        }).catch(function () { return embeds; });
-      }
       return embeds;
+    }).catch(function () {
+      return [];
+    });
+    return Promise.all([apiPromise, htmlPromise]).then(function (pair) {
+      var merged = onlyFlix([].concat(pair[0] || [], pair[1] || []));
+      ctx.log('flix embeds=' + merged.length + ' slug=' + slug + ' ep=' + episode);
+      return merged;
     });
   }
 
   function normalizeFlix(url) {
     if (!url) return '';
     if (!/^https?:/i.test(url)) url = 'https://flixcloud.cc' + (url.startsWith('/') ? url : '/' + url);
-    return url.replace(/[?&]v=[^&]+/, '').replace(/[?&]kuudere_ts=[^&]+/, '');
+    // Keep ?v=1|2 — FlixCloud embed variants; only strip tracker noise.
+    return url.replace(/[?&]kuudere_ts=[^&]+/, '').replace(/\?&/, '?').replace(/[?&]$/, '');
   }
 
   var season = ctx.season || 1;

@@ -1,6 +1,6 @@
 var SPECS = {
-  "origin": "https://cinejoy.to",
-  "api": "https://api.shegu.st",
+  "origin": "https://cinejoy.pk",
+  "api": "https://api.wing.st",
   "enc": "https://enc-dec.app/api",
   "tmdbKey": "1865f43a0549ca50d341dd9ab8b29f49"
 };
@@ -26,14 +26,49 @@ function extract(ctx) {
     return j.result;
   }
 
+  function base64urlDecodeBin(s) {
+    var t = String(s || '')
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    while (t.length % 4) t += '=';
+    try {
+      return atob(t);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function base64urlEncodeBin(bin) {
+    var b64 = btoa(bin);
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function responseBin(r) {
+    if (r && r._bodyB64) {
+      try {
+        return atob(String(r._bodyB64));
+      } catch (e) {
+        return '';
+      }
+    }
+    return r.arrayBuffer().then(function (buf) {
+      var view = new Uint8Array(buf);
+      var out = '';
+      for (var i = 0; i < view.length; i++) out += String.fromCharCode(view[i]);
+      return out;
+    });
+  }
+
   function walk(o, urls) {
     if (!o) return;
     if (typeof o === 'string' && /^https?:/i.test(o)) urls.push(o);
     else if (Array.isArray(o)) o.forEach(function (e) { walk(e, urls); });
     else if (typeof o === 'object') {
-      ['url', 'file', 'src', 'stream', 'link', 'source'].forEach(function (k) {
-        if (o[k]) walk(o[k], urls);
-      });
+      ['url', 'file', 'src', 'stream', 'link', 'source', 'playlist', 'data'].forEach(
+        function (k) {
+          if (o[k]) walk(o[k], urls);
+        },
+      );
     }
   }
 
@@ -125,53 +160,79 @@ function extract(ctx) {
         return r.json();
       })
       .then(function (j) {
-        var token = validate(j);
-        if (!token) return [];
-        return fetchJson(api + '/challenge?rid=' + encodeURIComponent(token)).then(function (challenge) {
-          var xat = cinejoySolveScryptPow(ctx.crypto, challenge);
-          if (!xat) return [];
-          var reqHeaders = Object.assign({}, headers, { 'x-at': xat });
-          return ctx
-            .fetch(api + '/' + token, { headers: reqHeaders })
-            .then(function (r) {
-              return r.text();
-            })
-            .then(function (text) {
+        var encResult = validate(j);
+        if (!encResult || !encResult.data || !encResult.state) return [];
+        var bin = base64urlDecodeBin(encResult.data);
+        if (!bin) return [];
+        // bodyB64 — encrypted gate payload has null bytes; latin1 body dies in the JSON bridge.
+        var gateB64 = btoa(bin);
+        return ctx
+          .fetch(api + '/g', {
+            method: 'POST',
+            headers: Object.assign({}, headers, { 'Content-Type': 'application/octet-stream' }),
+            bodyB64: gateB64,
+          })
+          .then(function (r) {
+            if (!r.ok) {
+              ctx.log('cinejoy ' + server + ' /g http ' + r.status);
+              return [];
+            }
+            return Promise.resolve(responseBin(r)).then(function (raw) {
+              if (!raw) {
+                ctx.log('cinejoy ' + server + ' /g empty');
+                return [];
+              }
               return ctx
                 .fetch(enc + '/dec-cinejoy', {
                   method: 'POST',
                   headers: Object.assign({}, headers, { 'Content-Type': 'application/json' }),
-                  body: JSON.stringify({ text: text }),
+                  body: JSON.stringify({
+                    text: base64urlEncodeBin(raw),
+                    state: encResult.state,
+                  }),
                 })
-                .then(function (r) {
-                  return r.json();
+                .then(function (dr) {
+                  return dr.json();
                 })
                 .then(function (dj) {
-                  return toRows(validate(dj), server);
+                  var payload = validate(dj);
+                  if (!payload) {
+                    ctx.log('cinejoy ' + server + ' dec fail');
+                    return [];
+                  }
+                  return toRows(payload, server);
                 });
             });
-        });
+          });
       })
-      .catch(function () {
+      .catch(function (e) {
+        ctx.log('cinejoy ' + server + ' err ' + (e && e.message ? e.message : e));
         return [];
       });
   }
 
   return fetchMeta()
     .then(function (meta) {
+      ctx.log('cinejoy meta ' + meta.title + ' ' + meta.year);
       return fetchJson(api + '/servers').then(function (sj) {
-        var servers = ((sj && sj.servers) || []).map(function (s) {
-          return s && (s.name || s.id || s);
-        }).filter(Boolean);
+        var servers = ((sj && sj.servers) || [])
+          .map(function (s) {
+            return s && (s.name || s.id || s);
+          })
+          .filter(Boolean);
+        ctx.log('cinejoy servers ' + servers.join(','));
         if (!servers.length) return [];
         return Promise.all(servers.slice(0, 6).map(function (name) { return resolveServer(meta, name); })).then(
           function (groups) {
-            return [].concat.apply([], groups);
+            var out = [].concat.apply([], groups);
+            ctx.log('cinejoy streams=' + out.length);
+            return out;
           },
         );
       });
     })
-    .catch(function () {
+    .catch(function (e) {
+      ctx.log('cinejoy meta err ' + (e && e.message ? e.message : e));
       return [];
     });
 }

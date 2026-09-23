@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.1",
+  "version": "1.6.18",
   "tags": [
     "providers",
     "anime",
@@ -96,9 +96,19 @@
         "origin": "https://player.vidzee.wtf",
         "servers": [
           "dcloud",
+          "apre",
           "tik",
           "ipcloud",
-          "v6:Hindi"
+          "v6:Hindi",
+          "v4:English",
+          "v4:Hindi",
+          "v4:Tamil",
+          "v4:Telugu",
+          "v4:Bengali",
+          "v4:Malayalam",
+          "v4:Kannada",
+          "v4:Marathi",
+          "v4:Punjabi"
         ]
       }
     },
@@ -220,16 +230,6 @@
       "kind": "http"
     },
     {
-      "id": "flixcloud",
-      "name": "FlixCloud",
-      "entry": "flixcloud.js",
-      "types": [
-        "movie",
-        "tv"
-      ],
-      "kind": "http"
-    },
-    {
       "id": "vidcore",
       "name": "VidCore",
       "entry": "vidcore.js",
@@ -255,7 +255,6 @@
       "id": "cinejoy",
       "name": "CineJoy",
       "entry": "cinejoy.js",
-      "prelude": "_cinejoy_pow.js",
       "types": [
         "movie",
         "tv"
@@ -278,11 +277,28 @@
         "servers": [
           {
             "id": "dcloud",
-            "label": "DCloud"
+            "label": "Dcloud"
+          },
+          {
+            "id": "acme",
+            "label": "Acme"
+          },
+          {
+            "id": "tik",
+            "label": "TCloud"
           },
           {
             "id": "ipcloud",
             "label": "IPcloud"
+          },
+          {
+            "id": "turkce",
+            "label": "T\u00fcrk\u00e7e",
+            "movieOnly": true
+          },
+          {
+            "id": "hindiv3",
+            "label": "Hindi v3"
           }
         ]
       }
@@ -595,8 +611,7 @@
       "name": "Kurage",
       "entry": "kurage.js",
       "types": [
-        "movie",
-        "tv"
+        "anime"
       ],
       "kind": "http"
     },
@@ -1354,8 +1369,8 @@
       "name": "FlixCloud",
       "entry": "flixcloud.js",
       "types": [
-        "movie",
-        "tv"
+        "tv",
+        "anime"
       ],
       "kind": "hop",
       "hosts": [
@@ -1729,7 +1744,6 @@
     "vidcore.js",
     "animekai.js",
     "cinejoy.js",
-    "_cinejoy_pow.js",
     "meowtv.js",
     "playimdb.js",
     "yflix.js",

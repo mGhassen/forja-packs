@@ -438,8 +438,8 @@ async function iptvFeed(ctx) {
       sort: String((prefs && prefs.liveSort) || 'playlist').trim(),
       q: q,
     };
-    // Top-bar search scans the whole shelf (legacy Live paint search).
-    if (q) pageOpts.categoryId = '';
+    // Host clears category on search start (shelf-wide + hitCategoryIds). Mid-search
+    // category pick keeps categoryId so catalog_page scopes q to that group.
     var FAV = '__favorites__';
     var WATCHED = '__watched__';
     if (section === 'live' && filterCat === FAV) {

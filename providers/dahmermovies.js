@@ -3,7 +3,9 @@ var SPECS = {
   "stOrigin": "https://st.111477.xyz",
   "tmdbKey": "439c478a771f35c05022f9feabcca01c",
   "limit": 3,
-  "sort": "file-desc"
+  "sort": "file-desc",
+  "rateLimitWaitMs": 7200,
+  "rateLimitRetries": 4
 };
 
 function extract(ctx) {
@@ -13,6 +15,10 @@ function extract(ctx) {
   var tmdbKey = cfg.tmdbKey;
   var limit = parseInt(cfg.limit, 10);
   var sort = cfg.sort;
+  var rateLimitWaitMs = parseInt(cfg.rateLimitWaitMs, 10);
+  if (!(rateLimitWaitMs > 0)) rateLimitWaitMs = 7200;
+  var rateLimitRetries = parseInt(cfg.rateLimitRetries, 10);
+  if (!(rateLimitRetries > 0)) rateLimitRetries = 4;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   var isTv = ctx.type !== 'movie';
@@ -36,6 +42,19 @@ function extract(ctx) {
       .replace(/\//g, '_')
       .replace(/=+$/g, '');
     return stOrigin + '/config/' + b64;
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function isRateLimited(status, body) {
+    if (status === 429 || (status >= 500 && status < 600)) return true;
+    var text = String(body || '');
+    if (text.length >= 65536) return false;
+    return /error\s*(?:code:?\s*)?1015|you are being rate limited/i.test(text);
   }
 
   function qualityWithCodecs(str) {
@@ -84,6 +103,14 @@ function extract(ctx) {
     return out;
   }
 
+  function fetchOnce(endpoint) {
+    return ctx.fetch(endpoint, { headers: headers }).then(function (r) {
+      return r.text().then(function (body) {
+        return { status: r.status, body: body };
+      });
+    });
+  }
+
   function fetchStreamsForId(addonBase, id) {
     var endpoint;
     if (isTv) {
@@ -94,17 +121,32 @@ function extract(ctx) {
       endpoint = addonBase + '/stream/movie/' + id + '.json';
     }
     ctx.log('addon ' + endpoint.slice(0, 140));
-    return ctx
-      .fetch(endpoint, { headers: headers })
-      .then(function (r) {
-        ctx.log('addon http ' + r.status);
-        if (r.status !== 200) return [];
-        return r.json().then(function (data) {
-          var streams = data && data.streams ? data.streams : [];
-          ctx.log('addon streams=' + streams.length + ' id=' + id);
-          return rowsFromStreams(streams);
-        });
+
+    function attempt(n) {
+      return fetchOnce(endpoint).then(function (res) {
+        ctx.log('addon http ' + res.status + (n > 1 ? ' try=' + n : ''));
+        if (res.status === 200) {
+          try {
+            var data = JSON.parse(res.body || '{}');
+            var streams = data && data.streams ? data.streams : [];
+            ctx.log('addon streams=' + streams.length + ' id=' + id);
+            return rowsFromStreams(streams);
+          } catch (e) {
+            ctx.log('addon json fail id=' + id);
+            return [];
+          }
+        }
+        if (isRateLimited(res.status, res.body) && n <= rateLimitRetries) {
+          ctx.log('addon rate-limit wait ' + rateLimitWaitMs + 'ms try=' + n);
+          return sleep(rateLimitWaitMs).then(function () {
+            return attempt(n + 1);
+          });
+        }
+        return [];
       });
+    }
+
+    return attempt(1);
   }
 
   function resolveIds() {

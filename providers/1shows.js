@@ -1,7 +1,8 @@
 var SPECS = {
-  "origin": "https://www.1shows.org",
+  "origin": "https://www.1shows.bz",
   "api": "https://api.viduki.net",
-  "downloadKeyHex": "7e82474d94d34f79c91eda37abfe27fb44e515fe8eea8db0a89958b798f745b1",
+  // AES-256 key derived from makimaDL.wasm tables (rotates with that asset).
+  "downloadKeyHex": "8a4df84251d6e25688e68342d1b28fa281f9bd04a3e437a2cf496e9a896f515b",
   "tmdbKey": "439c478a771f35c05022f9feabcca01c"
 };
 
@@ -9,7 +10,6 @@ function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var site = cfg.origin.replace(/\/$/, '');
   var api = cfg.api.replace(/\/$/, '');
-  // AES-256 key from 1Shows public makimaDL.wasm StaticArray (rotates with that asset).
   var downloadKeyHex = cfg.downloadKeyHex;
   var tmdbKey = cfg.tmdbKey;
   var ua =
@@ -229,12 +229,14 @@ function extract(ctx) {
     var iv = payloadBytes(payload.iv);
     var ct = payloadBytes(payload.ct);
     var tag = payloadBytes(payload.tag);
-    var aadCandidates = [utf8Bytes(token)];
+    // Site passes hex-decoded token bytes as GCM AAD.
+    var aadCandidates = [];
     try {
       if (/^[0-9a-f]+$/i.test(String(token || '')) && String(token).length % 2 === 0) {
         aadCandidates.push(hexToBytes(token));
       }
     } catch (e) {}
+    aadCandidates.push(utf8Bytes(token));
     var lastErr = null;
     for (var ai = 0; ai < aadCandidates.length; ai++) {
       try {

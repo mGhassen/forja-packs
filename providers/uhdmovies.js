@@ -51,17 +51,18 @@ function extract(ctx) {
 
   function fixUrl(url, domain) {
     if (!url) return '';
-    if (/^https?:/i.test(url)) return url;
-    if (url.startsWith('//')) return 'https:' + url;
-    if (url.startsWith('/')) return domain + url;
-    return domain + '/' + url;
+    var cleaned = String(url).replace(/\\\//g, '/');
+    if (/^https?:/i.test(cleaned)) return cleaned;
+    if (cleaned.startsWith('//')) return 'https:' + cleaned;
+    if (cleaned.startsWith('/')) return domain + cleaned;
+    return domain + '/' + cleaned;
   }
 
   // SID shorteners (tech.unblockedgames, thenaukriadda, …) — never playable as-is.
   function isSidLink(url) {
     if (!url) return false;
     if (/[?&]sid=/i.test(url)) return true;
-    return /unblockedgames|examzculture|creativeexpressionsblog|thenaukriadda/i.test(url);
+    return /unblockedgames|examzculture|creativeexpressionsblog|thenaukriadda|examdegree/i.test(url);
   }
 
   function metaRefreshUrl(html) {
@@ -69,54 +70,109 @@ function extract(ctx) {
     return m ? m[1].replace(/['"]/g, '') : null;
   }
 
-  function bypassHrefli(url) {
+  function formBody(data) {
+    return Object.keys(data).map(function (k) {
+      return k + '=' + encodeURIComponent(data[k] == null ? '' : data[k]);
+    }).join('&');
+  }
+
+  function readForm($root, selector) {
+    var $f = $root(selector).first();
+    var action = $f.attr('action') || '';
+    var data = {};
+    $f.find('input').each(function () {
+      var name = $root(this).attr('name');
+      if (name) data[name] = $root(this).attr('value') || '';
+    });
+    return { action: action, data: data };
+  }
+
+  function redirectFromHtml(html) {
+    var body = String(html || '');
+    var loc = body.match(/location\.replace\(\s*["']([^"']+)["']\s*\)/i)
+      || body.match(/replace\(\s*["']([^"']+)["']\s*\)/);
+    if (loc) return loc[1].replace(/\\\//g, '/');
+    return metaRefreshUrl(body);
+  }
+
+  function bypassLandingFrom(html1, url) {
     var host = getBaseUrl(url);
-    return fetchText(url).then(function (html1) {
-      var $1 = ctx.html(html1);
-      var formUrl1 = $1('form#landing').attr('action');
-      if (!formUrl1) return null;
-      var formData1 = {};
-      $1('form#landing input').each(function () { formData1[$1(this).attr('name')] = $1(this).attr('value') || ''; });
-      return ctx.fetch(formUrl1, {
-        method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url }),
-        body: Object.keys(formData1).map(function (k) { return k + '=' + encodeURIComponent(formData1[k]); }).join('&'),
-      }).then(function (r) { return r.text(); }).then(function (html2) {
-        var $2 = ctx.html(html2);
-        var formUrl2 = $2('form#landing').attr('action');
-        if (!formUrl2) return null;
-        var formData2 = {};
-        $2('form#landing input').each(function () { formData2[$2(this).attr('name')] = $2(this).attr('value') || ''; });
-        return ctx.fetch(formUrl2, {
-          method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: formUrl1 }),
-          body: Object.keys(formData2).map(function (k) { return k + '=' + encodeURIComponent(formData2[k]); }).join('&'),
-        }).then(function (r) { return r.text(); }).then(function (html3) {
-          var body = String(html3 || '');
-          // Current SID pages: dynamic cookie + href from inline JS.
-          var cookieM = body.match(/s_\d+\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
-          var linkM = body.match(/setAttribute\(\s*["']href["']\s*,\s*["']([^"']+)["']\)/);
-          if (cookieM && linkM) {
-            var goUrl = fixUrl(linkM[1], host);
-            return fetchText(goUrl, { Cookie: cookieM[1] + '=' + cookieM[2], Referer: formUrl2 }).then(function (html4) {
-              return metaRefreshUrl(html4);
-            });
-          }
-          // Legacy: ?go= token + cookie from _wp_http2.
-          var skM = body.match(/\?go=([^"'\s]+)/);
-          if (!skM) return null;
-          var skToken = skM[1];
-          var wpHttp2 = formData2['_wp_http2'] || '';
-          return fetchText(host + '?go=' + skToken, { Cookie: skToken + '=' + wpHttp2 }).then(function (html4) {
-            var metaM = metaRefreshUrl(html4);
-            if (!metaM) return null;
-            if (/driveseed|driveleech|video-seed/i.test(metaM)) return metaM;
-            return fetchText(metaM).then(function (html5) {
-              var pm = String(html5 || '').match(/replace\("([^"]+)"\)/);
-              if (!pm || pm[1] === '/404') return metaM;
-              return fixUrl(pm[1], getBaseUrl(metaM));
-            });
+    var $1 = ctx.html(html1);
+    var form1 = readForm($1, 'form#landing');
+    if (!form1.action) return Promise.resolve(null);
+    return ctx.fetch(form1.action, {
+      method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url }),
+      body: formBody(form1.data),
+    }).then(function (r) { return r.text(); }).then(function (html2) {
+      var $2 = ctx.html(html2);
+      var form2 = readForm($2, 'form#landing');
+      if (!form2.action) return null;
+      return ctx.fetch(form2.action, {
+        method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: form1.action }),
+        body: formBody(form2.data),
+      }).then(function (r) { return r.text(); }).then(function (html3) {
+        var body = String(html3 || '');
+        var cookieM = body.match(/s_\d+\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
+        var linkM = body.match(/setAttribute\(\s*["']href["']\s*,\s*["']([^"']+)["']\)/);
+        if (cookieM && linkM) {
+          var goUrl = fixUrl(linkM[1], host);
+          return fetchText(goUrl, { Cookie: cookieM[1] + '=' + cookieM[2], Referer: form2.action }).then(function (html4) {
+            return redirectFromHtml(html4);
+          });
+        }
+        var skM = body.match(/\?go=([^"'\s]+)/);
+        if (!skM) return redirectFromHtml(body);
+        var skToken = skM[1];
+        var wpHttp2 = form2.data['_wp_http2'] || '';
+        return fetchText(host + '?go=' + skToken, { Cookie: skToken + '=' + wpHttp2 }).then(function (html4) {
+          var metaM = redirectFromHtml(html4);
+          if (!metaM) return null;
+          if (/driveseed|driveleech|video-seed/i.test(metaM)) return metaM;
+          return fetchText(metaM).then(function (html5) {
+            var pm = redirectFromHtml(html5);
+            if (!pm || pm === '/404') return metaM;
+            return fixUrl(pm, getBaseUrl(metaM));
           });
         });
       });
+    });
+  }
+
+  function bypassLpLandFrom(html1, url) {
+    var host = getBaseUrl(url);
+    var $1 = ctx.html(html1);
+    var form1 = readForm($1, 'form#lp-land');
+    if (!form1.action && !form1.data._lp_http) return Promise.resolve(null);
+    var action1 = fixUrl(form1.action || host + '/', host);
+    return ctx.fetch(action1, {
+      method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: url }),
+      body: formBody(form1.data),
+    }).then(function (r) { return r.text(); }).then(function (html2) {
+      var $2 = ctx.html(html2);
+      var form2 = readForm($2, 'form[id^="lp-s"][id$="-form"]');
+      if (!form2.action) return null;
+      var action2 = fixUrl(form2.action, host);
+      return ctx.fetch(action2, {
+        method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', Referer: action1 }),
+        body: formBody(form2.data),
+      }).then(function (r) { return r.text(); }).then(function (html3) {
+        var body = String(html3 || '');
+        var cookieM = body.match(/sc\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']/);
+        var linkM = body.match(/setAttribute\(\s*["']href["']\s*,\s*["']([^"']+)["']\)/);
+        if (!cookieM || !linkM) return null;
+        var goUrl = fixUrl(linkM[1], host);
+        var cookieVal = cookieM[2].replace(/\\\//g, '/');
+        return fetchText(goUrl, { Cookie: cookieM[1] + '=' + cookieVal, Referer: action2 }).then(function (html4) {
+          return redirectFromHtml(html4);
+        });
+      });
+    });
+  }
+
+  function bypassHrefli(url) {
+    return fetchText(url).then(function (html) {
+      if (/id=["']lp-land["']|_lp_http/i.test(html)) return bypassLpLandFrom(html, url);
+      return bypassLandingFrom(html, url);
     }).catch(function () { return null; });
   }
 
