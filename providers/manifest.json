@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.5.47",
+  "version": "1.6.0",
   "tags": [
     "providers",
     "anime",
@@ -938,6 +938,418 @@
       ]
     },
     {
+      "kind": "http",
+      "id": "a111477",
+      "name": "111477",
+      "entry": "a111477.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "vadapav",
+      "name": "Vadapav",
+      "entry": "vadapav.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "xdownloader",
+      "name": "XDownloader",
+      "entry": "xdownloader.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "flystream",
+      "name": "FlyStream",
+      "entry": "flystream.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "movienight",
+      "name": "MovieNight",
+      "entry": "movienight.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "downloadeverything",
+      "name": "DownloadEverything",
+      "entry": "downloadeverything.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "movy",
+      "name": "Movy",
+      "entry": "movy.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "prelude": "_streamcrypto.js"
+    },
+    {
+      "kind": "http",
+      "id": "vuflix",
+      "name": "Vuflix",
+      "entry": "vuflix.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "rivestream",
+      "name": "RiveStream",
+      "entry": "rivestream.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "dulo",
+      "name": "Dulo",
+      "entry": "dulo.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "flaxmovies",
+      "name": "FlaxMovies",
+      "entry": "flaxmovies.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "vidgod",
+      "name": "VidGod",
+      "entry": "vidgod.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "vidfast",
+      "name": "VidFast",
+      "entry": "vidfast.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "peestream",
+      "name": "PeeStream",
+      "entry": "peestream.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "lookmovie",
+      "name": "LookMovie",
+      "entry": "lookmovie.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "bcine",
+      "name": "Bcine",
+      "entry": "bcine.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "mapple",
+      "name": "Mapple",
+      "entry": "mapple.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "prelude": "_streamcrypto.js"
+    },
+    {
+      "kind": "http",
+      "id": "nova",
+      "name": "Nova",
+      "entry": "nova.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "megasource",
+      "name": "MegaSource",
+      "entry": "megasource.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "purstream",
+      "name": "Purstream",
+      "entry": "purstream.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "vidapi",
+      "name": "VidApi",
+      "entry": "vidapi.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "vidvault",
+      "name": "VidVault",
+      "entry": "vidvault.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "cinesrc",
+      "name": "CineSrc",
+      "entry": "cinesrc.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "cinesu",
+      "name": "CineSu",
+      "entry": "cinesu.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "frame",
+      "name": "Frame",
+      "entry": "frame.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "fsharetv",
+      "name": "FshareTV",
+      "entry": "fsharetv.js",
+      "types": [
+        "movie"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "fsonic",
+      "name": "FSonic",
+      "entry": "fsonic.js",
+      "types": [
+        "movie"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "fsonline",
+      "name": "FSOnline",
+      "entry": "fsonline.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "lmscript",
+      "name": "LMScript",
+      "entry": "lmscript.js",
+      "types": [
+        "movie"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "xpass",
+      "name": "XPass",
+      "entry": "xpass.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "zxcstream",
+      "name": "ZxcStream",
+      "entry": "zxcstream.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "prelude": "_streamcrypto.js"
+    },
+    {
+      "kind": "http",
+      "id": "hindmoviez",
+      "name": "HindMoviez",
+      "entry": "hindmoviez.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "prelude": "_streamcrypto.js"
+    },
+    {
+      "kind": "http",
+      "id": "recloud",
+      "name": "ReCloud",
+      "entry": "recloud.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "tryembed",
+      "name": "TryEmbed",
+      "entry": "tryembed.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "luna",
+      "name": "Luna",
+      "entry": "luna.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "123anime",
+      "name": "123Anime",
+      "entry": "123anime.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "anihq",
+      "name": "AniHQ",
+      "entry": "anihq.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "anipm",
+      "name": "AniPM",
+      "entry": "anipm.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "dulo-anime",
+      "name": "Dulo Anime",
+      "entry": "dulo-anime.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "watchhentai",
+      "name": "WatchHentai",
+      "entry": "watchhentai.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "hentaini",
+      "name": "Hentaini",
+      "entry": "hentaini.js",
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "arabicanime",
+      "name": "ArabicAnime",
+      "entry": "arabicanime.js",
+      "types": [
+        "anime",
+        "arabic"
+      ]
+    },
+    {
       "id": "hop-flixcloud",
       "name": "FlixCloud",
       "entry": "flixcloud.js",
@@ -1365,6 +1777,48 @@
     "aniwaves.js",
     "miruro.js",
     "dailymotion.js",
+    "a111477.js",
+    "vadapav.js",
+    "xdownloader.js",
+    "flystream.js",
+    "movienight.js",
+    "downloadeverything.js",
+    "movy.js",
+    "vuflix.js",
+    "rivestream.js",
+    "dulo.js",
+    "flaxmovies.js",
+    "vidgod.js",
+    "vidfast.js",
+    "peestream.js",
+    "lookmovie.js",
+    "bcine.js",
+    "mapple.js",
+    "nova.js",
+    "megasource.js",
+    "purstream.js",
+    "vidapi.js",
+    "vidvault.js",
+    "cinesrc.js",
+    "cinesu.js",
+    "frame.js",
+    "fsharetv.js",
+    "fsonic.js",
+    "fsonline.js",
+    "lmscript.js",
+    "xpass.js",
+    "zxcstream.js",
+    "hindmoviez.js",
+    "recloud.js",
+    "tryembed.js",
+    "luna.js",
+    "123anime.js",
+    "anihq.js",
+    "anipm.js",
+    "dulo-anime.js",
+    "watchhentai.js",
+    "hentaini.js",
+    "arabicanime.js",
     "hops/abyss.js",
     "hops/megaup.js",
     "hops/onetouchtv.js",
