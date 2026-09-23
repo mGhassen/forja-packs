@@ -382,6 +382,69 @@ async function resolveGolf(ctx, slot, cfg) {
   return JSON.parse('[' + m3u8M[1] + ']').join('');
 }
 
+function resolvePlaylistUri(baseUrl, ref) {
+  var t = String(ref || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  try {
+    return new URL(t, baseUrl).href;
+  } catch (_) {
+    return '';
+  }
+}
+
+/** WAF decoy segment URIs (still images), including TikTok `.image` hosts. */
+function isImageBaitUri(uri) {
+  var path = String(uri || '').split('?')[0].toLowerCase();
+  if (!path) return false;
+  if (/\.(png|jpe?g|gif|webp|svg|image)$/i.test(path)) return true;
+  if (path.indexOf('tiktokcdn') >= 0 && path.indexOf('.image') >= 0) return true;
+  return false;
+}
+
+function isImageMagicBytes(u8) {
+  if (!u8 || u8.length < 12) return false;
+  if (u8[0] === 0x89 && u8[1] === 0x50) return true; // PNG
+  if (u8[0] === 0xff && u8[1] === 0xd8) return true; // JPEG
+  if (u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) return true; // GIF
+  // RIFF....WEBP
+  return (
+    u8[0] === 0x52 &&
+    u8[1] === 0x49 &&
+    u8[2] === 0x46 &&
+    u8[3] === 0x46 &&
+    u8[8] === 0x57 &&
+    u8[9] === 0x45 &&
+    u8[10] === 0x42 &&
+    u8[11] === 0x50
+  );
+}
+
+function firstMediaPlaylistUri(masterBody, masterUrl) {
+  var lines = String(masterBody || '').split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].trim().indexOf('#EXT-X-STREAM-INF') !== 0) continue;
+    for (var j = i + 1; j < lines.length; j++) {
+      var next = lines[j].trim();
+      if (!next || next.charAt(0) === '#') continue;
+      return resolvePlaylistUri(masterUrl, next);
+    }
+  }
+  return '';
+}
+
+function playlistSegmentUris(body, baseUrl) {
+  var out = [];
+  var lines = String(body || '').split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line || line.charAt(0) === '#') continue;
+    var abs = resolvePlaylistUri(baseUrl, line);
+    if (abs) out.push(abs);
+  }
+  return out;
+}
+
 async function probePlayableM3u8(ctx, url, headers) {
   var target = String(url || '').trim();
   if (!target) return false;
@@ -389,7 +452,40 @@ async function probePlayableM3u8(ctx, url, headers) {
     var res = await ctx.fetch(target, { headers: headers || {} });
     if (!res.ok) return false;
     var text = String(await res.text() || '').replace(/^\s+/, '');
-    return text.indexOf('#EXTM3U') === 0;
+    if (text.indexOf('#EXTM3U') !== 0) return false;
+
+    var mediaUrl = target;
+    if (text.indexOf('#EXT-X-STREAM-INF') >= 0) {
+      mediaUrl = firstMediaPlaylistUri(text, target);
+      if (!mediaUrl) return false;
+      var mediaRes = await ctx.fetch(mediaUrl, { headers: headers || {} });
+      if (!mediaRes.ok) return false;
+      text = String(await mediaRes.text() || '').replace(/^\s+/, '');
+      if (text.indexOf('#EXTM3U') !== 0) return false;
+    }
+
+    var segs = playlistSegmentUris(text, mediaUrl);
+    if (!segs.length) return false;
+    var bait = 0;
+    for (var i = 0; i < segs.length; i++) {
+      if (isImageBaitUri(segs[i])) bait++;
+    }
+    // Every URI is a still-image decoy (common embedindia WAF).
+    if (bait === segs.length) return false;
+
+    var sample = segs[0];
+    for (var j = 0; j < segs.length; j++) {
+      if (!isImageBaitUri(segs[j])) {
+        sample = segs[j];
+        break;
+      }
+    }
+    var segRes = await ctx.fetch(sample, { headers: headers || {} });
+    if (!segRes.ok) return false;
+    var buf = await arrayBuffer(segRes);
+    var u8 = new Uint8Array(buf);
+    if (isImageMagicBytes(u8)) return false;
+    return u8.length > 0;
   } catch (_) {
     return false;
   }

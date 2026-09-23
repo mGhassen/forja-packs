@@ -439,6 +439,48 @@ async function resolveGolf(ctx, slot, cfg) {
   return JSON.parse('[' + m3u8M[1] + ']').join('');
 }
 
+function isImageBaitUri(uri) {
+  var raw = String(uri || '').trim();
+  if (!raw) return false;
+  var path = raw.split('?')[0].toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|svg|image)$/i.test(path)) return true;
+  // embedindia WAF decoy: TikTok CDN stills named *.image (RIFF/WEBP body).
+  if (path.indexOf('tiktokcdn') >= 0 && path.indexOf('tplv-tiktokx-origin') >= 0) {
+    return true;
+  }
+  return false;
+}
+
+function looksLikeImageMagic(bytes) {
+  if (!bytes || bytes.length < 12) return false;
+  var b0 = bytes[0] & 0xff;
+  var b1 = bytes[1] & 0xff;
+  if (b0 === 0x89 && b1 === 0x50) return true; // PNG
+  if (b0 === 0xff && b1 === 0xd8) return true; // JPEG
+  if (b0 === 0x47 && b1 === 0x49) return true; // GIF
+  // RIFF....WEBP
+  return (
+    b0 === 0x52 &&
+    b1 === 0x49 &&
+    (bytes[8] & 0xff) === 0x57 &&
+    (bytes[9] & 0xff) === 0x45
+  );
+}
+
+function firstPlaylistUri(body, baseUrl) {
+  var lines = String(body || '').split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line || line.charAt(0) === '#') continue;
+    try {
+      return new URL(line, baseUrl).href;
+    } catch (_) {
+      return line;
+    }
+  }
+  return '';
+}
+
 async function probePlayableM3u8(ctx, url, headers) {
   var target = String(url || '').trim();
   if (!target) return false;
@@ -446,7 +488,26 @@ async function probePlayableM3u8(ctx, url, headers) {
     var res = await ctx.fetch(target, { headers: headers || {} });
     if (!res.ok) return false;
     var text = String(await res.text() || '').replace(/^\s+/, '');
-    return text.indexOf('#EXTM3U') === 0;
+    if (text.indexOf('#EXTM3U') !== 0) return false;
+    var mediaUrl = target;
+    if (text.indexOf('#EXT-X-STREAM-INF') >= 0) {
+      mediaUrl = firstPlaylistUri(text, target);
+      if (!mediaUrl) return false;
+      var mediaRes = await ctx.fetch(mediaUrl, { headers: headers || {} });
+      if (!mediaRes.ok) return false;
+      text = String(await mediaRes.text() || '').replace(/^\s+/, '');
+      if (text.indexOf('#EXTM3U') !== 0) return false;
+    }
+    var segUrl = firstPlaylistUri(text, mediaUrl);
+    if (!segUrl) return false;
+    if (isImageBaitUri(segUrl)) return false;
+    var segRes = await ctx.fetch(segUrl, { headers: headers || {} });
+    if (!segRes.ok) return false;
+    var buf = await arrayBuffer(segRes);
+    var bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    // Only need magic — large WebP decoys are multi-MB.
+    if (looksLikeImageMagic(bytes.subarray(0, 16))) return false;
+    return true;
   } catch (_) {
     return false;
   }
