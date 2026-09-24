@@ -75,7 +75,13 @@ function iptvNormStreams(raw, kindFallback) {
         s.icon || s.stream_icon || s.logo || s.cover || s.poster || '',
       ).trim(),
       categoryId: String(s.categoryId || s.category_id || 'all').trim() || 'all',
-      url: s.url ? String(s.url).trim() : undefined,
+      url: (function () {
+        var u = s.url ? String(s.url).trim() : '';
+        if (u) return u;
+        // M3U catalog_page rows encode the play URL as id/stream_id.
+        if (/^https?:\/\//i.test(id) || id.indexOf('://') > 0) return id;
+        return undefined;
+      })(),
       ext: String(s.ext || s.container_ext || s.container_extension || '')
         .replace(/^\./, '')
         .trim(),

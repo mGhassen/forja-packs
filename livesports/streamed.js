@@ -375,17 +375,15 @@ async function resolveStream(ctx, cfg) {
   }
   if (!m3u8) throw new Error('goat unlock failed');
   var headers = playbackHeadersForSlot(slot, cfg);
-  var src = String(slot.source || '').toLowerCase();
-  if (src === 'echo' || src === 'streamed') {
-    if (!(await probePlayableM3u8(ctx, m3u8, headers))) {
-      throw new Error('goat m3u8 not playable');
-    }
-  }
+  // Admin goat: master lists 1080p WebP bait then playable 540p — pin the
+  // highest playable media playlist (MediaKit does not ABR-fallback like web).
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) throw new Error('goat m3u8 not playable');
   return [
     {
-      url: m3u8,
+      url: playable,
       headers: headers,
-      directPlayback: preferDirectPlayback(m3u8),
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }

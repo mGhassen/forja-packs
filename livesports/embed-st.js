@@ -208,6 +208,9 @@ function preferDirectPlayback(m3u8Url) {
   if (host.indexOf('strmd.st') >= 0 && path.indexOf('/streamfree/stream/') >= 0) {
     return true;
   }
+  if (host.indexOf('strmd.st') >= 0 && path.indexOf('/rtmp/stream/') >= 0) {
+    return true;
+  }
   if (
     (host.indexOf('streamfree.top') >= 0 || host.indexOf('strmfree.st') >= 0) &&
     (path.indexOf('/live/') >= 0 ||
@@ -421,16 +424,31 @@ function isImageMagicBytes(u8) {
 }
 
 function firstMediaPlaylistUri(masterBody, masterUrl) {
+  var entries = masterVariantEntries(masterBody, masterUrl);
+  return entries.length ? entries[0].url : '';
+}
+
+function masterVariantEntries(masterBody, masterUrl) {
+  var out = [];
   var lines = String(masterBody || '').split('\n');
   for (var i = 0; i < lines.length; i++) {
-    if (lines[i].trim().indexOf('#EXT-X-STREAM-INF') !== 0) continue;
+    var line = lines[i].trim();
+    if (line.indexOf('#EXT-X-STREAM-INF') !== 0) continue;
+    var bw = 0;
+    var m = line.match(/BANDWIDTH=(\d+)/i);
+    if (m) bw = parseInt(m[1], 10) || 0;
     for (var j = i + 1; j < lines.length; j++) {
       var next = lines[j].trim();
       if (!next || next.charAt(0) === '#') continue;
-      return resolvePlaylistUri(masterUrl, next);
+      var abs = resolvePlaylistUri(masterUrl, next);
+      if (abs) out.push({ url: abs, bandwidth: bw });
+      break;
     }
   }
-  return '';
+  out.sort(function (a, b) {
+    return (b.bandwidth || 0) - (a.bandwidth || 0);
+  });
+  return out;
 }
 
 function playlistSegmentUris(body, baseUrl) {
@@ -445,50 +463,66 @@ function playlistSegmentUris(body, baseUrl) {
   return out;
 }
 
-async function probePlayableM3u8(ctx, url, headers) {
+async function mediaPlaylistIsPlayable(ctx, mediaUrl, headers, bodyText) {
+  var text = bodyText;
+  if (text == null) {
+    var mediaRes = await ctx.fetch(mediaUrl, { headers: headers || {} });
+    if (!mediaRes.ok) return false;
+    text = String(await mediaRes.text() || '').replace(/^\s+/, '');
+  }
+  if (text.indexOf('#EXTM3U') !== 0) return false;
+  var segs = playlistSegmentUris(text, mediaUrl);
+  if (!segs.length) return false;
+  var bait = 0;
+  for (var i = 0; i < segs.length; i++) {
+    if (isImageBaitUri(segs[i])) bait++;
+  }
+  if (bait === segs.length) return false;
+  var sample = segs[0];
+  for (var j = 0; j < segs.length; j++) {
+    if (!isImageBaitUri(segs[j])) {
+      sample = segs[j];
+      break;
+    }
+  }
+  var segRes = await ctx.fetch(sample, { headers: headers || {} });
+  if (!segRes.ok) return false;
+  var buf = await arrayBuffer(segRes);
+  var u8 = new Uint8Array(buf);
+  if (isImageMagicBytes(u8)) return false;
+  return u8.length > 0;
+}
+
+/**
+ * Highest-bandwidth playable media playlist (skip TikTok WebP bait variants).
+ */
+async function selectPlayableM3u8(ctx, url, headers) {
   var target = String(url || '').trim();
-  if (!target) return false;
+  if (!target) return '';
   try {
     var res = await ctx.fetch(target, { headers: headers || {} });
-    if (!res.ok) return false;
+    if (!res.ok) return '';
     var text = String(await res.text() || '').replace(/^\s+/, '');
-    if (text.indexOf('#EXTM3U') !== 0) return false;
-
-    var mediaUrl = target;
-    if (text.indexOf('#EXT-X-STREAM-INF') >= 0) {
-      mediaUrl = firstMediaPlaylistUri(text, target);
-      if (!mediaUrl) return false;
-      var mediaRes = await ctx.fetch(mediaUrl, { headers: headers || {} });
-      if (!mediaRes.ok) return false;
-      text = String(await mediaRes.text() || '').replace(/^\s+/, '');
-      if (text.indexOf('#EXTM3U') !== 0) return false;
+    if (text.indexOf('#EXTM3U') !== 0) return '';
+    if (text.indexOf('#EXT-X-STREAM-INF') < 0) {
+      return (await mediaPlaylistIsPlayable(ctx, target, headers, text))
+        ? target
+        : '';
     }
-
-    var segs = playlistSegmentUris(text, mediaUrl);
-    if (!segs.length) return false;
-    var bait = 0;
-    for (var i = 0; i < segs.length; i++) {
-      if (isImageBaitUri(segs[i])) bait++;
-    }
-    // Every URI is a still-image decoy (common embedindia WAF).
-    if (bait === segs.length) return false;
-
-    var sample = segs[0];
-    for (var j = 0; j < segs.length; j++) {
-      if (!isImageBaitUri(segs[j])) {
-        sample = segs[j];
-        break;
+    var variants = masterVariantEntries(text, target);
+    for (var i = 0; i < variants.length; i++) {
+      if (await mediaPlaylistIsPlayable(ctx, variants[i].url, headers)) {
+        return variants[i].url;
       }
     }
-    var segRes = await ctx.fetch(sample, { headers: headers || {} });
-    if (!segRes.ok) return false;
-    var buf = await arrayBuffer(segRes);
-    var u8 = new Uint8Array(buf);
-    if (isImageMagicBytes(u8)) return false;
-    return u8.length > 0;
+    return '';
   } catch (_) {
-    return false;
+    return '';
   }
+}
+
+async function probePlayableM3u8(ctx, url, headers) {
+  return !!(await selectPlayableM3u8(ctx, url, headers));
 }
 
 async function resolveGoatEmbed(ctx, embedUrl, cfg) {
@@ -511,16 +545,13 @@ async function resolveGoatEmbed(ctx, embedUrl, cfg) {
   }
   if (!m3u8) return null;
   var headers = playbackHeadersForSlot(slot, cfg);
-  // Dead/gated slots still crack to a signed CDN URL that 403s on open.
-  var src = String(slot.source || '').toLowerCase();
-  if (src === 'echo' || src === 'streamed') {
-    if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
-  }
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) return null;
   return [
     {
-      url: m3u8,
+      url: playable,
       headers: headers,
-      directPlayback: preferDirectPlayback(m3u8),
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }
@@ -643,16 +674,17 @@ async function resolveEpiEmbeds(ctx, embedUrl, cfg) {
   if (ctx.live && typeof ctx.live.sniffEmbed === 'function') {
     var ref = epiEmbedsReferer(raw);
     var m3u8 = await ctx.live.sniffEmbed(raw, ref);
-    if (m3u8) {
+      if (m3u8) {
       var origin = ref.replace(/\/$/, '');
       var headers = { Referer: raw, Origin: origin, 'User-Agent': ua() };
-      if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
+      var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+      if (!playable) return null;
       return [
         {
-          url: m3u8,
+          url: playable,
           headers: headers,
           // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
-          directPlayback: preferDirectPlayback(m3u8),
+          directPlayback: preferDirectPlayback(playable),
         },
       ];
     }
@@ -675,13 +707,14 @@ async function resolveEmbedIndia(ctx, embedUrl, cfg) {
   if (!m3u8) return null;
   var headers = playbackHeadersForEmbedIndia(slot, embedUrl);
   // Dead JW sniff / gated slots still yield a signed URL that EOFs in the player.
-  if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) return null;
   return [
     {
-      url: m3u8,
+      url: playable,
       headers: headers,
       // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
-      directPlayback: preferDirectPlayback(m3u8),
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }

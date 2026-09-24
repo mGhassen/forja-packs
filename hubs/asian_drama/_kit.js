@@ -832,6 +832,18 @@ function hubApplyTmdbHit(meta, hit) {
   if (hit.premiereDate && !String(meta.premiereDate || '').trim()) {
     meta.premiereDate = String(hit.premiereDate);
   }
+  // Card / list subtitle reads releaseInfo — fill from TMDB when KissKH omitted it.
+  if (!String(meta.releaseInfo || '').trim()) {
+    var year =
+      hit.year != null && Number(hit.year) > 0
+        ? String(hit.year)
+        : hit.premiereDate
+          ? String(hit.premiereDate).slice(0, 4)
+          : '';
+    if (year && /^(19|20)\d{2}$/.test(year)) {
+      meta.releaseInfo = year;
+    }
+  }
   if (
     hit.premiereDate &&
     hubIsFutureIsoDate(hit.premiereDate) &&
@@ -1205,6 +1217,10 @@ function hubKisskhMetaFromRow(row) {
   var tmdb = row.tmdbID || row.tmdbId || row.tmdb_id;
   if (tmdb) ids.tmdb = String(tmdb);
   var release = String(row.releaseDate || '').trim();
+  if (!release) {
+    var titleYear = String(row.title || '').match(/\((19|20)\d{2}\)/);
+    if (titleYear) release = titleYear[0].slice(1, 5);
+  }
   var premiere = hubParseIsoDate(release);
   var cover = String(row.thumbnail || row.cover || '').trim();
   if (cover) {

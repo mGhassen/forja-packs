@@ -105,13 +105,29 @@ function hubPosterTypeLabel(meta) {
   var kind = String(meta.kind || meta.type || meta.mediaType || '')
     .trim()
     .toLowerCase();
+  var surface = '';
+  var open = meta.open || meta.metaOpen || meta.catalogOpen;
+  if (open && typeof open === 'object') {
+    surface = String(open.surface || '')
+      .trim()
+      .toLowerCase();
+  }
+  // Hub kinds win over TMDB hint — drama bookmarks often store tmdbMediaType=tv.
+  if (kind === 'asian_drama' || kind === 'drama' || surface === 'drama') {
+    return 'DRAMA';
+  }
+  if (kind === 'anime' || surface === 'anime') return 'ANIME';
   if (hint === 'tv' || kind === 'tv' || kind === 'series' || kind === 'shows') {
     return 'TV';
   }
   if (hint === 'movie' || kind === 'movie' || kind === 'movies') return 'FILM';
-  if (kind === 'anime') return 'ANIME';
-  if (kind === 'asian_drama' || kind === 'drama') return 'DRAMA';
   return null;
+}
+
+/** Year from trailing `(2026)` / `(1999)` in a title — KissKH often embeds it. */
+function hubYearFromTitle(title) {
+  var m = String(title || '').match(/\((19|20)\d{2}\)\s*$/);
+  return m ? m[0].slice(1, 5) : '';
 }
 
 function hubPosterCardSubtitle(meta) {
@@ -119,6 +135,9 @@ function hubPosterCardSubtitle(meta) {
   var release = String(
     meta.releaseInfo || meta.releaseDate || meta.year || '',
   ).trim();
+  if (!release) {
+    release = hubYearFromTitle(meta.name || meta.title || '');
+  }
   if (release.indexOf(' • ') !== -1) return release || null;
   var parts = [];
   if (release) {
@@ -127,6 +146,203 @@ function hubPosterCardSubtitle(meta) {
   var typeLabel = hubPosterTypeLabel(meta);
   if (typeLabel) parts.push(typeLabel);
   return parts.length ? parts.join(' • ') : null;
+}
+
+function myListTmdbAbs(path, size) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return 'https://tmdb.forjahq.xyz/t/p/' + (size || 'w500') + p;
+}
+
+function myListPickTitleLogo(images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? myListTmdbAbs(chosen.file_path, 'w500') : '';
+}
+
+function myListNeedsEnrich(row) {
+  if (!row || typeof row !== 'object') return false;
+  var tmdbId = Number(row.tmdbId);
+  if (!(tmdbId > 0)) return false;
+  var poster = String(row.posterPath || row.poster || '').trim();
+  var title = String(row.title || row.name || '').trim();
+  var vote = row.voteAverage != null ? row.voteAverage : row.rating;
+  var logo = String(row.logo || '').trim();
+  var release = String(
+    row.releaseDate || row.releaseInfo || row.year || '',
+  ).trim();
+  return (
+    !poster ||
+    !title ||
+    vote == null ||
+    Number(vote) === 0 ||
+    !logo ||
+    !release
+  );
+}
+
+function myListMediaType(row) {
+  var kind = String(row._simklType || '');
+  var mt = String(row.mediaType || row.kind || row.type || 'movie');
+  var tmdbMt = String(row.tmdbMediaType || '').trim();
+  if (tmdbMt === 'tv' || tmdbMt === 'movie') return tmdbMt;
+  if (
+    kind === 'anime' ||
+    kind === 'shows' ||
+    mt === 'anime' ||
+    mt === 'tv' ||
+    mt === 'series' ||
+    mt === 'asian_drama' ||
+    mt === 'drama'
+  ) {
+    return 'tv';
+  }
+  return 'movie';
+}
+
+function myListApplyTmdbDetails(row, data, mediaType) {
+  if (!row || !data) return row;
+  var next = Object.assign({}, row);
+  var title = String(data.title || data.name || '').trim();
+  var poster = myListTmdbAbs(data.poster_path, 'w500');
+  var backdrop = myListTmdbAbs(data.backdrop_path, 'w1280');
+  var logo = myListPickTitleLogo(data.images);
+  var vote = Number(data.vote_average);
+  var date = String(data.release_date || data.first_air_date || '');
+  if (title) {
+    next.title = title;
+    if (!next.name) next.name = title;
+  }
+  if (poster) {
+    next.posterPath = poster;
+    next.poster = poster;
+  }
+  if (backdrop) {
+    next.backdropPath = backdrop;
+    next.background = backdrop;
+  }
+  if (logo) next.logo = logo;
+  if (vote > 0) {
+    next.voteAverage = vote;
+    next.rating = vote;
+  }
+  if (date) {
+    next.releaseDate = date;
+    next.releaseInfo = date.length >= 4 ? date.slice(0, 4) : date;
+  }
+  // Never invent a tmdb open for hub bookmarks (anime/drama) — that would
+  // reopen them on Home providers.
+  var hubMt = String(next.mediaType || next.kind || '');
+  var open = next.metaOpen || next.open || next.catalogOpen;
+  var surface =
+    open && typeof open === 'object' ? String(open.surface || '') : '';
+  var isHub =
+    hubMt === 'anime' ||
+    hubMt === 'drama' ||
+    hubMt === 'asian_drama' ||
+    surface === 'anime' ||
+    surface === 'drama' ||
+    next.anilistId != null ||
+    next.kisskhId != null ||
+    (next.pluginId && String(next.pluginId) !== 'tmdb');
+  var hasOpen = !!(next.metaOpen || next.open || next.catalogOpen);
+  if (!hasOpen && !isHub) {
+    var tmdbOpen = {
+      surface: 'tmdb',
+      id: String(data.id),
+      extract: {
+        resolveType: mediaType,
+        panelCategory: mediaType,
+        ctx: { tmdbId: Number(data.id) },
+      },
+    };
+    next.catalogOpen = tmdbOpen;
+    next.metaOpen = tmdbOpen;
+    next.open = tmdbOpen;
+  }
+  // Subtitle must rebuild after year/art fill.
+  delete next.paint;
+  return next;
+}
+
+function hubTmdbGetDetails(ctx, mediaType, id) {
+  var n = Number(id);
+  if (!(n > 0)) return Promise.resolve(null);
+  var media = String(mediaType || 'movie') === 'tv' ? 'tv' : 'movie';
+  var cfg = hubConfig(ctx, {
+    base: 'https://tmdb.forjahq.xyz/3',
+    apiKey: '',
+  });
+  var key = String(cfg.apiKey || '').trim();
+  var base = String(cfg.base || 'https://tmdb.forjahq.xyz/3').replace(/\/$/, '');
+  if (base.indexOf('api.themoviedb.org') >= 0 && !key) {
+    return Promise.resolve(null);
+  }
+  var url =
+    base +
+    '/' +
+    media +
+    '/' +
+    n +
+    '?append_to_response=images' +
+    (key ? '&api_key=' + encodeURIComponent(key) : '');
+  return ctx
+    .fetch(url)
+    .then(function (res) {
+      if (!res.ok) return null;
+      return res.json();
+    })
+    .then(function (json) {
+      if (!json || json.success === false || json.status_code) return null;
+      return json;
+    })
+    .catch(function () {
+      return null;
+    });
+}
+
+function hubEnrichMyListRows(ctx, items, limit) {
+  if (!Array.isArray(items) || !items.length) {
+    return Promise.resolve(items || []);
+  }
+  var n = Number(limit) > 0 ? Number(limit) : items.length;
+  var out = items.slice();
+  var jobs = [];
+  for (var i = 0; i < out.length && jobs.length < n; i++) {
+    if (!myListNeedsEnrich(out[i])) continue;
+    (function (idx) {
+      jobs.push(
+        hubTmdbGetDetails(ctx, myListMediaType(out[idx]), out[idx].tmdbId).then(
+          function (data) {
+            if (!data) return;
+            out[idx] = myListApplyTmdbDetails(
+              out[idx],
+              data,
+              myListMediaType(out[idx]),
+            );
+          },
+        ),
+      );
+    })(i);
+  }
+  if (!jobs.length) return Promise.resolve(out);
+  return Promise.all(jobs).then(function () {
+    return out;
+  });
 }
 
 function hubPaintPoster(item, opts) {

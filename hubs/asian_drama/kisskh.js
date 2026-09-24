@@ -56,6 +56,10 @@ function kisskhMeta(row) {
   var tmdb = row.tmdbID || row.tmdbId || row.tmdb_id;
   if (tmdb) ids.tmdb = String(tmdb);
   var release = String(row.releaseDate || '').trim();
+  if (!release) {
+    var titleYear = String(row.title || '').match(/\((19|20)\d{2}\)/);
+    if (titleYear) release = titleYear[0].slice(1, 5);
+  }
   var premiere = hubParseIsoDate(release);
   var meta = {
     id: 'kisskh:' + row.id,
@@ -208,6 +212,19 @@ function kisskhDetails(ctx, cfg, params) {
         hubIsFutureIsoDate(meta.premiereDate)
       ) {
         meta.status = 'NOT_YET_RELEASED';
+      }
+      // Details often omit drama.releaseDate — use earliest episode air date.
+      if (!String(meta.releaseInfo || '').trim()) {
+        var earliest = '';
+        for (var ei = 0; ei < videos.length; ei++) {
+          var day = videos[ei].airDate;
+          if (!day) continue;
+          if (!earliest || day < earliest) earliest = day;
+        }
+        if (earliest) {
+          meta.releaseInfo = earliest.slice(0, 4);
+          if (!meta.premiereDate) meta.premiereDate = earliest;
+        }
       }
       var bg = String(raw.thumbnail || raw.cover || '').trim();
       if (bg) meta.background = kisskhCover(bg);

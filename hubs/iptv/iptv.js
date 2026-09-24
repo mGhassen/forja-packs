@@ -45,6 +45,10 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
   if (!url && platform === 'xtream') {
     url = iptvStreamPath(portal, 'live', id, ext);
   }
+  // M3U shelf / catalog_page: playable URL is stored as stream_id (no path build).
+  if (!url && platform === 'm3u') {
+    url = id;
+  }
   // Stalker: no CDN URL until host create_link — paint with pending handoff.
   if (!url && platform === 'stalker') {
     if (!id) return null;

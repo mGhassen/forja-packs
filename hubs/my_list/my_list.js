@@ -92,6 +92,23 @@ function myListIsHubRow(row) {
   return false;
 }
 
+/** Keep Simkl / stub year when a local hub bookmark wins and has none. */
+function myListCopyMissingRelease(dst, src) {
+  if (!dst || typeof dst !== 'object') return dst;
+  var has = String(
+    dst.releaseDate || dst.releaseInfo || dst.year || '',
+  ).trim();
+  if (has) return dst;
+  if (!src || typeof src !== 'object') return dst;
+  var from = String(
+    src.releaseDate || src.releaseInfo || src.year || '',
+  ).trim();
+  if (!from) return dst;
+  var next = Object.assign({}, dst);
+  next.releaseDate = from;
+  return next;
+}
+
 function simklCardItem(item) {
   if (!item || typeof item !== 'object') return null;
   var media = item.show || item.movie || item.anime || item;
@@ -208,7 +225,7 @@ function filterSimklByLocal(simklItems, allLocal, status, hiddenKeys) {
       if (localStatus !== status) continue;
       // Local hub bookmark wins over Simkl stub (anime / Asian Drama open).
       if (myListIsHubRow(local)) {
-        out.push(local);
+        out.push(myListCopyMissingRelease(local, s));
         continue;
       }
       // Keep Simkl art; stamp local identity + status onto the card.
@@ -266,15 +283,17 @@ function mergeLocalHubs(simklItems, localForStatus) {
       local.mediaType === 'drama') {
       // Hub drama always wins over a Simkl/TMDB stub with the same tmdb id.
       var tmdbD = asInt(local.tmdbId);
+      var stolen = null;
       if (tmdbD != null) {
         for (var di = out.length - 1; di >= 0; di--) {
           if (!myListIsHubRow(out[di]) && asInt(out[di].tmdbId) === tmdbD) {
+            if (!stolen) stolen = out[di];
             out.splice(di, 1);
           }
         }
         seenTmdb[tmdbD] = true;
       }
-      out.push(local);
+      out.push(myListCopyMissingRelease(local, stolen));
       for (var d = 0; d < localKeys.length; d++) seenHub[localKeys[d]] = true;
       continue;
     }
@@ -298,6 +317,13 @@ function myListShapeRow(row) {
   out.kind = kind;
   if (!out.type) out.type = kind;
   if (!out.listStatus && out.status) out.listStatus = String(out.status);
+  // KissKH often embeds `(2026)` in the title and leaves releaseDate empty.
+  if (
+    !String(out.releaseDate || out.releaseInfo || out.year || '').trim()
+  ) {
+    var titleYear = hubYearFromTitle(out.title || out.name || '');
+    if (titleYear) out.releaseDate = titleYear;
+  }
   var storedOpen = out.open || out.metaOpen || out.catalogOpen;
   // Hub rows must keep anime/drama open — never a conflicting tmdb open
   // (bad KissKH TMDB ids reopen Home with the wrong title).
@@ -407,22 +433,37 @@ function myListLoadFeed(ctx, params) {
     }
 
     function finish(merged) {
-      var out = [];
+      var shaped = [];
       for (var i = 0; i < merged.length; i++) {
-        var shaped = myListShapeRow(merged[i]);
-        if (!shaped) continue;
-        if (shaped.rating == null && shaped.voteAverage != null) {
-          shaped.rating = Number(shaped.voteAverage);
+        var row = myListShapeRow(merged[i]);
+        if (!row) continue;
+        if (row.rating == null && row.voteAverage != null) {
+          row.rating = Number(row.voteAverage);
         }
-        if (
-          !shaped.releaseInfo &&
-          (shaped.releaseDate || shaped.year)
-        ) {
-          shaped.releaseInfo = String(shaped.releaseDate || shaped.year);
+        if (!row.releaseInfo && (row.releaseDate || row.year)) {
+          row.releaseInfo = String(row.releaseDate || row.year);
         }
-        out.push(hubPaintPoster(shaped));
+        shaped.push(row);
       }
-      return out;
+      // Fill missing years (and art) from TMDB before paint — drama hub
+      // bookmarks often store empty releaseDate even when tmdbId is set.
+      return hubEnrichMyListRows(ctx, shaped, shaped.length).then(
+        function (enriched) {
+          var out = [];
+          for (var j = 0; j < enriched.length; j++) {
+            var item = enriched[j];
+            if (
+              !item.releaseInfo &&
+              (item.releaseDate || item.year)
+            ) {
+              item.releaseInfo = String(item.releaseDate || item.year);
+            }
+            delete item.paint;
+            out.push(hubPaintPoster(item));
+          }
+          return out;
+        },
+      );
     }
 
     if (!simkl || typeof simkl.isLoggedIn !== 'function') {
