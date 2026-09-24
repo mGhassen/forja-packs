@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.18",
+  "version": "1.6.19",
   "tags": [
     "providers",
     "anime",
@@ -131,7 +131,8 @@
       "types": [
         "movie",
         "tv",
-        "drama"
+        "drama", 
+        "anime"
       ],
       "kind": "http",
       "ctxConfigMap": {

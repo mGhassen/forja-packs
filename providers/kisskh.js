@@ -25,7 +25,8 @@ function extract(ctx) {
   var sticky = null;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
-  // Hub Sources injects KissKh drama/episode ids — Search never returns tmdbID.
+  // Hub Sources injects KissKh drama/episode ids. Home/TMDB has no kisskhId —
+  // Search API also never returns tmdbID, so Home must title-match (not list[0]).
   var episodeId = cfg.episodeId || ctx.config.episodeId;
   var dramaId = cfg.dramaId || ctx.config.dramaId;
   var tmdbId = String(ctx.tmdbId || '');
@@ -37,6 +38,10 @@ function extract(ctx) {
       (episodeId || '') +
       ' title=' +
       title +
+      ' year=' +
+      (ctx.year || '') +
+      ' type=' +
+      (ctx.type || '') +
       ' ep=' +
       (ctx.episode || 1) +
       ' mirrors=' +
@@ -346,11 +351,23 @@ function extract(ctx) {
 
   function episodeFromDrama(drama, origin) {
     var eps = drama.episodes || drama.Episodes || [];
+    if (!eps.length) return [];
+    var isMovie = String(ctx.type || '').toLowerCase() === 'movie';
     var want = Number(ctx.episode || 1);
-    var ep =
-      eps.find(function (e) {
-        return Number(e.number || e.Number) === want;
-      }) || eps[0];
+    var ep = null;
+    if (isMovie || eps.length === 1) {
+      // KissKh movies often number the single playable as 0 (not 1).
+      ep =
+        eps.find(function (e) {
+          var n = Number(e.number || e.Number);
+          return n === 0 || n === 1;
+        }) || eps[0];
+    } else {
+      ep =
+        eps.find(function (e) {
+          return Number(e.number || e.Number) === want;
+        }) || eps[0];
+    }
     if (!ep) return [];
     sticky = origin;
     return fetchEpisode(ep.id || ep.Id);
@@ -366,24 +383,173 @@ function extract(ctx) {
       });
   }
 
+  // Search never returns tmdbID (API). Home movies only have title+year —
+  // never take list[0] (noisy token search). Score like Asian Drama hub pick.
+  function normTitle(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\(.*?\)/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function scoreHit(row, wantTitle, wantYear, preferMovie) {
+    var name = String((row && row.title) || '');
+    var n = normTitle(name);
+    var w = normTitle(wantTitle);
+    if (!n || !w) return 0;
+    var score = 0;
+    if (n === w) score += 100;
+    else if (n.indexOf(w) === 0 || w.indexOf(n) === 0) score += 70;
+    else if (n.indexOf(w) >= 0 || w.indexOf(n) >= 0) score += 40;
+    else {
+      var wt = w.split(' ').filter(function (t) {
+        return t.length > 2;
+      });
+      var nt = n.split(' ');
+      var hit = 0;
+      for (var i = 0; i < wt.length; i++) {
+        if (nt.indexOf(wt[i]) >= 0) hit++;
+      }
+      if (wt.length && hit === wt.length) score += 55;
+      else if (wt.length && hit / wt.length >= 0.7) score += 30;
+      else return 0;
+    }
+    var release = String((row && row.releaseDate) || '').substring(0, 4);
+    if (wantYear && release === wantYear) score += 25;
+    var eps = Number((row && row.episodesCount) || 0);
+    var kind = String((row && row.type) || '').toLowerCase();
+    if (preferMovie) {
+      if (eps === 1 || kind === 'movie' || kind === 'hollywood') score += 15;
+      if (eps > 3 && kind !== 'movie' && kind !== 'hollywood') score -= 20;
+    } else if (eps > 1) {
+      score += 10;
+    }
+    if (tmdbId) {
+      var rowTmdb = String(
+        (row && (row.tmdbID || row.tmdbId || row.tmdb_id)) || '',
+      );
+      if (rowTmdb && rowTmdb === tmdbId) score += 50;
+    }
+    return score;
+  }
+
+  function searchQueries(rawTitle) {
+    var t = String(rawTitle || '').trim();
+    var out = [];
+    function add(q) {
+      q = String(q || '').trim();
+      if (q.length < 2) return;
+      if (out.indexOf(q) >= 0) return;
+      out.push(q);
+    }
+    add(t);
+    add(t.replace(/\s*[-–]\s*\(\d{4}\)\s*$/, ''));
+    add(t.replace(/\(\d{4}\)/g, '').trim());
+    add(t.split(/[:|]/)[0].trim());
+    var stop = {
+      the: 1,
+      a: 1,
+      an: 1,
+      of: 1,
+      and: 1,
+      to: 1,
+      in: 1,
+      on: 1,
+      for: 1,
+    };
+    var words = normTitle(t).split(' ').filter(function (w) {
+      return w && !stop[w];
+    });
+    if (words.length >= 2) add(words.slice(0, 2).join(' '));
+    if (words.length) add(words[0]);
+    return out;
+  }
+
+  function pickFromRows(rows, wantTitle, wantYear, preferMovie) {
+    var best = null;
+    var bestScore = 0;
+    (rows || []).forEach(function (row) {
+      if (!row || !row.id) return;
+      var s = scoreHit(row, wantTitle, wantYear, preferMovie);
+      if (s > bestScore) {
+        bestScore = s;
+        best = row;
+      }
+    });
+    if (!best || bestScore < 60) return null;
+    return best;
+  }
+
+  function searchDramaByTitle() {
+    var preferMovie = String(ctx.type || '').toLowerCase() === 'movie';
+    var wantYear = String(ctx.year || '')
+      .trim()
+      .substring(0, 4);
+    if (!/^\d{4}$/.test(wantYear)) wantYear = '';
+    var queries = searchQueries(title);
+    if (!queries.length) return Promise.resolve([]);
+    var seen = {};
+    var all = [];
+
+    function runAt(i) {
+      if (i >= queries.length) {
+        var hit = pickFromRows(all, title, wantYear, preferMovie);
+        if (!hit) {
+          ctx.log(
+            'kisskh title pick miss title=' +
+              title +
+              ' candidates=' +
+              all.length,
+          );
+          return [];
+        }
+        ctx.log(
+          'kisskh title pick id=' +
+            hit.id +
+            ' title=' +
+            hit.title +
+            ' score>=60 queries=' +
+            queries.length,
+        );
+        return fetchDrama(hit.id);
+      }
+      var q = encodeURIComponent(queries[i]);
+      return fetchJson('/api/DramaList/Search?q=' + q + '&type=0')
+        .then(function (res) {
+          sticky = res.origin;
+          var list = Array.isArray(res.json) ? res.json : [];
+          list.forEach(function (row) {
+            if (!row || row.id == null) return;
+            var id = String(row.id);
+            if (seen[id]) return;
+            seen[id] = true;
+            all.push(row);
+          });
+          var early = pickFromRows(all, title, wantYear, preferMovie);
+          // Exact (or year-boosted) hit — stop searching more queries.
+          if (early && scoreHit(early, title, wantYear, preferMovie) >= 100) {
+            ctx.log(
+              'kisskh title pick early id=' +
+                early.id +
+                ' title=' +
+                early.title,
+            );
+            return fetchDrama(early.id);
+          }
+          return runAt(i + 1);
+        })
+        .catch(function () {
+          return runAt(i + 1);
+        });
+    }
+
+    return runAt(0);
+  }
+
   if (episodeId) return fetchEpisode(episodeId);
   if (dramaId) return fetchDrama(dramaId);
-
-  var q = encodeURIComponent(title);
-  if (!q) return Promise.resolve([]);
-  return fetchJson('/api/DramaList/Search?q=' + q + '&type=0')
-    .then(function (res) {
-      var list = res.json;
-      var hit =
-        (Array.isArray(list) ? list : []).find(function (d) {
-          return String(d.tmdbID || d.tmdbId || '') === tmdbId;
-        }) ||
-        (Array.isArray(list) ? list[0] : null);
-      if (!hit) return [];
-      sticky = res.origin;
-      return fetchDrama(hit.id);
-    })
-    .catch(function () {
-      return [];
-    });
+  if (!title) return Promise.resolve([]);
+  return searchDramaByTitle();
 }
