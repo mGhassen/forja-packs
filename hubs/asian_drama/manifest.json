@@ -4,7 +4,7 @@
   "name": "ForjaHQ Asian Drama",
   "description": "KissKH Asian drama catalog hub.",
   "author": "ForjaHQ",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "tags": [
     "asian-drama",
     "drama"
@@ -61,7 +61,20 @@
               }
             ]
           }
-        ]
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine", "stremio", "nuvio", "torrent"],
+            "preferred": ["engine"],
+            "order": ["engine", "stremio", "nuvio", "torrent"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] },
+            "stremio": { "allowlist": [], "preferred": [], "order": [] },
+            "nuvio": { "allowlist": [], "preferred": [], "order": [] },
+            "torrent": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "enrich": "enrich-tmdb",
       "config": {

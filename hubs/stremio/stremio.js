@@ -90,6 +90,14 @@ async function extract(ctx) {
     });
   }
 
+  if (action === 'filters') {
+    var filterCatalogs = await stremioListCatalogs(ctx);
+    return hubOk('filters', stremioFiltersFromCatalogs(filterCatalogs), {
+      maxAge: 120,
+      swr: 600,
+    });
+  }
+
   if (action === 'rail') {
     var rail = String(params.rail || params.id || '');
     var skip = params.skip != null ? params.skip : params.page != null ? Number(params.page) * 20 : 0;

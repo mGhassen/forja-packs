@@ -4,7 +4,7 @@
   "name": "ForjaHQ Stremio",
   "description": "Browse catalogs from your installed Stremio addons.",
   "author": "ForjaHQ",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "tags": [
     "stremio",
     "catalog",
@@ -26,6 +26,7 @@
       "capabilities": [
         "nav",
         "layout",
+        "filters",
         "rail",
         "search"
       ],

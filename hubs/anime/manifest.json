@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.46",
+  "version": "1.0.47",
   "tags": [
     "anime"
   ],
@@ -82,7 +82,20 @@
               }
             ]
           }
-        ]
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine", "stremio", "nuvio", "torrent"],
+            "preferred": ["engine"],
+            "order": ["engine", "stremio", "nuvio", "torrent"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] },
+            "stremio": { "allowlist": [], "preferred": [], "order": [] },
+            "nuvio": { "allowlist": [], "preferred": [], "order": [] },
+            "torrent": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "enrich": "anime-enrich-tmdb",
       "config": {

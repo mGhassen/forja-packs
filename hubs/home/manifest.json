@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.68",
+  "version": "1.0.69",
   "tags": [
     "home",
     "movies",
@@ -64,7 +64,20 @@
               }
             ]
           }
-        ]
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine", "stremio", "nuvio", "torrent"],
+            "preferred": ["engine"],
+            "order": ["engine", "stremio", "nuvio", "torrent"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] },
+            "stremio": { "allowlist": [], "preferred": [], "order": [] },
+            "nuvio": { "allowlist": [], "preferred": [], "order": [] },
+            "torrent": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "config": {
         "base": "https://tmdb.forjahq.xyz/3",
