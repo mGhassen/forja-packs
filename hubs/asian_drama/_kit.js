@@ -413,12 +413,27 @@ function hubNormalizeTitle(raw) {
   return t.replace(/\s+/g, ' ').trim();
 }
 
+/// KissKH often ships "Local … - English Alt" and "Title 2: Subtitle".
+/// Strip those so TMDB /search/multi can score a hit.
+function hubNormalizeDramaTitle(raw) {
+  var t = hubNormalizeTitle(raw);
+  if (!t) return t;
+  var dash = t.indexOf(' - ');
+  if (dash > 0) t = t.substring(0, dash).trim();
+  t = t.replace(/\s+\d+\s*:\s*.*$/, '').trim();
+  t = t
+    .replace(/\s+(?:season|part)\s*\d+\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t;
+}
+
 function hubTmdbSearchTitle(meta) {
   if (!meta) return '';
   var ids = meta.ids || {};
   var fromIds = String(ids.tmdbSearch || '').trim();
-  if (fromIds) return hubNormalizeTitle(fromIds);
-  return hubNormalizeTitle(meta.name || '');
+  if (fromIds) return hubNormalizeDramaTitle(fromIds);
+  return hubNormalizeDramaTitle(meta.name || '');
 }
 
 
@@ -806,6 +821,21 @@ function hubTmdbParseBackdrops(json) {
   return out;
 }
 
+/// Dual movie/TV scrapers need resolveType movie|tv — not hub kind "drama".
+function hubStampDramaExtractResolveType(meta, mediaType) {
+  var mt = String(mediaType || '').toLowerCase();
+  if (mt !== 'movie' && mt !== 'tv') return meta;
+  if (!meta.open) meta.open = {};
+  var prev = meta.open.extract || {};
+  var ctx = prev.ctx && typeof prev.ctx === 'object' ? prev.ctx : {};
+  meta.open.extract = Object.assign({}, prev, {
+    resolveType: mt,
+    panelCategory: prev.panelCategory || 'drama',
+    ctx: ctx,
+  });
+  return meta;
+}
+
 function hubApplyTmdbHit(meta, hit) {
   if (!meta || !hit || !hit.id) return meta;
   meta.ids = Object.assign({}, meta.ids || {}, { tmdb: String(hit.id) });
@@ -813,6 +843,7 @@ function hubApplyTmdbHit(meta, hit) {
     meta.ids.imdb = String(hit.imdb);
   }
   if (hit.mediaType) meta.tmdbMediaType = String(hit.mediaType);
+  hubStampDramaExtractResolveType(meta, hit.mediaType || meta.tmdbMediaType);
   if (hit.backdrop) {
     meta.background = String(hit.backdrop);
     meta.bannerImage = '';
@@ -1209,6 +1240,25 @@ function hubKisskhNormTitle(s) {
     .trim();
 }
 
+function hubKisskhInferMediaType(row) {
+  var kt = String(row.type || '').trim().toLowerCase();
+  if (kt === 'movie' || kt === 'hollywood') return 'movie';
+  if (kt === 'tvseries' || kt === 'anime' || kt === 'tv') return 'tv';
+  var label = String(row.label || '').trim().toUpperCase();
+  if (label === 'MOVIE' || label === 'FILM' || label === 'HOLLYWOOD') {
+    return 'movie';
+  }
+  if (
+    label === 'TV' ||
+    label === 'SERIES' ||
+    label === 'TVSERIES' ||
+    label === 'ANIME'
+  ) {
+    return 'tv';
+  }
+  return '';
+}
+
 function hubKisskhMetaFromRow(row) {
   if (!row || !row.id) return null;
   var name = String(row.title || '').trim();
@@ -1231,6 +1281,7 @@ function hubKisskhMetaFromRow(row) {
       cover = 'https://tmdb.forjahq.xyz/t/p/w500' + cover;
     }
   }
+  var mediaType = hubKisskhInferMediaType(row);
   var meta = {
     id: 'kisskh:' + row.id,
     type: 'drama',
@@ -1243,7 +1294,7 @@ function hubKisskhMetaFromRow(row) {
       id: String(row.id),
       torrentEp: true,
       extract: {
-        resolveType: 'drama',
+        resolveType: mediaType === 'movie' ? 'movie' : 'tv',
         panelCategory: 'drama',
         ctx: { kisskhId: Number(row.id) },
       },
@@ -1252,6 +1303,7 @@ function hubKisskhMetaFromRow(row) {
   if (premiere) meta.premiereDate = premiere;
   var label = String(row.label || '').trim();
   if (label) meta.badge = label;
+  if (mediaType) meta.tmdbMediaType = mediaType;
   return meta;
 }
 

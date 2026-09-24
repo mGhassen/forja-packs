@@ -48,6 +48,12 @@ function kisskhInferMediaType(row) {
   return '';
 }
 
+/// Dual movie/TV scrapers key off resolveType === 'movie'.
+/// Keep panelCategory=drama for Sources chips; never leave resolveType=drama.
+function kisskhExtractResolveType(mediaType) {
+  return mediaType === 'movie' ? 'movie' : 'tv';
+}
+
 function kisskhMeta(row) {
   if (!row || !row.id) return null;
   var name = String(row.title || '').trim();
@@ -61,6 +67,7 @@ function kisskhMeta(row) {
     if (titleYear) release = titleYear[0].slice(1, 5);
   }
   var premiere = hubParseIsoDate(release);
+  var mediaType = kisskhInferMediaType(row);
   var meta = {
     id: 'kisskh:' + row.id,
     type: 'drama',
@@ -74,7 +81,7 @@ function kisskhMeta(row) {
       // Host: open.torrentEp → search Title 05 (not SxxExx).
       torrentEp: true,
       extract: {
-        resolveType: 'drama',
+        resolveType: kisskhExtractResolveType(mediaType),
         panelCategory: 'drama',
         ctx: { kisskhId: Number(row.id) },
       },
@@ -87,7 +94,6 @@ function kisskhMeta(row) {
   if (label) meta.badge = label;
   var desc = String(row.description || '').trim();
   if (desc) meta.description = hubStripHtml(desc);
-  var mediaType = kisskhInferMediaType(row);
   if (mediaType) meta.tmdbMediaType = mediaType;
   return hubPaintPoster(meta);
 }
