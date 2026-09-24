@@ -107,17 +107,44 @@ function liveSportsShapeRow(row) {
     .join(' ')
     .toLowerCase();
 
-  if (!game) {
-    out.sportMatchGame = {
-      id: String(out.id || ''),
-      title: title,
-      homeTeam: home,
-      awayTeam: away,
-      sport: category,
-      category: category,
-      dateMs: dateMs,
-    };
+  var broadcasts = [];
+  var seenCh = {};
+  function pushCh(raw) {
+    if (!Array.isArray(raw)) return;
+    for (var i = 0; i < raw.length; i++) {
+      var name = String(raw[i] || '').trim();
+      if (!name) continue;
+      var k = name.toLowerCase();
+      if (seenCh[k]) continue;
+      seenCh[k] = 1;
+      broadcasts.push(name);
+    }
   }
+  pushCh(out.broadcastChannels);
+  pushCh(out.broadcast_channels);
+  if (game) {
+    pushCh(game.broadcastChannels);
+    pushCh(game.broadcast_channels);
+  }
+  if (broadcasts.length) {
+    out.broadcastChannels = broadcasts.slice();
+  }
+
+  var gameOut = game
+    ? Object.assign({}, game)
+    : {
+        id: String(out.id || ''),
+        title: title,
+        homeTeam: home,
+        awayTeam: away,
+        sport: category,
+        category: category,
+        dateMs: dateMs,
+      };
+  if (broadcasts.length) {
+    gameOut.broadcastChannels = broadcasts.slice();
+  }
+  out.sportMatchGame = gameOut;
   return hubPaintEvent(out, {
     homeBadgeUrl: homeBadge,
     awayBadgeUrl: awayBadge,
@@ -126,6 +153,7 @@ function liveSportsShapeRow(row) {
     timeLabel: timeLabel,
     viewers: viewers,
     live: live,
+    props: broadcasts.length ? { broadcastChannels: broadcasts.slice() } : {},
   });
 }
 

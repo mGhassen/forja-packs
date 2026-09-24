@@ -4,7 +4,7 @@
   "name": "ForjaHQ Asian Drama",
   "description": "KissKH Asian drama catalog hub.",
   "author": "ForjaHQ",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "tags": [
     "asian-drama",
     "drama"
@@ -29,7 +29,8 @@
         "search_helpers",
         "details",
         "filters",
-        "feed"
+        "feed",
+        "settings"
       ],
       "nav": {
         "label": "Asian Drama",
@@ -38,6 +39,29 @@
         "page": {
           "action": "layout"
         }
+      },
+      "settings": {
+        "group": "Details",
+        "order": 20,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ]
       },
       "enrich": "enrich-tmdb",
       "config": {

@@ -4,7 +4,7 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-      "version": "1.5.67",
+      "version": "1.5.68",
   "tags": [
     "iptv",
     "live"
@@ -50,7 +50,27 @@
       },
       "settings": {
         "addon": "iptv",
-        "order": 10
+        "group": "Details",
+        "order": 10,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ]
       },
       "prelude": "_prelude.js,_channels_data.js,_channels.js,_layout.js"
     },

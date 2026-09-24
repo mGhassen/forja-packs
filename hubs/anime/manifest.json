@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.45",
+  "version": "1.0.46",
   "tags": [
     "anime"
   ],
@@ -62,6 +62,23 @@
               {
                 "id": "native",
                 "label": "Native"
+              }
+            ]
+          },
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
               }
             ]
           }

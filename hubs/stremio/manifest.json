@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "forjahq-stremio",
+  "name": "ForjaHQ Stremio",
+  "description": "Browse catalogs from your installed Stremio addons.",
+  "author": "ForjaHQ",
+  "version": "1.0.2",
+  "tags": [
+    "stremio",
+    "catalog",
+    "movies",
+    "tv"
+  ],
+  "plugins": [
+    {
+      "id": "stremio-hub",
+      "name": "Stremio",
+      "description": "Empty hub — installed VOD Stremio addon catalogs become the rows",
+      "entry": "stremio.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "stremio"
+      ],
+      "capabilities": [
+        "nav",
+        "layout",
+        "rail",
+        "search"
+      ],
+      "nav": {
+        "tabId": "stremio",
+        "label": "Stremio",
+        "icon": "icons/nav.png",
+        "accent": "#7B5CFF",
+        "page": {
+          "action": "layout"
+        }
+      },
+      "prelude": "_kit.js,_layout.js,_search.js"
+    }
+  ],
+  "bundle": [
+    "stremio.js",
+    "_kit.js",
+    "_layout.js",
+    "_search.js",
+    "icons/nav.png"
+  ]
+}
