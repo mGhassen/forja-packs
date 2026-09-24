@@ -8,7 +8,7 @@ const wasmBytes = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), 'vendor', 'stream-lock.wasm'),
 )
 
-const embedPath = /\/embed\/(\d+)\/([^/]+)\/([^/]+)\/(\d+)\/?$/
+const embedPath = /\/embed\/([A-Za-z0-9_-]+)\/([^/]+)\/([^/]+)\/(\d+)\/?$/
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
