@@ -65,6 +65,8 @@ async function catalogExtract(ctx) {
 var __resolveExtract = (function () {
 var SPECS = {
   origin: 'https://streamfree.top',
+  // Embed pages + signed /live playlists moved off the schedule origin.
+  streamOrigin: 'https://strmfree.st',
   embedOrigin: 'https://embed.st',
 };
 
@@ -85,8 +87,9 @@ function tokenQuery(info) {
 }
 
 /**
- * Site `/api/v1/sources/{key}` returns embed URLs whose last path segment is
- * `{stream_key}{quality}{sourceSuffix?}` (suffix 2–5 = backup Direct sources).
+ * Site `/api/v1/sources/{key}` returns absolute embeds, typically
+ * `https://strmfree.st/embed/{category}/{stream_key}{quality}{sourceSuffix?}`.
+ * Suffix 2–5 = backup Direct sources.
  */
 function parseSourceEmbed(url, sid) {
   try {
@@ -104,21 +107,36 @@ function parseSourceEmbed(url, sid) {
       suffix: m[2] || '',
       variant: folder,
       url: String(url),
+      category: embedPathCategory(url),
     };
   } catch (_) {
     return null;
   }
 }
 
+/** `/embed/{category}/{variant}` → category; else ''. */
+function embedPathCategory(url) {
+  try {
+    var parts = new URL(String(url || '')).pathname.split('/').filter(Boolean);
+    if (parts[0] === 'embed' && parts.length >= 3) return String(parts[1] || '');
+  } catch (_) {}
+  return '';
+}
+
+function playerRefererFor(origin, category, sid) {
+  var cat = String(category || 'soccer').trim() || 'soccer';
+  return origin.replace(/\/$/, '') + '/player/' + cat + '/' + sid;
+}
+
 async function fetchEmbedTokens(ctx, embedUrl, referer) {
-  var html = await (
-    await ctx.fetch(embedUrl, {
-      headers: {
-        'User-Agent': ua(),
-        Referer: referer || embedUrl,
-      },
-    })
-  ).text();
+  var res = await ctx.fetch(embedUrl, {
+    headers: {
+      'User-Agent': ua(),
+      Referer: referer || embedUrl,
+    },
+  });
+  if (!res.ok) return null;
+  var html = await res.text();
   var tok = html.match(/_0x\s*=\s*(.*?);/s);
   if (!tok) return null;
   try {
@@ -142,13 +160,13 @@ async function resolveServerPath(ctx, hostOrigin, sid, embedUrl) {
       if (key && key.is_external && key.external_url) {
         return { external: String(key.external_url) };
       }
-      // Match website: cdn → /live-cdn/, else /live-origin/.
+      // Match website: non-origin → /live-cdn/, else /live/{variant}/.
       if (key && key.server_name && key.server_name !== 'origin') {
         return { prefix: '/live-cdn/' };
       }
     }
   } catch (_) {}
-  return { prefix: '/live-origin/' };
+  return { prefix: '/live/' };
 }
 
 function embedHostOrigin(embedUrl, fallbackOrigin) {
@@ -159,13 +177,26 @@ function embedHostOrigin(embedUrl, fallbackOrigin) {
   }
 }
 
+function deriveStreamKey(embedUrl) {
+  try {
+    var folder = String(embedUrl || '')
+      .split('?')[0]
+      .split('/')
+      .pop();
+    var m = String(folder || '').match(/^(.+?)(540p|720p|1080p|2160p)/);
+    return m ? m[1] : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 async function listStreamfreeTop(ctx, cfg) {
   var origin = cfg.origin.replace(/\/$/, '');
   var cat = String(ctx.category || (ctx.config && ctx.config.category) || 'soccer');
   var sid = String(ctx.matchId || '').replace(/^sf_/, '');
   if (!sid) return [];
 
-  var playerReferer = origin + '/player/' + cat + '/' + sid;
+  var playerReferer = playerRefererFor(origin, cat, sid);
   var sourcesRes = await ctx.fetch(origin + '/api/v1/sources/' + sid, {
     headers: {
       'User-Agent': ua(),
@@ -183,20 +214,27 @@ async function listStreamfreeTop(ctx, cfg) {
   var seen = {};
 
   for (var i = 0; i < rawSources.length; i++) {
-    var parsed = parseSourceEmbed(rawSources[i], sid);
+    var rawUrl = String(rawSources[i] || '').trim();
+    var parsed = parseSourceEmbed(rawUrl, sid);
     if (!parsed) continue;
-    var embedUrl = origin + '/embed/' + parsed.variant;
+    // Keep absolute strmfree.st embeds — schedule-origin /embed/{variant} 404s.
+    var embedUrl =
+      /^https?:\/\//i.test(parsed.url) ? parsed.url : origin + '/embed/' + parsed.variant;
     if (seen[embedUrl]) continue;
     seen[embedUrl] = 1;
     var label = 'StreamFree ' + parsed.quality;
     if (parsed.suffix) label += ' · src ' + parsed.suffix;
+    var rowCat = parsed.category || cat;
     out.push({
       url: embedUrl,
       name: label,
       source: 'streamfree',
       id: sid,
       quality: parsed.quality,
-      headers: { Referer: playerReferer, 'User-Agent': ua() },
+      headers: {
+        Referer: playerRefererFor(origin, rowCat, sid),
+        'User-Agent': ua(),
+      },
       directPlayback: false,
       viewers: viewers,
     });
@@ -204,8 +242,33 @@ async function listStreamfreeTop(ctx, cfg) {
   return out;
 }
 
+/**
+ * Prefer the live embed host URL. Old Providers rows used
+ * streamfree.top/embed/{variant} which now 404s.
+ */
+async function canonicalStreamfreeEmbed(ctx, cfg, embedUrl, sid, parsed) {
+  var raw = String(embedUrl || '').trim();
+  if (!raw) return '';
+  if (/strmfree\.st/i.test(raw) && /\/embed\//i.test(raw)) return raw;
+
+  var listed = await listStreamfreeTop(
+    Object.assign({}, ctx, { matchId: sid, fixtureSearch: false }),
+    cfg,
+  );
+  if (parsed && parsed.variant) {
+    for (var i = 0; i < listed.length; i++) {
+      if (String(listed[i].url || '').indexOf(parsed.variant) >= 0) {
+        return String(listed[i].url);
+      }
+    }
+  }
+  if (listed.length) return String(listed[0].url || '');
+  return raw;
+}
+
 async function unlockStreamfreeEmbed(ctx, cfg, embedUrl) {
   var origin = cfg.origin.replace(/\/$/, '');
+  var streamOrigin = String(cfg.streamOrigin || 'https://strmfree.st').replace(/\/$/, '');
   var cat = String(ctx.category || (ctx.config && ctx.config.category) || 'soccer');
   var sid = String(ctx.matchId || '').replace(/^sf_/, '');
   var raw = String(embedUrl || '').trim();
@@ -226,38 +289,32 @@ async function unlockStreamfreeEmbed(ctx, cfg, embedUrl) {
     return [];
   }
 
-  if (!sid) {
-    // Derive stream key from /embed/{sid}{quality}…
-    try {
-      var folder = raw.split('?')[0].split('/').pop();
-      var m = String(folder || '').match(/^(.+?)(540p|720p|1080p|2160p)/);
-      if (m) sid = m[1];
-    } catch (_) {}
-  }
+  if (!sid) sid = deriveStreamKey(raw);
   if (!sid) return [];
 
-  var playerReferer = origin + '/player/' + cat + '/' + sid;
   var parsed = parseSourceEmbed(raw, sid);
   if (!parsed) {
-    // Same-origin /embed/{variant} — rebuild absolute API-style path for parse.
     try {
       var variant = raw.split('?')[0].split('/').pop();
-      parsed = parseSourceEmbed(origin + '/embed/' + variant, sid);
+      parsed = parseSourceEmbed(streamOrigin + '/embed/' + cat + '/' + variant, sid);
+      if (!parsed) parsed = parseSourceEmbed(origin + '/embed/' + variant, sid);
     } catch (_) {}
   }
   if (!parsed) return [];
 
-  var embed = origin + '/embed/' + parsed.variant;
+  var embed = await canonicalStreamfreeEmbed(ctx, cfg, raw, sid, parsed);
+  if (!embed) return [];
+  // Re-parse after canonicalization (category path may differ).
+  var canonParsed = parseSourceEmbed(embed, sid) || parsed;
+  var rowCat = canonParsed.category || embedPathCategory(embed) || cat;
+  var playerReferer = playerRefererFor(origin, rowCat, sid);
+
   var tokens = await fetchEmbedTokens(ctx, embed, playerReferer);
-  if (!tokens && parsed.url.indexOf('http') === 0) {
-    tokens = await fetchEmbedTokens(ctx, parsed.url, playerReferer);
-    if (tokens) embed = parsed.url;
-  }
   if (!tokens) return [];
-  var m3uInfo = tokens[parsed.quality];
+  var m3uInfo = tokens[canonParsed.quality];
   if (!m3uInfo || typeof m3uInfo !== 'object') return [];
 
-  var hostOrigin = embedHostOrigin(embed, origin);
+  var hostOrigin = embedHostOrigin(embed, streamOrigin);
   var server = await resolveServerPath(ctx, hostOrigin, sid, embed);
   var url;
   if (server.external) {
@@ -265,15 +322,15 @@ async function unlockStreamfreeEmbed(ctx, cfg, embedUrl) {
   } else {
     url =
       hostOrigin +
-      (server.prefix || '/live-origin/') +
+      (server.prefix || '/live/') +
       sid +
-      parsed.quality +
-      parsed.suffix +
+      canonParsed.quality +
+      canonParsed.suffix +
       '/index.m3u8?' +
       tokenQuery(m3uInfo);
   }
-  var label = 'StreamFree ' + parsed.quality;
-  if (parsed.suffix) label += ' · src ' + parsed.suffix;
+  var label = 'StreamFree ' + canonParsed.quality;
+  if (canonParsed.suffix) label += ' · src ' + canonParsed.suffix;
   return [
     {
       url: url,
@@ -323,13 +380,17 @@ async function resolveStreamfreeByFixture(ctx, cfg) {
 async function resolveStream(ctx, cfg) {
   var embed = String(ctx.embedUrl || ctx.url || ctx.iframe || '').trim();
   if (embed) {
-    return unlockStreamfreeEmbed(ctx, cfg, embed);
+    var unlocked = await unlockStreamfreeEmbed(ctx, cfg, embed);
+    if (unlocked.length) return unlocked;
   }
   var sid = String(ctx.matchId || '').replace(/^sf_/, '');
   if (!sid || ctx.fixtureSearch === true) {
     return resolveStreamfreeByFixture(ctx, cfg);
   }
-  return listStreamfreeTop(ctx, cfg);
+  var listed = await listStreamfreeTop(ctx, cfg);
+  if (listed.length) return listed;
+  // Wrong/stale matchId (e.g. another catalog's id) — fall back to fixture search.
+  return resolveStreamfreeByFixture(ctx, cfg);
 }
 
 async function resolveExtract(ctx) {

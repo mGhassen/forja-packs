@@ -1400,6 +1400,19 @@ function liveFixtureSoftMatch(row, want) {
     if (wt && rt && (wt === rt || wt.indexOf(rt) >= 0 || rt.indexOf(wt) >= 0)) {
       return liveDatesClose(want.dateMs, date);
     }
+    // Swapped "A vs B" / "B vs A" titles (Streamed vs StreamFree order).
+    var wantPair = liveParseTitleTeams(want.title);
+    var rowPair = liveParseTitleTeams(title);
+    if (wantPair.home && wantPair.away && rowPair.home && rowPair.away) {
+      return (
+        liveTeamPairSoftEqual(
+          wantPair.home,
+          wantPair.away,
+          rowPair.home,
+          rowPair.away,
+        ) && liveDatesClose(want.dateMs, date)
+      );
+    }
   }
   return false;
 }

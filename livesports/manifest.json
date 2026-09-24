@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.18",
+  "version": "2.0.19",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -114,6 +114,7 @@
       "config": {
         "matchIdPrefix": "sf_",
         "origin": "https://streamfree.top",
+        "streamOrigin": "https://strmfree.st",
         "embedOrigin": "https://embed.st"
       }
     },
