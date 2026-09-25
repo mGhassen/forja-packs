@@ -1926,6 +1926,92 @@ function tmdbStructuredDiscoverTv(ctx, cfg, query, filter) {
   return tmdbSafeJson(tmdbGet(ctx, cfg, '/discover/tv', q));
 }
 
+var TMDB_RESULT_PAGE = 20;
+
+// Walk the same order Search shows: film, series, film, series, then whichever side remains.
+function tmdbPlanZip(movieTotal, tvTotal, offset, count) {
+  var movies = [];
+  var shows = [];
+  var mi = 0;
+  var ti = 0;
+  var pos = 0;
+  function emit(type) {
+    var idx = type === 'movie' ? mi++ : ti++;
+    if (pos++ < offset) return;
+    if (type === 'movie') movies.push(idx);
+    else shows.push(idx);
+  }
+  while (movies.length + shows.length < count && (mi < movieTotal || ti < tvTotal)) {
+    if (mi < movieTotal && ti < tvTotal) {
+      emit('movie');
+      if (movies.length + shows.length >= count) break;
+      emit('tv');
+    } else if (mi < movieTotal) {
+      emit('movie');
+    } else {
+      emit('tv');
+    }
+  }
+  return {
+    movies: movies,
+    shows: shows,
+    hasMore: mi < movieTotal || ti < tvTotal,
+  };
+}
+
+function tmdbResultIndices(start, count) {
+  var out = [];
+  var i;
+  for (i = 0; i < count; i++) out.push(start + i);
+  return out;
+}
+
+function tmdbMetasAtIndices(cfg, packs, indices, forcedType, predicate) {
+  var byIndex = {};
+  var p;
+  for (p = 0; p < packs.length; p++) {
+    var rows = (packs[p].json && packs[p].json.results) || [];
+    var base = (packs[p].page - 1) * TMDB_RESULT_PAGE;
+    var r;
+    for (r = 0; r < rows.length; r++) {
+      var row = rows[r];
+      if (row && row.media_type === 'person') continue;
+      var meta = tmdbMeta(cfg, row, forcedType || '');
+      if (!meta) continue;
+      if (predicate && !predicate(meta)) continue;
+      byIndex[base + r] = meta;
+    }
+  }
+  var out = [];
+  var i;
+  for (i = 0; i < indices.length; i++) {
+    if (byIndex[indices[i]]) out.push(byIndex[indices[i]]);
+  }
+  return out;
+}
+
+function tmdbFetchIndexed(cfg, indices, forcedType, fetchPage, predicate) {
+  if (!indices.length) return Promise.resolve([]);
+  var pages = {};
+  var i;
+  for (i = 0; i < indices.length; i++) {
+    pages[Math.floor(indices[i] / TMDB_RESULT_PAGE) + 1] = true;
+  }
+  var pageNums = [];
+  for (var k in pages) {
+    if (Object.prototype.hasOwnProperty.call(pages, k)) pageNums.push(Number(k));
+  }
+  return Promise.all(
+    pageNums.map(function (page) {
+      return fetchPage(page).then(function (json) {
+        return { page: page, json: json || { results: [] } };
+      });
+    }),
+  ).then(function (packs) {
+    return tmdbMetasAtIndices(cfg, packs, indices, forcedType, predicate);
+  });
+}
+
 // Alternate films and series so an All search page is not only the first type.
 function tmdbZipMedia(movies, shows, limit) {
   var out = [];
@@ -1977,34 +2063,49 @@ function tmdbStructuredSearch(ctx, cfg, params) {
   var hasPersonCandidate = parsed.remainder.trim().length >= 2;
   var runMulti =
     parsed.remainder.length > 0 || !tmdbParsedHasStructuredFilters(parsed);
-  var limit = Number(params.limit) > 0 ? Number(params.limit) : 0;
+  var limit = Number(params.limit) > 0 ? Number(params.limit) : TMDB_RESULT_PAGE;
+  var hostPage = Number(params.page) > 0 ? Number(params.page) : 1;
+  var windowStart = (hostPage - 1) * limit;
 
-  // Chunks: { json, forcedType, applyYear }
-  var chunkPromises = [];
-
-  function pushMulti(query, page) {
-    chunkPromises.push(
-      tmdbSearchMultiPage(ctx, cfg, query, page).then(function (json) {
-        return {
-          json: json,
-          forcedType: '',
-          applyYear:
-            bounds != null || tmdbParsedHasScore(parsed) || !!parsed.mediaType,
-        };
-      }),
-    );
+  function passesFilters(meta, applyYearFilter) {
+    if (
+      applyYearFilter &&
+      bounds != null &&
+      !tmdbReleaseInYearBounds(meta.releaseInfo, bounds)
+    ) {
+      return false;
+    }
+    if (parsed.mediaType && meta.type !== parsed.mediaType) return false;
+    var score = Number(meta.rating) || 0;
+    if (parsed.minScore != null && score < parsed.minScore) return false;
+    if (parsed.maxScore != null && score > parsed.maxScore) return false;
+    return true;
   }
 
-  if (runMulti) {
-    pushMulti(trimmed, 1);
-    pushMulti(trimmed, 2);
-    if (
-      parsed.remainder &&
-      parsed.remainder.toLowerCase() !== trimmed.toLowerCase()
-    ) {
-      pushMulti(parsed.remainder, 1);
-      pushMulti(parsed.remainder, 2);
-    }
+  var applyYearMulti =
+    bounds != null || tmdbParsedHasScore(parsed) || !!parsed.mediaType;
+  var applyYearDiscover = tmdbParsedHasScore(parsed) || !!parsed.mediaType;
+
+  function takeMulti(query, start, count) {
+    if (!query) return Promise.resolve({ total: 0, items: [] });
+    return tmdbSearchMultiPage(ctx, cfg, query, 1).then(function (first) {
+      var total = Number(first && first.total_results) || 0;
+      var n = Math.min(count, Math.max(0, total - start));
+      if (n <= 0) return { total: total, items: [] };
+      return tmdbFetchIndexed(
+        cfg,
+        tmdbResultIndices(start, n),
+        '',
+        function (page) {
+          return tmdbSearchMultiPage(ctx, cfg, query, page);
+        },
+        function (meta) {
+          return passesFilters(meta, applyYearMulti);
+        },
+      ).then(function (items) {
+        return { total: total, items: items };
+      });
+    });
   }
 
   var personPromise = hasPersonCandidate
@@ -2012,38 +2113,12 @@ function tmdbStructuredSearch(ctx, cfg, params) {
     : Promise.resolve(null);
 
   return personPromise.then(function (personId) {
-    var discoverPages = 2;
     var wantMovies = !parsed.mediaType || parsed.mediaType === 'movie';
     var wantTv = !parsed.mediaType || parsed.mediaType === 'tv';
-    var applyYearDiscover = tmdbParsedHasScore(parsed) || !!parsed.mediaType;
-
-    function pushDiscover(isTv, genres, people) {
-      var page;
-      for (page = 1; page <= discoverPages; page++) {
-        (function (tvFlag, pageNum) {
-          var q = tmdbBuildDiscoverQuery(
-            parsed,
-            bounds,
-            pageNum,
-            genres,
-            people,
-            tvFlag,
-          );
-          var fetch = tvFlag
-            ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
-            : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
-          chunkPromises.push(
-            fetch.then(function (json) {
-              return {
-                json: json,
-                forcedType: tvFlag ? 'tv' : 'movie',
-                applyYear: applyYearDiscover,
-              };
-            }),
-          );
-        })(isTv, page);
-      }
-    }
+    var movieGenres = null;
+    var tvGenres = null;
+    var discoverPeople = null;
+    var runDiscover = false;
 
     if (
       personId != null ||
@@ -2055,85 +2130,143 @@ function tmdbStructuredSearch(ctx, cfg, params) {
       !!parsed.originalLanguage
     ) {
       if (tmdbParsedHasGenre(parsed)) {
+        runDiscover = true;
+        discoverPeople = personId;
         if (wantMovies && parsed.movieGenreIds.length) {
-          pushDiscover(false, parsed.movieGenreIds, personId);
+          movieGenres = parsed.movieGenreIds;
+        } else {
+          wantMovies = false;
         }
         if (wantTv) {
-          var tvGenres = parsed.tvGenreIds.length
+          tvGenres = parsed.tvGenreIds.length
             ? parsed.tvGenreIds
             : parsed.movieGenreIds;
-          if (tvGenres.length) pushDiscover(true, tvGenres, personId);
+          if (!tvGenres.length) wantTv = false;
         }
-      } else if (personId != null) {
-        if (wantMovies) pushDiscover(false, null, personId);
-        if (wantTv) pushDiscover(true, null, personId);
-      } else if (!hasPersonCandidate) {
-        if (wantMovies) pushDiscover(false, null, null);
-        if (wantTv) pushDiscover(true, null, null);
+      } else if (personId != null || !hasPersonCandidate) {
+        runDiscover = true;
+        discoverPeople = personId;
       }
     }
 
-    return Promise.all(chunkPromises).then(function (chunks) {
-      var seen = {};
-      var multi = [];
-      var movies = [];
-      var shows = [];
+    function discoverTotal(isTv, genres) {
+      if ((isTv && !wantTv) || (!isTv && !wantMovies)) {
+        return Promise.resolve(0);
+      }
+      var q = tmdbBuildDiscoverQuery(parsed, bounds, 1, genres, discoverPeople, isTv);
+      var fetch = isTv
+        ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
+        : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
+      return fetch.then(function (json) {
+        return Number(json && json.total_results) || 0;
+      });
+    }
 
-      function passesFilters(meta, applyYearFilter) {
-        if (
-          applyYearFilter &&
-          bounds != null &&
-          !tmdbReleaseInYearBounds(meta.releaseInfo, bounds)
-        ) {
-          return false;
+    function discoverSlice(isTv, genres, indices) {
+      return tmdbFetchIndexed(
+        cfg,
+        indices,
+        isTv ? 'tv' : 'movie',
+        function (page) {
+          var q = tmdbBuildDiscoverQuery(
+            parsed,
+            bounds,
+            page,
+            genres,
+            discoverPeople,
+            isTv,
+          );
+          return isTv
+            ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
+            : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
+        },
+        function (meta) {
+          return passesFilters(meta, applyYearDiscover);
+        },
+      );
+    }
+
+    var primaryQuery = runMulti ? trimmed : '';
+    var remainderQuery = '';
+    if (
+      runMulti &&
+      parsed.remainder &&
+      parsed.remainder.toLowerCase() !== trimmed.toLowerCase()
+    ) {
+      remainderQuery = parsed.remainder;
+    }
+
+    return Promise.all([
+      takeMulti(primaryQuery, 0, 0).then(function (pack) {
+        return pack.total;
+      }),
+      remainderQuery
+        ? takeMulti(remainderQuery, 0, 0).then(function (pack) {
+          return pack.total;
+        })
+        : Promise.resolve(0),
+      runDiscover ? discoverTotal(false, movieGenres) : Promise.resolve(0),
+      runDiscover ? discoverTotal(true, tvGenres) : Promise.resolve(0),
+    ]).then(function (totals) {
+      var primaryTotal = totals[0];
+      var remainderTotal = totals[1];
+      var movieTotal = wantMovies ? totals[2] : 0;
+      var tvTotal = wantTv ? totals[3] : 0;
+      var cursor = windowStart;
+      var room = limit;
+
+      function claim(total) {
+        var start = 0;
+        var count = 0;
+        if (cursor < total && room > 0) {
+          start = cursor;
+          count = Math.min(room, total - cursor);
+          cursor = 0;
+          room -= count;
+        } else if (cursor >= total) {
+          cursor -= total;
         }
-        if (parsed.mediaType && meta.type !== parsed.mediaType) return false;
-        var score = Number(meta.rating) || 0;
-        if (parsed.minScore != null && score < parsed.minScore) return false;
-        if (parsed.maxScore != null && score > parsed.maxScore) return false;
-        return true;
+        return { start: start, count: count };
       }
 
-      var ci;
-      for (ci = 0; ci < chunks.length; ci++) {
-        var chunk = chunks[ci];
-        var bucket =
-          chunk.forcedType === 'tv'
-            ? shows
-            : chunk.forcedType === 'movie'
-              ? movies
-              : multi;
-        var rows = (chunk.json && chunk.json.results) || [];
-        var ri;
-        for (ri = 0; ri < rows.length; ri++) {
-          var row = rows[ri];
-          if (row && row.media_type === 'person') continue;
-          var meta = tmdbMeta(cfg, row, chunk.forcedType || '');
-          if (!meta) continue;
-          if (!passesFilters(meta, chunk.applyYear)) continue;
-          var key = meta.type + ':' + meta.ids.tmdb;
-          if (seen[key]) continue;
-          seen[key] = true;
-          bucket.push(meta);
+      var primary = claim(primaryTotal);
+      var remainder = claim(remainderTotal);
+      var discoverCursor = cursor;
+      var discoverRoom = room;
+      var plan =
+        discoverRoom > 0
+          ? tmdbPlanZip(movieTotal, tvTotal, discoverCursor, discoverRoom)
+          : { movies: [], shows: [], hasMore: movieTotal + tvTotal > discoverCursor };
+
+      return Promise.all([
+        takeMulti(primaryQuery, primary.start, primary.count),
+        takeMulti(remainderQuery, remainder.start, remainder.count),
+        discoverSlice(false, movieGenres, plan.movies),
+        discoverSlice(true, tvGenres, plan.shows),
+      ]).then(function (parts) {
+        var seen = {};
+        var out = [];
+        function pushList(list) {
+          var i;
+          for (i = 0; i < list.length; i++) {
+            var meta = list[i];
+            var key = meta.type + ':' + meta.ids.tmdb;
+            if (seen[key]) continue;
+            seen[key] = true;
+            out.push(meta);
+            if (out.length >= limit) return;
+          }
         }
-      }
-
-      var out = multi.slice();
-      var room = limit > 0 ? limit - out.length : 0;
-      if (limit > 0 && room <= 0) return hubClampList(out, limit);
-
-      var discover;
-      if (!parsed.mediaType) {
-        discover = tmdbZipMedia(movies, shows, room);
-      } else if (parsed.mediaType === 'tv') {
-        discover = shows;
-      } else {
-        discover = movies;
-      }
-      var di;
-      var take = limit > 0 ? Math.min(discover.length, room) : discover.length;
-      for (di = 0; di < take; di++) out.push(discover[di]);
-      return limit > 0 ? hubClampList(out, limit) : out;
+        pushList(parts[0].items || []);
+        pushList(parts[1].items || []);
+        pushList(tmdbZipMedia(parts[2], parts[3], discoverRoom));
+        var catalogTotal = primaryTotal + remainderTotal + movieTotal + tvTotal;
+        var hasMore = windowStart + limit < catalogTotal;
+        return {
+          items: out,
+          hasMore: hasMore && out.length > 0,
+        };
+      });
     });
   });
 }

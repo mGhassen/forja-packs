@@ -2,11 +2,9 @@
 // Host only opens search chrome and calls action `search` / `search_helpers`.
 // Relies on tmdb.js helpers (tmdbStructuredSearch, hubConfig, …) at call time.
 //
-// Results are never strict-empty: page 1 soft-fills with related (or trending).
-// Scroll loads up to 3 pages; pages 2–3 are relatedness hops (new seed each page),
-// not the same TMDB multi query again.
+// Scroll stays on matching titles for as long as TMDB still has them.
+// Related or trending titles only fill a page once those matches run out.
 
-var HOME_SEARCH_MAX_PAGES = 3;
 var HOME_HELPER_POOL = 64;
 
 function homeSearchMetaKey(meta) {
@@ -148,21 +146,12 @@ function homeSearch(ctx, cfg, params) {
     Number(p.limit) > 0
       ? Number(p.limit)
       : Number((cfg && cfg.pageSize) || 20) || 20;
-  if (page > HOME_SEARCH_MAX_PAGES) {
-    return Promise.resolve(
-      homeSearchPaintEnvelope([], pageSize, false),
-    );
-  }
 
-  if (page > 1) {
-    return homeSearchRelatedPage(ctx, cfg, p, page, pageSize);
-  }
-
-  var searchParams = Object.assign({}, p, { limit: pageSize });
+  var searchParams = Object.assign({}, p, { limit: pageSize, page: page });
   var seen = homeSearchExcludeIds(p);
-  return tmdbStructuredSearch(ctx, cfg, searchParams).then(function (items) {
-    var hits = Array.isArray(items) ? items.slice() : [];
-    var seedMeta = hits.length ? hits[0] : null;
+  return tmdbStructuredSearch(ctx, cfg, searchParams).then(function (result) {
+    var hits = result && Array.isArray(result.items) ? result.items.slice() : [];
+    var catalogHasMore = !!(result && result.hasMore);
     var out = [];
     for (var i = 0; i < hits.length; i++) {
       var key = homeSearchMetaKey(hits[i]).toLowerCase();
@@ -172,25 +161,32 @@ function homeSearch(ctx, cfg, params) {
     }
 
     var padNeed = pageSize - out.length;
-    var seed = homeHelperParseSeed({ seed: seedMeta }) ||
-      homeHelperParseSeed(p);
+    var seed = homeHelperParseSeed({ seed: out[0] }) || homeHelperParseSeed(p);
 
-    function finish(list) {
+    function finish(list, hasMore) {
       var painted = homeSearchPaintList(list);
-      var hasSeed = !!(seed || homeHelperParseSeed({ seed: list[0] }));
-      var hasMore =
-        page < HOME_SEARCH_MAX_PAGES && hasSeed && painted.length > 0;
-      return homeSearchPaintEnvelope(painted, pageSize, hasMore);
+      return homeSearchPaintEnvelope(
+        painted,
+        pageSize,
+        !!(hasMore && painted.length > 0),
+      );
     }
 
-    if (padNeed <= 0) return Promise.resolve(finish(out));
+    // More matches still exist — do not swap the page for recommendations.
+    if (catalogHasMore || padNeed <= 0) {
+      return Promise.resolve(finish(out, catalogHasMore));
+    }
 
     if (seed) {
       return homeSearchRelatedMetas(ctx, cfg, seed, seen, padNeed).then(
         function (related) {
           for (var r = 0; r < related.length; r++) out.push(related[r]);
-          if (out.length > 0) return finish(out);
-          return homeSearchTrendingMetas(ctx, cfg, seen, pageSize).then(finish);
+          if (out.length > 0) return finish(out, false);
+          return homeSearchTrendingMetas(ctx, cfg, seen, pageSize).then(
+            function (trending) {
+              return finish(trending, false);
+            },
+          );
         },
       );
     }
@@ -198,25 +194,8 @@ function homeSearch(ctx, cfg, params) {
     return homeSearchTrendingMetas(ctx, cfg, seen, pageSize).then(function (
       trending,
     ) {
-      for (var t = 0; t < trending.length; t++) out.push(trending[t]);
-      return finish(out);
+      return finish(trending, false);
     });
-  });
-}
-
-function homeSearchRelatedPage(ctx, cfg, params, page, pageSize) {
-  var seen = homeSearchExcludeIds(params);
-  var seed = homeHelperParseSeed(params);
-  if (!seed) {
-    return Promise.resolve(homeSearchPaintEnvelope([], pageSize, false));
-  }
-  return homeSearchRelatedMetas(ctx, cfg, seed, seen, pageSize).then(function (
-    related,
-  ) {
-    var painted = homeSearchPaintList(related);
-    var hasMore =
-      page < HOME_SEARCH_MAX_PAGES && painted.length > 0;
-    return homeSearchPaintEnvelope(painted, pageSize, hasMore);
   });
 }
 
