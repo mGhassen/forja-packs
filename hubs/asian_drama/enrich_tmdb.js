@@ -49,12 +49,29 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (params.meta && typeof params.meta === 'object') {
+    // More Like This is a second enrich (phase rails). Host paints meta first.
+    if (String(params.phase || '') === 'rails') {
+      return hubResolveTmdbRecsToDrama(ctx, params.meta)
+        .then(function (payload) {
+          return hubOk('enrich', payload, { maxAge: 900, swr: 3600 });
+        })
+        .catch(function (e) {
+          return hubFail('enrich', 'UPSTREAM', e && e.message, true);
+        });
+    }
     return hubEnrichTmdb(ctx, [params.meta], 1, { details: true })
       .then(function (items) {
-        return hubResolveTmdbRecsToDrama(ctx, items[0] || params.meta);
-      })
-      .then(function (payload) {
-        return hubOk('enrich', payload, { maxAge: 900, swr: 3600 });
+        var meta = items[0] || params.meta;
+        var recs = meta && meta.recommendations;
+        if (Array.isArray(recs) && recs.length) {
+          meta._hubRecsPending = true;
+          return hubOk(
+            'enrich',
+            { meta: meta, deferRails: { phase: 'rails' } },
+            { maxAge: 900, swr: 3600 },
+          );
+        }
+        return hubOk('enrich', { meta: meta }, { maxAge: 900, swr: 3600 });
       })
       .catch(function (e) {
         return hubFail('enrich', 'UPSTREAM', e && e.message, true);

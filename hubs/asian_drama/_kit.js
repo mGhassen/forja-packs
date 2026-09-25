@@ -1381,53 +1381,105 @@ function hubKisskhPickForRec(rows, rec) {
   return null;
 }
 
+var HUB_KISSKH_SEARCH_NS = 'kisskh-search';
+var HUB_KISSKH_SEARCH_TTL_MS = 6 * 60 * 60 * 1000;
+
+function hubKisskhSearchCacheKey(q) {
+  return hubKisskhNormTitle(q);
+}
+
+function hubKisskhSearchCached(ctx, q) {
+  var key = hubKisskhSearchCacheKey(q);
+  if (!key) return Promise.resolve([]);
+  var cache = ctx && ctx.host && ctx.host.cache;
+  var read =
+    cache && typeof cache.diskGet === 'function'
+      ? cache.diskGet(HUB_KISSKH_SEARCH_NS, key)
+      : Promise.resolve(null);
+  return Promise.resolve(read)
+    .then(function (hit) {
+      if (Array.isArray(hit)) return hit;
+      return hubKisskhSearch(ctx, q).then(function (rows) {
+        if (
+          cache &&
+          typeof cache.diskSet === 'function' &&
+          Array.isArray(rows)
+        ) {
+          cache.diskSet(HUB_KISSKH_SEARCH_NS, key, rows, {
+            ttlMs: HUB_KISSKH_SEARCH_TTL_MS,
+          });
+        }
+        return rows;
+      });
+    })
+    .catch(function () {
+      return hubKisskhSearch(ctx, q);
+    });
+}
+
 /// TMDB recommendation cards → KissKH drama metas (skip titles KissKH lacks).
+/// Searches run in parallel (bounded). Order stays the TMDB recommendation order.
 function hubResolveTmdbRecsToDrama(ctx, meta) {
   var recs =
     meta && Array.isArray(meta.recommendations) ? meta.recommendations.slice() : [];
   if (meta && Array.isArray(meta.recommendations)) {
     delete meta.recommendations;
   }
+  if (meta) delete meta._hubRecsPending;
   if (!recs.length) return Promise.resolve({ meta: meta });
 
-  var out = [];
-  var seen = {};
-  var i = 0;
+  var slots = new Array(recs.length);
+  var cursor = 0;
+  var concurrency = 4;
 
-  function next() {
-    if (i >= recs.length || out.length >= 12) {
-      var data = { meta: meta };
-      if (out.length) {
-        data.rails = {
-          recommendations: { title: 'More Like This', items: out },
-        };
-      }
-      return Promise.resolve(data);
+  function applyHit(rec, rows) {
+    var hit = hubKisskhPickForRec(rows, rec);
+    if (!hit || !hit.id) return null;
+    if (!hit.poster && rec.poster) hit.poster = String(rec.poster);
+    if (!hit.background && rec.background) {
+      hit.background = String(rec.background);
     }
-    var rec = recs[i++];
-    var title = String((rec && rec.name) || '').trim();
-    if (!title) return next();
-    return hubKisskhSearch(ctx, title)
-      .then(function (rows) {
-        var hit = hubKisskhPickForRec(rows, rec);
-        if (hit && hit.id && !seen[hit.id]) {
-          seen[hit.id] = true;
-          // Prefer TMDB art when KissKH cover is empty.
-          if (!hit.poster && rec.poster) hit.poster = String(rec.poster);
-          if (!hit.background && rec.background) {
-            hit.background = String(rec.background);
-          }
-          if (!(Number(hit.rating) > 0) && Number(rec.rating) > 0) {
-            hit.rating = Number(rec.rating);
-          }
-          out.push(hit);
-        }
-        return next();
-      })
-      .catch(function () {
-        return next();
-      });
+    if (!(Number(hit.rating) > 0) && Number(rec.rating) > 0) {
+      hit.rating = Number(rec.rating);
+    }
+    return hit;
   }
 
-  return next();
+  function worker() {
+    if (cursor >= recs.length) return Promise.resolve();
+    var index = cursor++;
+    var rec = recs[index];
+    var title = String((rec && rec.name) || '').trim();
+    if (!title) return worker();
+    return hubKisskhSearchCached(ctx, title)
+      .then(function (rows) {
+        slots[index] = applyHit(rec, rows);
+      })
+      .catch(function () {
+        slots[index] = null;
+      })
+      .then(worker);
+  }
+
+  var workers = [];
+  var n = recs.length < concurrency ? recs.length : concurrency;
+  for (var w = 0; w < n; w++) workers.push(worker());
+
+  return Promise.all(workers).then(function () {
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < slots.length && out.length < 12; i++) {
+      var hit = slots[i];
+      if (!hit || !hit.id || seen[hit.id]) continue;
+      seen[hit.id] = true;
+      out.push(hit);
+    }
+    var data = { meta: meta };
+    if (out.length) {
+      data.rails = {
+        recommendations: { title: 'More Like This', items: out },
+      };
+    }
+    return data;
+  });
 }
