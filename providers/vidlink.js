@@ -176,17 +176,21 @@ function extract(ctx) {
 
   function headersForUrl(url, upstream) {
     var host = String(url || '').toLowerCase();
-    if (host.indexOf('hakunaymatata.com') >= 0) {
-      var hakuna = { 'User-Agent': headers['User-Agent'] };
+    if (
+      host.indexOf('mooncase.online') >= 0 ||
+      host.indexOf('suubmon.store') >= 0 ||
+      host.indexOf('hakunaymatata.com') >= 0
+    ) {
+      var bare = { 'User-Agent': headers['User-Agent'] };
       if (upstream) {
         for (var hk in upstream) {
           if (!Object.prototype.hasOwnProperty.call(upstream, hk)) continue;
           var lk = String(hk).toLowerCase();
           if (lk === 'referer' || lk === 'origin') continue;
-          if (typeof upstream[hk] === 'string' && upstream[hk]) hakuna[hk] = upstream[hk];
+          if (typeof upstream[hk] === 'string' && upstream[hk]) bare[hk] = upstream[hk];
         }
       }
-      return hakuna;
+      return bare;
     }
     var out = {
       'User-Agent': headers['User-Agent'],

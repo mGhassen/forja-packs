@@ -167,6 +167,7 @@ function extract(ctx) {
               name: 'NetMirror (Netflix) - ' + q,
               quality: q,
               headers: playHeaders,
+              probe: 'skip',
               subtitles: subtitles.length ? subtitles : undefined,
             });
           });
@@ -176,6 +177,7 @@ function extract(ctx) {
             name: 'NetMirror (Netflix) - Auto',
             quality: 'Auto',
             headers: playHeaders,
+            probe: 'skip',
             subtitles: subtitles.length ? subtitles : undefined,
           });
         }
@@ -418,6 +420,7 @@ function extract(ctx) {
             headers: Object.assign({}, buildHeaders(ott), {
               Referer: response.referer || apiBase,
             }),
+            probe: 'skip',
           },
         ];
       })

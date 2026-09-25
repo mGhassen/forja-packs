@@ -99,6 +99,7 @@ function extract(ctx) {
         quality: quality || '',
         language: language || '',
         headers: hdrs || { 'User-Agent': ua },
+        pngStrip: server && server.id === 'hianime' ? 'auto' : undefined,
       });
     }
     var urlField = json.url;

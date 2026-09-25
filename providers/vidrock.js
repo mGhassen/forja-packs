@@ -44,6 +44,7 @@ function extract(ctx) {
       name: label,
       quality: qualityOf(url),
       headers: playHeaders,
+      pngStrip: 'auto',
     };
   }
 
@@ -85,6 +86,7 @@ function extract(ctx) {
               name: 'VidRock ' + name,
               quality: q,
               headers: playHeaders,
+              pngStrip: 'auto',
             });
           }
         });

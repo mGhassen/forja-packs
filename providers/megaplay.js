@@ -101,6 +101,7 @@ function extract(ctx) {
             name: 'Megaplay [' + name + '] (' + kind.toUpperCase() + ')',
             language: kind === 'dub' ? 'Dub' : 'Sub',
             headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+            pngStrip: 'auto',
           },
         ];
       })

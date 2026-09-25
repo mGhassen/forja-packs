@@ -160,6 +160,7 @@ function extract(ctx) {
                   (lang && lang !== 'Auto' ? ' · ' + lang : ''),
                 language: lang === 'Auto' ? '' : lang,
                 headers: hdrs,
+                pngStrip: 'auto',
               },
             ];
           });

@@ -100,6 +100,7 @@ function extract(ctx) {
                             Referer: origin + '/',
                             Origin: origin,
                           },
+                          pngStrip: 'auto',
                         };
                       })
                       .catch(function () {

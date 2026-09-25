@@ -197,6 +197,7 @@ function extract(ctx) {
                     name: 'MovieBlast ' + (v.server || ''),
                     quality: quality(v.server),
                     language: v.lang || '',
+                    type: 'mkv',
                     headers: {
                       'Accept-Encoding': 'identity',
                       'Icy-MetaData': '1',
@@ -204,6 +205,7 @@ function extract(ctx) {
                       'User-Agent': 'MovieBlast',
                       'x-request-x': appId,
                     },
+                    probe: 'skip',
                   };
                 });
             });

@@ -144,6 +144,7 @@ function extract(ctx) {
           title: 'DimaToon',
           quality: '720p',
           headers: headers(episodeUrl),
+          probe: 'skip',
         },
       ];
     })

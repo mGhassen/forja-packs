@@ -98,6 +98,7 @@ function extract(ctx) {
           'User-Agent': ua,
           Accept: '*/*',
         },
+        probe: 'skip',
       });
     }
     return out;

@@ -77,6 +77,7 @@ function extract(ctx) {
           title: 'Dimakids',
           quality: '720p',
           headers: headers(pageUrl),
+          probe: 'skip',
         },
       ];
     })
