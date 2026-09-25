@@ -44,7 +44,6 @@ function arabicLayout() {
   }
 
   return {
-    dir: 'rtl',
     pages: {
       arabic: {
         feed: true,

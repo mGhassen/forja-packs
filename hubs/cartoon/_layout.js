@@ -2,7 +2,6 @@
 
 function cartoonLayout() {
   return {
-    dir: 'rtl',
     pages: {
       cartoon: {
         feed: true,

@@ -2,7 +2,6 @@
 
 function brstejLayout() {
   return {
-    dir: 'rtl',
     pages: {
       aflem: {
         pageSize: 24,

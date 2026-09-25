@@ -31,6 +31,7 @@ var ANILIST_MEDIA_FIELDS = [
 var ANILIST_DETAILS_FIELDS = [
   ANILIST_MEDIA_FIELDS,
   'nextAiringEpisode { episode airingAt }',
+  'airingSchedule(perPage: 50) { nodes { episode airingAt } }',
   'streamingEpisodes { title thumbnail }',
   'characters(page: 1, perPage: 16, sort: [ROLE, RELEVANCE, ID]) { edges { ' +
     'role node { name { full } image { large } } } }',
@@ -214,36 +215,96 @@ function anilistMeta(m, preferred) {
   return hubPaintPoster(meta);
 }
 
+function anilistUnixToIso(unixSeconds) {
+  var n = Number(unixSeconds);
+  if (!(n > 0)) return '';
+  var d = new Date(n * 1000);
+  if (isNaN(d.getTime())) return '';
+  var y = d.getFullYear();
+  var m = d.getMonth() + 1;
+  var day = d.getDate();
+  return (
+    String(y) +
+    '-' +
+    (m < 10 ? '0' : '') +
+    m +
+    '-' +
+    (day < 10 ? '0' : '') +
+    day
+  );
+}
+
+function anilistAiringIsoByEpisode(m) {
+  var nodes =
+    m && m.airingSchedule && Array.isArray(m.airingSchedule.nodes)
+      ? m.airingSchedule.nodes
+      : [];
+  var out = {};
+  var i;
+  for (i = 0; i < nodes.length; i++) {
+    var node = nodes[i] || {};
+    var ep = Number(node.episode);
+    var iso = anilistUnixToIso(node.airingAt);
+    if (ep > 0 && iso) out[ep] = iso;
+  }
+  var next = m && m.nextAiringEpisode;
+  if (next) {
+    var nextEp = Number(next.episode);
+    var nextIso = anilistUnixToIso(next.airingAt);
+    if (nextEp > 0 && nextIso) out[nextEp] = nextIso;
+  }
+  return out;
+}
+
+function anilistApplyAir(entry, m, isoByEp) {
+  var num = Number(entry.episode);
+  var iso = (isoByEp && isoByEp[num]) || '';
+  if (iso) entry.airDate = iso;
+  var next = m && m.nextAiringEpisode;
+  var nextEp = next ? Number(next.episode) : 0;
+  var nextAt = next ? Number(next.airingAt) : 0;
+  var nextAhead = nextEp > 0 && (!(nextAt > 0) || nextAt * 1000 > Date.now());
+  if (nextAhead && num >= nextEp) entry.aired = false;
+  else if (iso && hubIsFutureIsoDate(iso)) entry.aired = false;
+  return entry;
+}
+
 function anilistVideosFromMedia(m) {
+  var isoByEp = anilistAiringIsoByEpisode(m);
   var stream = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
-  if (stream.length) {
-    var out = [];
-    for (var i = 0; i < stream.length; i++) {
-      var ep = stream[i] || {};
-      var num = i + 1;
-      out.push({
-        id: String(num),
-        episode: num,
-        season: 1,
-        title: String(ep.title || '').trim() || 'Episode ' + num,
-        thumbnail: anilistAbsUrl(ep.thumbnail || ''),
-      });
-    }
-    return out;
+  var known = {};
+  var i;
+  for (i = 0; i < stream.length; i++) {
+    var ep = stream[i] || {};
+    var num = i + 1;
+    known[num] = {
+      title: String(ep.title || '').trim(),
+      thumbnail: anilistAbsUrl(ep.thumbnail || ''),
+    };
   }
-  var count = Number(m.episodes) || 0;
-  if (count <= 0 && m.nextAiringEpisode && m.nextAiringEpisode.episode) {
-    count = Number(m.nextAiringEpisode.episode);
-  }
+  var total = Number(m.episodes) || 0;
+  var nextEp =
+    m.nextAiringEpisode && Number(m.nextAiringEpisode.episode) > 0
+      ? Number(m.nextAiringEpisode.episode)
+      : 0;
+  var count = stream.length > 0 ? stream.length : total;
+  if (count <= 0 && nextEp > 0) count = nextEp;
+  // Rest of a short season, plus the next episode when it is the one after the list.
+  if (total > count && total - count <= 30) count = total;
+  if (nextEp > count && nextEp - count <= 2) count = nextEp;
   if (count <= 0) return [];
   var videos = [];
-  for (var j = 1; j <= count; j++) {
-    videos.push({
+  var j;
+  for (j = 1; j <= count; j++) {
+    var row = known[j] || {};
+    var entry = {
       id: String(j),
       episode: j,
       season: 1,
-      title: 'Episode ' + j,
-    });
+      title: row.title || 'Episode ' + j,
+    };
+    if (row.thumbnail) entry.thumbnail = row.thumbnail;
+    videos.push(anilistApplyAir(entry, m, isoByEp));
   }
   return videos;
 }

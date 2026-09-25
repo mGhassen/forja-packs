@@ -2,7 +2,6 @@
 
 function kidsLayout() {
   return {
-    dir: 'rtl',
     pages: {
       kids: {
         feed: true,

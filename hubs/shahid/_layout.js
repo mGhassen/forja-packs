@@ -63,7 +63,6 @@ function shahidLayout() {
     widgets.push(hubWithLoad(extra, 'rail', { rail: id }));
   }
   return {
-    dir: 'rtl',
     pages: {
       shahid: {
         feed: true,
