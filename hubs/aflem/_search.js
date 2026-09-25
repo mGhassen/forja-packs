@@ -72,14 +72,22 @@ function brstejSearch(ctx, cfg, params) {
       page;
     return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
       var origin = brstejOrigin(got.url) || base;
-      return brstejParseEpisodeCards(ctx, got.html, origin);
+      var series = brstejParseSerieCards(ctx, got.html, origin);
+      var items = series.length
+        ? series
+        : brstejParseEpisodeCards(ctx, got.html, origin);
+      return {
+        items: items,
+        more: brstejHtmlHasNextPage(got.html, page),
+      };
     });
   }
 
   function walk(page) {
-    return fetchPage(page).then(function (episodes) {
+    return fetchPage(page).then(function (got) {
+      var episodes = (got && got.items) || [];
       brstejMergeSearchPage(episodes, byKey, order);
-      var lastPage = episodes.length < 24;
+      var lastPage = !got.more && episodes.length < 24;
       // Strong title hit (exact / prefix) → stop early.
       if (lastPage || page >= maxPages || bestScore() >= 80) {
         return null;

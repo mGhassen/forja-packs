@@ -29,6 +29,7 @@ Packs are JavaScript plugins the Forja app installs by manifest URL, caches on d
 | **Live Sports hub** | [`hubs/live_sports/manifest.json`](hubs/live_sports/manifest.json) | Live sports schedule UI (KitShell) |
 | **IPTV** | [`hubs/iptv/manifest.json`](hubs/iptv/manifest.json) | IPTV portals, live channels, and portal VOD details |
 | **My List** | [`hubs/my_list/manifest.json`](hubs/my_list/manifest.json) | My List hub |
+| **Downloads** | [`hubs/downloads/manifest.json`](hubs/downloads/manifest.json) | Saved films, series, anime, and dramas |
 | **Stremio** | [`hubs/stremio/manifest.json`](hubs/stremio/manifest.json) | Stremio catalog hub (installed VOD addon catalogs) |
 
 Web **Community Packs** lists packs published in admin (`plugin_packs`). Register a pack there with its GitHub (or CDN) `manifest.json` URL.

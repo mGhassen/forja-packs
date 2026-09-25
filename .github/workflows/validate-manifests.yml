@@ -20,7 +20,7 @@ jobs:
           for dir in providers livesports torrent debrid iptv/vod \
             hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
             hubs/cartoon hubs/kids hubs/shahid hubs/live_sports \
-            hubs/my_list hubs/stremio; do
+            hubs/my_list hubs/stremio hubs/downloads; do
             f="$dir/manifest.json"
             if [[ ! -f "$f" ]]; then
               echo "missing: $f"

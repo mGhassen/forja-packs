@@ -1,12 +1,12 @@
 // Brstej hub — browse / search / details (protocol 1).
-// Aflem hub — scrape Brstej (uo.brstej.com). Playback: provider `brstej`.
+// Aflem hub — scrape Brstej (hd1.brstej.com). Playback: provider `brstej`.
 // Host surface: arabic.
 
 var BRSTEJ_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
 var BRSTEJ_DEFAULTS = {
-  origin: 'https://uo.brstej.com',
+  origin: 'https://hd1.brstej.com',
 };
 
 var BRSTEJ_FEED_RAILS = ['spotlight', 'latest', 'series'];
@@ -355,24 +355,34 @@ function brstejNormTitle(title) {
     .trim();
 }
 
+function brstejSerieHrefId(href) {
+  var m = /(?:view-serie|series1)\.php\?id=(\d+)/.exec(String(href || ''));
+  return m ? m[1] : '';
+}
+
+function brstejHtmlHasNextPage(html, page) {
+  var next = (Number(page) || 1) + 1;
+  return new RegExp('[?&]page=' + next + '([^0-9]|$)').test(String(html || ''));
+}
+
 function brstejParseSerieCards(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = [];
   var seen = {};
   if (!$) return out;
-  $('li[class*="col-xs-6"]').each(function () {
-    var card = $(this);
-    var a = card.find('a[href*="view-serie.php"]').first();
-    if (!a.length) a = card.find('a[href]').first();
-    if (!a.length) return;
+  function push(card, a) {
+    if (!a || !a.length) return;
     var href = a.attr('href') || '';
-    var m = /view-serie\.php\?id=(\d+)/.exec(href);
-    if (!m) return;
-    var id = m[1];
-    if (seen[id]) return;
-    seen[id] = true;
-    var title = brstejStripPrefix((a.attr('title') || a.text() || '').trim());
+    var id = brstejSerieHrefId(href);
+    if (!id || seen[id]) return;
+    var title = (a.attr('title') || '').trim();
+    if (!title) {
+      var h3 = card.find('h3').first();
+      title = (h3.text() || a.text() || '').trim();
+    }
+    title = brstejStripPrefix(title);
     if (!title) return;
+    seen[id] = true;
     var meta = brstejMeta(
       'serie:' + id,
       title,
@@ -380,7 +390,25 @@ function brstejParseSerieCards(ctx, html, base) {
       { url: brstejAbs(base, href) },
     );
     if (meta) out.push(meta);
+  }
+  $('article.psd-card').each(function () {
+    var card = $(this);
+    var a = card
+      .find('h3 a[href*="series1.php"], h3 a[href*="view-serie.php"]')
+      .first();
+    if (!a.length) {
+      a = card.find('a[href*="series1.php"], a[href*="view-serie.php"]').first();
+    }
+    push(card, a);
   });
+  $('a.pcg-series-card, a[href*="series1.php?id="], a[href*="view-serie.php"]').each(
+    function () {
+      var a = $(this);
+      var card = a.closest('article, li');
+      if (!card.length) card = a;
+      push(card, a);
+    },
+  );
   return out;
 }
 
@@ -451,10 +479,12 @@ function brstejBrowseSeries(ctx, cfg, opts) {
   var url = base + '/moslslat.php?page=' + page;
   return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
     var origin = brstejOrigin(got.url) || base;
-    return brstejPageResult(
+    var pageOut = brstejPageResult(
       brstejParseSerieCards(ctx, got.html, origin),
       limit,
     );
+    if (brstejHtmlHasNextPage(got.html, page)) pageOut.hasMore = true;
+    return pageOut;
   });
 }
 
@@ -521,7 +551,11 @@ function brstejBrowsePath(ctx, cfg, path, opts) {
   return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
     var origin = brstejOrigin(got.url) || base;
     var series = brstejParseSerieCards(ctx, got.html, origin);
-    if (series.length) return brstejPageResult(series, limit);
+    if (series.length) {
+      var seriesPage = brstejPageResult(series, limit);
+      if (brstejHtmlHasNextPage(got.html, page)) seriesPage.hasMore = true;
+      return seriesPage;
+    }
     var episodes = brstejParseEpisodeCards(ctx, got.html, origin);
     var grouped = brstejGroupCategoryCards(episodes, !!opts.asMovies);
     // hasMore from raw episode cards — grouping collapses many eps → few shows.
@@ -721,6 +755,32 @@ function brstejParseEpisodeAnchors($, anchors, base) {
   return list;
 }
 
+function brstejAppendPdsSeasons($, base, out) {
+  var sections = $('section.pds-season');
+  if (!sections.length) return;
+  sections.each(function (si) {
+    var section = $(this);
+    var idAttr = section.attr('id') || '';
+    var idMatch = /pds-season-(\d+)/.exec(idAttr);
+    var heading = (section.find('h3').first().text() || '').trim();
+    var headMatch = /الموسم\s+(\d+)/.exec(heading);
+    var seasonNum = idMatch
+      ? Number(idMatch[1])
+      : headMatch
+        ? Number(headMatch[1])
+        : si + 1;
+    var eps = brstejParseEpisodeAnchors(
+      $,
+      section.find('a[href*="watch.php"]'),
+      base,
+    );
+    for (var i = 0; i < eps.length; i++) {
+      eps[i].season = seasonNum;
+      out.videos.push(eps[i]);
+    }
+  });
+}
+
 function brstejParseSerieHtml(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = { title: '', poster: '', description: '', videos: [] };
@@ -755,6 +815,7 @@ function brstejParseSerieHtml(ctx, html, base) {
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
+  if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
   return out;
 }
@@ -795,6 +856,7 @@ function brstejParseWatchHtml(ctx, html, base) {
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
+  if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
   return out;
 }
@@ -836,10 +898,9 @@ function brstejDetails(ctx, cfg, params) {
     url = base + '/watch.php?vid=' + encodeURIComponent(showId.substring(6));
     fromWatch = true;
   } else if (showId.indexOf('serie:') === 0) {
-    url =
-      base + '/view-serie.php?id=' + encodeURIComponent(showId.substring(6));
+    url = base + '/series1.php?id=' + encodeURIComponent(showId.substring(6));
   } else {
-    url = base + '/view-serie.php?id=' + encodeURIComponent(showId);
+    url = base + '/series1.php?id=' + encodeURIComponent(showId);
   }
   return brstejFetchHtml(ctx, url, base + '/')
     .then(function (got) {

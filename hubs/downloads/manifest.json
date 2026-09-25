@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "forjahq-downloads",
+  "name": "ForjaHQ Downloads",
+  "description": "Films, series, anime, and dramas saved on this device.",
+  "author": "ForjaHQ",
+  "version": "1.0.0",
+  "tags": ["downloads"],
+  "plugins": [
+    {
+      "id": "downloads-hub",
+      "name": "Downloads",
+      "description": "Saved films, series, anime, and dramas",
+      "entry": "downloads.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": ["list"],
+      "capabilities": ["nav", "layout", "feed"],
+      "nav": {
+        "label": "Downloads",
+        "icon": "icons/nav.png",
+        "accent": "#34D399",
+        "hostRequires": "offlineDownloads",
+        "page": { "action": "layout" }
+      },
+      "prelude": "_kit.js,_layout.js"
+    }
+  ],
+  "bundle": [
+    "downloads.js",
+    "_kit.js",
+    "_layout.js",
+    "icons/nav.png"
+  ]
+}

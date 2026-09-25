@@ -5,8 +5,6 @@ function brstejLayout() {
     dir: 'rtl',
     pages: {
       aflem: {
-        feed: true,
-        feedRails: BRSTEJ_FEED_RAILS.slice(),
         pageSize: 24,
         // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
         // Visual: latest → continue? → series.

@@ -1,5 +1,5 @@
 var SPECS = {
-  origin: 'https://uo.brstej.com',
+  origin: 'https://hd1.brstej.com',
 };
 
 var UA =

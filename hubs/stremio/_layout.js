@@ -52,30 +52,30 @@ function stremioLayoutFromCatalogs(catalogs) {
   var widgets = [];
 
   // Default hero — All (no type menu). Hidden when Movies / Series / Anime is on.
-  widgets.push(
-    hubWithLoad(
-      {
-        type: 'hero',
-        id: 'hero',
-        title: first.title,
-        rail: first.railId,
-        bleed: first.railId,
-        slideCap: 5,
-        hideWhenTypeFilter: true,
-        actions: [
-          {
-            id: 'details',
-            label: 'View details',
-            icon: 'info',
-            tone: 'secondary',
-          },
-          { id: 'follow' },
-        ],
-      },
-      'rail',
-      { rail: first.railId },
-    ),
-  );
+  // widgets.push(
+  //   hubWithLoad(
+  //     {
+  //       type: 'hero',
+  //       id: 'hero',
+  //       title: first.title,
+  //       rail: first.railId,
+  //       bleed: first.railId,
+  //       slideCap: 5,
+  //       hideWhenTypeFilter: true,
+  //       actions: [
+  //         {
+  //           id: 'details',
+  //           label: 'View details',
+  //           icon: 'info',
+  //           tone: 'secondary',
+  //         },
+  //         { id: 'follow' },
+  //       ],
+  //     },
+  //     'rail',
+  //     { rail: first.railId },
+  //   ),
+  // );
 
   // Per-type heroes — only while that type menu is selected.
   var typeHeroDone = {};
