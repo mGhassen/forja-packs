@@ -25,6 +25,7 @@ function downloadsLayout() {
             }),
             hubWithLoad(
               kitList('grid', {
+                open: 'panel',
                 kindMenu: 'kind',
                 focusUp: 'kind',
                 emptyTitle: 'Nothing downloaded yet',

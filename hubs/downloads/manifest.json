@@ -4,7 +4,7 @@
   "name": "ForjaHQ Downloads",
   "description": "Films, series, anime, and dramas saved on this device.",
   "author": "ForjaHQ",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "tags": ["downloads"],
   "plugins": [
     {
