@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.20",
+  "version": "1.6.21",
   "tags": [
     "providers",
     "anime",
@@ -63,6 +63,17 @@
       "id": "vidrock",
       "name": "VidRock",
       "entry": "vidrock.js",
+      "types": [
+        "movie",
+        "tv",
+        "drama"
+      ],
+      "kind": "http"
+    },
+    {
+      "id": "vidsrc",
+      "name": "VidSrc",
+      "entry": "vidsrc.js",
       "types": [
         "movie",
         "tv",
@@ -1727,6 +1738,7 @@
     "vixsrc.js",
     "vidnest.js",
     "vidrock.js",
+    "vidsrc.js",
     "vidsrcsbs.js",
     "vidzee.js",
     "multiembed.js",
