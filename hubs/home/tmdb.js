@@ -1926,6 +1926,20 @@ function tmdbStructuredDiscoverTv(ctx, cfg, query, filter) {
   return tmdbSafeJson(tmdbGet(ctx, cfg, '/discover/tv', q));
 }
 
+// Alternate films and series so an All search page is not only the first type.
+function tmdbZipMedia(movies, shows, limit) {
+  var out = [];
+  var i = 0;
+  var j = 0;
+  var cap = limit > 0 ? limit : movies.length + shows.length;
+  while (out.length < cap && (i < movies.length || j < shows.length)) {
+    if (i < movies.length) out.push(movies[i++]);
+    if (out.length >= cap) break;
+    if (j < shows.length) out.push(shows[j++]);
+  }
+  return out;
+}
+
 function tmdbStructuredSearch(ctx, cfg, params) {
   var trimmed = String(params.query || '').trim();
   var filter = params.filter;
@@ -2061,7 +2075,9 @@ function tmdbStructuredSearch(ctx, cfg, params) {
 
     return Promise.all(chunkPromises).then(function (chunks) {
       var seen = {};
-      var out = [];
+      var multi = [];
+      var movies = [];
+      var shows = [];
 
       function passesFilters(meta, applyYearFilter) {
         if (
@@ -2081,6 +2097,12 @@ function tmdbStructuredSearch(ctx, cfg, params) {
       var ci;
       for (ci = 0; ci < chunks.length; ci++) {
         var chunk = chunks[ci];
+        var bucket =
+          chunk.forcedType === 'tv'
+            ? shows
+            : chunk.forcedType === 'movie'
+              ? movies
+              : multi;
         var rows = (chunk.json && chunk.json.results) || [];
         var ri;
         for (ri = 0; ri < rows.length; ri++) {
@@ -2092,10 +2114,25 @@ function tmdbStructuredSearch(ctx, cfg, params) {
           var key = meta.type + ':' + meta.ids.tmdb;
           if (seen[key]) continue;
           seen[key] = true;
-          out.push(meta);
-          if (limit > 0 && out.length >= limit) return out;
+          bucket.push(meta);
         }
       }
+
+      var out = multi.slice();
+      var room = limit > 0 ? limit - out.length : 0;
+      if (limit > 0 && room <= 0) return hubClampList(out, limit);
+
+      var discover;
+      if (!parsed.mediaType) {
+        discover = tmdbZipMedia(movies, shows, room);
+      } else if (parsed.mediaType === 'tv') {
+        discover = shows;
+      } else {
+        discover = movies;
+      }
+      var di;
+      var take = limit > 0 ? Math.min(discover.length, room) : discover.length;
+      for (di = 0; di < take; di++) out.push(discover[di]);
       return limit > 0 ? hubClampList(out, limit) : out;
     });
   });
