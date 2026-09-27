@@ -600,9 +600,29 @@ function liveFeedStartsAtMs(row) {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function liveFeedFlag(v) {
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
+function liveFeedEndsAtMs(row) {
+  var raw = row && (row.endsAt || row.ends_at);
+  if (raw == null || raw === '') return 0;
+  if (typeof raw === 'number') {
+    return raw > 1e12 ? raw : raw > 0 ? raw * 1000 : 0;
+  }
+  var s = String(raw).trim();
+  if (!s) return 0;
+  var asNum = Number(s);
+  if (!isNaN(asNum) && asNum > 0) {
+    return asNum > 1e12 ? asNum : asNum * 1000;
+  }
+  var parsed = Date.parse(s);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 function liveFeedIsAlwaysOn(row) {
   if (!row) return false;
-  if (row.always_live === true || row.alwaysLive === true) return true;
+  if (liveFeedFlag(row.always_live) || liveFeedFlag(row.alwaysLive)) return true;
   var badge = String(row.badge || row.kind || row.category || '').toLowerCase();
   if (badge.indexOf('24/7') >= 0 || badge.indexOf('24-7') >= 0) return true;
   var genres = row.genres;
@@ -617,7 +637,14 @@ function liveFeedIsAlwaysOn(row) {
 
 function liveFeedIsAiring(row) {
   if (!row) return false;
-  return row.airing === true || row.live === true || liveFeedIsAlwaysOn(row);
+  if (liveFeedIsAlwaysOn(row)) return true;
+  var now = Date.now();
+  var start = liveFeedStartsAtMs(row);
+  // Lobby viewers before kickoff are not on air (PPV "Live in …").
+  if (start > now) return false;
+  var end = liveFeedEndsAtMs(row);
+  if (end > 0 && end < now) return false;
+  return row.airing === true || row.live === true;
 }
 
 function liveFeedHorizonRangeMs(horizon) {

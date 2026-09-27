@@ -71,9 +71,19 @@ function liveSportsShapeRow(row) {
   var alwaysLive =
     out.alwaysLive === true ||
     out.always_live === true ||
+    out.alwaysLive === 1 ||
+    out.always_live === 1 ||
     catLower.indexOf('24/7') >= 0 ||
     catLower.indexOf('24-7') >= 0;
-  var airing = out.airing === true || out.live === true || alwaysLive;
+  var endMs = liveSportsNum(out.endsAt || out.ends_at);
+  if (endMs > 0 && endMs < 1e12) endMs = endMs * 1000;
+  var scheduledFuture = dateMs > Date.now();
+  var scheduledEnded = endMs > 0 && endMs < Date.now();
+  var airing =
+    alwaysLive ||
+    ((out.airing === true || out.live === true) &&
+      !scheduledFuture &&
+      !scheduledEnded);
   var viewers = liveSportsNum(out.viewers);
   var poster = liveSportsAbsUrl(out.poster || out.posterPath || '');
   var live = airing || alwaysLive;
@@ -93,6 +103,7 @@ function liveSportsShapeRow(row) {
   out.dateMs = dateMs;
   out.startsAt = dateMs > 0 ? String(dateMs) : out.startsAt || '';
   out.airing = airing;
+  out.live = airing;
   out.alwaysLive = alwaysLive;
   out.viewers = viewers;
   out.poster = poster;

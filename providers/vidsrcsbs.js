@@ -180,7 +180,7 @@ function extract(ctx) {
             if (!chosen || !chosen.url) return null;
             var hdrs = chosen.headers || {};
             var referer = hdrs.Referer || hdrs.referer || nxshaOrigin + '/';
-            return {
+            var row = {
               url: chosen.url,
               name: (label || 'VidSrc.sbs') + ' · ' + (server.name || server.scraper || 'nxsha'),
               quality: chosen.quality || chosen.label || '',
@@ -189,6 +189,8 @@ function extract(ctx) {
                 hdrs.Origin || hdrs.origin ? { Origin: hdrs.Origin || hdrs.origin } : {},
               ),
             };
+            if (ctx.emit) ctx.emit(row);
+            return row;
           });
         }),
       ).then(function (rows) {

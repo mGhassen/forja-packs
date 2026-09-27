@@ -136,26 +136,8 @@ function extract(ctx) {
   }
 
   function resolvePlaylist(link) {
-    return getText(link.url, {
-      Accept: 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-    })
-      .then(function (content) {
-        if (content.indexOf('#EXT-X-STREAM-INF:') >= 0) {
-          return parseM3u8(content, link.url).map(function (stream) {
-            return {
-              url: stream.url,
-              name: link.name.replace(/\s-\sUnknown$/, '') + ' - ' + qualityFromStream(stream),
-              quality: qualityFromStream(stream),
-              headers: headers,
-              subtitles: link.subtitles || [],
-            };
-          });
-        }
-        return [link];
-      })
-      .catch(function () {
-        return [link];
-      });
+    if (ctx.emit) ctx.emit(link);
+    return Promise.resolve([link]);
   }
 
   function processPrimebox(data, serverName) {

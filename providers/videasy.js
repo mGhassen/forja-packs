@@ -167,7 +167,13 @@ function extract(ctx) {
       ctx.log('mirrors=' + mirrors.length);
       return Promise.all(
         mirrors.map(function (mirror) {
-          return probe(mirror, seed);
+          return probe(mirror, seed).then(function (part) {
+            part = part || [];
+            for (var j = 0; j < part.length; j++) {
+              if (ctx.emit) ctx.emit(part[j]);
+            }
+            return part;
+          });
         }),
       ).then(function (chunks) {
         var rows = [];

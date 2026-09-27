@@ -422,6 +422,7 @@ function hubPaintPoster(item, opts) {
     poster: imageUrl,
     open: open,
   };
+  if (meta.logo) out.meta.logo = String(meta.logo);
   if (Object.keys(ids).length) out.meta.ids = ids;
   if (meta.tmdbMediaType) out.meta.tmdbMediaType = meta.tmdbMediaType;
   if (meta.background) out.meta.background = meta.background;

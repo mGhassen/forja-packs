@@ -19,6 +19,7 @@ function downloadsLoadFeed(ctx) {
         kind: kind,
         name: String(row.name || ''),
         poster: String(row.poster || ''),
+        logo: String(row.logo || ''),
         releaseInfo: String(row.releaseInfo || row.year || ''),
         open: row.open,
       };
