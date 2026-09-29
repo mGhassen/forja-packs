@@ -72,6 +72,8 @@ function extract(ctx) {
     function tryAt(i) {
       if (i >= list.length) return Promise.reject(new Error('KissKh mirrors failed'));
       var origin = list[i];
+      // Advance once. A later mirror's rejection must not fall into this catch
+      // or the tail of the list runs again (one lookup turned into ~100 requests).
       return ctx
         .fetch(origin + path, { headers: headersFor(origin) })
         .then(function (r) {
@@ -79,18 +81,18 @@ function extract(ctx) {
             var trimmed = String(body || '').trim();
             if (!r.ok) {
               ctx.log('kisskh HTTP ' + r.status + ' @ ' + origin);
-              return tryAt(i + 1);
+              return null;
             }
             if (!trimmed || trimmed.charAt(0) === '<') {
               ctx.log('kisskh HTML shell @ ' + origin);
-              return tryAt(i + 1);
+              return null;
             }
             try {
               sticky = origin;
               return { origin: origin, json: JSON.parse(trimmed) };
             } catch (e) {
               ctx.log('kisskh JSON parse fail @ ' + origin);
-              return tryAt(i + 1);
+              return null;
             }
           });
         })
@@ -101,6 +103,10 @@ function extract(ctx) {
               ': ' +
               (e && e.message ? e.message : e),
           );
+          return null;
+        })
+        .then(function (hit) {
+          if (hit) return hit;
           return tryAt(i + 1);
         });
     }
