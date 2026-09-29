@@ -564,6 +564,12 @@ async function mediaPlaylistIsPlayable(ctx, mediaUrl, headers, bodyText) {
 async function selectPlayableM3u8(ctx, url, headers) {
   var target = String(url || '').trim();
   if (!target) return '';
+  // nginx 403s non-browser HTTP on this CDN. MediaKit plays the playlist direct.
+  try {
+    if (new URL(target).host.toLowerCase().indexOf('indianservers.st') >= 0) {
+      return target;
+    }
+  } catch (_) {}
   try {
     var res = await ctx.fetch(target, { headers: headers || {} });
     if (!res.ok) return '';
