@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.22",
+  "version": "2.0.23",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -254,53 +254,6 @@
       }
     },
     {
-      "id": "espn",
-      "name": "ESPN",
-      "description": "ESPN scoreboard schedule catalog",
-      "entry": "espn.js",
-      "types": [
-        "live_sport"
-      ],
-      "kind": "http",
-      "capabilities": [
-        "catalog"
-      ],
-      "defaultCapabilities": {
-        "catalog": true
-      },
-      "legacyIds": {
-        "catalog": "catalog-espn"
-      },
-      "config": {
-        "scheduleHorizon": "fullDay",
-        "daysAhead": 7,
-        "catalogTimeoutSec": 90,
-        "leagues": [
-          "NBA",
-          "NFL",
-          "MLB",
-          "NHL",
-          "WNBA",
-          "NCAAMB",
-          "NCAAWB",
-          "NCAAFB",
-          "EPL",
-          "MLS",
-          "LALIGA",
-          "SERIEA",
-          "BUNDESLIGA",
-          "LIGUE1",
-          "UCL",
-          "EUROPA",
-          "EREDIVISIE",
-          "LIGAPORTUGAL",
-          "LIGAMX",
-          "WORLDCUP",
-          "UFC"
-        ]
-      }
-    },
-    {
       "id": "liveonsat",
       "name": "LiveOnSat",
       "description": "LiveOnSat TV schedule + broadcast channel hints",
@@ -367,7 +320,6 @@
     "watchfooty.js",
     "streamic.js",
     "mobikora.js",
-    "espn.js",
     "liveonsat.js",
     "livesoccertv.js",
     "goat/unlock.mjs",
