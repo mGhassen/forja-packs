@@ -93,6 +93,43 @@ function bumpViewers(map, id, n) {
   if (count > prev) map[key] = count;
 }
 
+/** Site live grid. REST /matches/live is every in-play event, including ones with no stream. */
+async function fetchPopularLive(ctx) {
+  var headers = {
+    'User-Agent': ua(),
+    Accept: 'application/json',
+    Referer: SITE_ORIGIN + '/',
+  };
+  try {
+    var res = await ctx.fetch(POPULAR_LIVE_TRPC, { headers: headers });
+    if (!res.ok) return [];
+    var list = trpcJson(await res.json());
+    return Array.isArray(list) ? list : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function itemFromSiteMatch(m) {
+  var home = (m.team1 && m.team1.name) || '';
+  var away = (m.team2 && m.team2.name) || '';
+  var ts = m.date ? Date.parse(m.date) : 0;
+  if (!(ts > 0)) ts = 0;
+  return {
+    matchId: m.id || m.matchId,
+    title:
+      m.title ||
+      (home && away ? home + ' vs ' + away : home || away || 'Match'),
+    sport: m.sport,
+    timestamp: ts,
+    poster: m.poster,
+    teams: {
+      home: { name: home || 'Home' },
+      away: { name: away || 'Away' },
+    },
+  };
+}
+
 /** Match-level concurrent viewers — not on /api/v1/matches/live. */
 async function fetchViewerCounts(ctx) {
   var out = {};
@@ -148,14 +185,20 @@ async function catalogExtract(ctx) {
   var byId = {};
   var viewersById = await fetchViewerCounts(ctx);
 
-  // Keep stream-less airing rows — Status → Airing shows them; play may still fail.
-  var liveList = await fetchList(ctx, cfg.api || LIVE_API);
+  // Same list as the site home (sports.getPopularLiveMatches), not REST /matches/live.
+  var liveList = cfg.api
+    ? await fetchList(ctx, cfg.api)
+    : await fetchPopularLive(ctx);
   for (var i = 0; i < liveList.length; i++) {
-    var item = liveList[i];
-    var statusLive = item.status === 'in' || item.status === 'live';
-    if (!statusLive) continue;
-    var mid = String(item.matchId);
-    byId[mid] = toRow(pluginId, item, true, viewersById[mid] || 0);
+    var raw = liveList[i];
+    if (!raw) continue;
+    var item = raw.matchId && raw.teams ? raw : itemFromSiteMatch(raw);
+    var status = String(raw.status || 'in');
+    if (status !== 'in' && status !== 'live') continue;
+    var mid = String(item.matchId || '');
+    if (!mid) continue;
+    var viewers = Number(raw.viewerCount || viewersById[mid] || 0);
+    byId[mid] = toRow(pluginId, item, true, viewers);
   }
 
   // Upcoming schedule (pre only) — skip post/finished.
