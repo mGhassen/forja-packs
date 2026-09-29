@@ -141,6 +141,29 @@ function liveSportsShapeRow(row) {
     out.broadcastChannels = broadcasts.slice();
   }
 
+  var catalogs = [];
+  var seenCat = {};
+  function pushCat(raw) {
+    var name = String(raw || '').trim();
+    if (!name || name.indexOf('stremio:') === 0) return;
+    var key = name.toLowerCase();
+    if (seenCat[key]) return;
+    seenCat[key] = 1;
+    catalogs.push(name);
+  }
+  if (Array.isArray(out.catalogs)) {
+    for (var c = 0; c < out.catalogs.length; c++) {
+      var cat = out.catalogs[c];
+      if (typeof cat === 'string') pushCat(cat);
+      else if (cat && typeof cat === 'object') {
+        pushCat(cat.name || cat.label || cat.id);
+      }
+    }
+  }
+  if (!catalogs.length) {
+    pushCat(out.catalogName || out.pluginName || out.stremioAddonName);
+  }
+
   var gameOut = game
     ? Object.assign({}, game)
     : {
@@ -156,6 +179,9 @@ function liveSportsShapeRow(row) {
     gameOut.broadcastChannels = broadcasts.slice();
   }
   out.sportMatchGame = gameOut;
+  var paintProps = {};
+  if (broadcasts.length) paintProps.broadcastChannels = broadcasts.slice();
+  if (catalogs.length) paintProps.catalogs = catalogs.slice();
   return hubPaintEvent(out, {
     homeBadgeUrl: homeBadge,
     awayBadgeUrl: awayBadge,
@@ -164,7 +190,7 @@ function liveSportsShapeRow(row) {
     timeLabel: timeLabel,
     viewers: viewers,
     live: live,
-    props: broadcasts.length ? { broadcastChannels: broadcasts.slice() } : {},
+    props: paintProps,
   });
 }
 

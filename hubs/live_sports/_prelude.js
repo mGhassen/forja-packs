@@ -866,6 +866,162 @@ function liveFeedPickBetter(a, b) {
   return a;
 }
 
+function liveFeedCatalogLabel(row) {
+  if (!row || typeof row !== 'object') return '';
+  var name = String(row.catalogName || row.pluginName || row.stremioAddonName || '')
+    .trim();
+  if (name) return name;
+  var listed = row.catalogs;
+  if (Array.isArray(listed) && listed.length === 1) {
+    var only = listed[0];
+    if (typeof only === 'string') return String(only).trim();
+    if (only && typeof only === 'object') {
+      return String(only.name || only.label || '').trim();
+    }
+  }
+  return '';
+}
+
+function liveFeedCollectCatalogs(row) {
+  var out = [];
+  var seen = {};
+  function add(label) {
+    label = String(label || '').trim();
+    if (!label || label.indexOf('stremio:') === 0) return;
+    var key = label.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = 1;
+    out.push(label);
+  }
+  var raw = row && row.catalogs;
+  if (Array.isArray(raw)) {
+    for (var i = 0; i < raw.length; i++) {
+      var c = raw[i];
+      if (typeof c === 'string') add(c);
+      else if (c && typeof c === 'object') add(c.name || c.label || c.id);
+    }
+  }
+  add(liveFeedCatalogLabel(row));
+  if (!out.length && row) {
+    var id = String(row.pluginId || row.livePluginId || '').trim();
+    if (id.indexOf('stremio:') !== 0) add(id);
+  }
+  return out;
+}
+
+function liveFeedUnionCatalogs(a, b) {
+  var out = [];
+  var seen = {};
+  function add(label) {
+    label = String(label || '').trim();
+    if (!label) return;
+    var key = label.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = 1;
+    out.push(label);
+  }
+  var lists = [a, b];
+  for (var i = 0; i < lists.length; i++) {
+    var list = lists[i] || [];
+    for (var j = 0; j < list.length; j++) add(list[j]);
+  }
+  return out;
+}
+
+function liveFeedEnsureCatalogs(rows) {
+  for (var i = 0; i < (rows || []).length; i++) {
+    var row = rows[i];
+    if (!row || typeof row !== 'object') continue;
+    var list = liveFeedCollectCatalogs(row);
+    if (list.length) row.catalogs = list;
+  }
+  return rows || [];
+}
+
+function liveFeedNameMap(plugins) {
+  var map = {};
+  var list = Array.isArray(plugins) ? plugins : [];
+  function put(id, name) {
+    id = String(id || '').trim();
+    name = String(name || '').trim();
+    if (!id || !name) return;
+    map[id] = name;
+    if (id.indexOf('live-') === 0) map[id.slice(5)] = name;
+    else map['live-' + id] = name;
+  }
+  for (var i = 0; i < list.length; i++) {
+    var p = list[i];
+    if (!p || typeof p !== 'object') continue;
+    var name = String(p.name || p.label || '').trim();
+    put(p.id, name);
+    put(p.pluginId, name);
+  }
+  return map;
+}
+
+function liveFeedLookupName(nameMap, id) {
+  id = String(id || '').trim();
+  if (!id || !nameMap) return '';
+  if (nameMap[id]) return nameMap[id];
+  if (id.indexOf('live-') === 0 && nameMap[id.slice(5)]) return nameMap[id.slice(5)];
+  if (nameMap['live-' + id]) return nameMap['live-' + id];
+  return '';
+}
+
+function liveFeedApplyCatalogNames(rows, nameMap) {
+  for (var i = 0; i < (rows || []).length; i++) {
+    var row = rows[i];
+    if (!row || typeof row !== 'object') continue;
+    if (String(row.catalogName || '').trim()) continue;
+    var stremio = String(row.stremioAddonName || '').trim();
+    if (stremio) {
+      row.catalogName = stremio;
+      continue;
+    }
+    var id = String(row.pluginId || row.livePluginId || '').trim();
+    var name = liveFeedLookupName(nameMap, id);
+    if (name) row.catalogName = name;
+    else if (id && id.indexOf('stremio:') !== 0) row.catalogName = id;
+  }
+}
+
+function liveFeedRowsNeedCatalogNames(rows) {
+  for (var i = 0; i < (rows || []).length; i++) {
+    var row = rows[i];
+    if (!row || typeof row !== 'object') continue;
+    if (String(row.catalogName || row.stremioAddonName || '').trim()) continue;
+    if (Array.isArray(row.catalogs) && row.catalogs.length) continue;
+    var id = String(row.pluginId || row.livePluginId || '').trim();
+    if (id) return true;
+  }
+  return false;
+}
+
+function liveFeedPrepareCatalogNames(host, rows) {
+  liveFeedApplyCatalogNames(rows, {});
+  if (!liveFeedRowsNeedCatalogNames(rows)) return Promise.resolve(rows);
+  if (!host || !host.plugin || typeof host.plugin.list !== 'function') {
+    return Promise.resolve(rows);
+  }
+  return Promise.resolve(
+    host.plugin.list({ type: 'live_sport', capability: 'catalog' }),
+  ).then(
+    function (plugins) {
+      liveFeedApplyCatalogNames(rows, liveFeedNameMap(plugins));
+      return rows;
+    },
+    function () {
+      return rows;
+    },
+  );
+}
+
+function liveFeedFinish(host, rows, query, mergeMatching) {
+  return liveFeedPrepareCatalogNames(host, rows).then(function (named) {
+    return liveFeedFilterRows(named, query, mergeMatching);
+  });
+}
+
 function liveFeedMergePair(a, b) {
   var primary = liveFeedPickBetter(a, b);
   var other = primary === a ? b : a;
@@ -891,6 +1047,11 @@ function liveFeedMergePair(a, b) {
   addSources(primary);
   addSources(other);
   if (sources.length) out.sources = sources;
+  var catalogs = liveFeedUnionCatalogs(
+    liveFeedCollectCatalogs(primary),
+    liveFeedCollectCatalogs(other),
+  );
+  if (catalogs.length) out.catalogs = catalogs;
   var va = liveFeedViewerCount(primary.viewers);
   var vb = liveFeedViewerCount(other.viewers);
   if (va + vb > 0) out.viewers = va + vb;
@@ -1004,6 +1165,7 @@ function liveFeedFilterRows(rows, query, mergeMatching) {
     out.push(map);
   }
   if (mergeMatching) out = liveFeedMergeMatching(out);
+  liveFeedEnsureCatalogs(out);
   return liveFeedSortLiveFirst(out);
 }
 
@@ -1014,15 +1176,17 @@ function liveFeedShouldMerge(query, cfg) {
   return true;
 }
 
-function liveFeedNormalizePluginRows(pluginId, batch) {
+function liveFeedNormalizePluginRows(pluginId, batch, pluginName) {
   var collected = [];
   var list = Array.isArray(batch) ? batch : [];
+  var name = String(pluginName || '').trim();
   for (var i = 0; i < list.length; i++) {
     var row = list[i];
     if (!row || typeof row !== 'object') continue;
     var map = Object.assign({}, row);
-    if (!map.pluginId) map.pluginId = pluginId;
-    if (!map.livePluginId) map.livePluginId = pluginId;
+    if (pluginId && !map.pluginId) map.pluginId = pluginId;
+    if (pluginId && !map.livePluginId) map.livePluginId = pluginId;
+    if (name && !String(map.catalogName || '').trim()) map.catalogName = name;
     if (!String(map.id || '').trim()) continue;
     collected.push(map);
   }
@@ -1049,8 +1213,11 @@ function liveSportsAggregateFeed(ctx, params) {
   // Pack only filters/merges/shapes — same reduce step as after each catalog scrape.
   if (params && Array.isArray(params.rows)) {
     var hostRows = liveFeedNormalizePluginRows('', params.rows);
-    return Promise.resolve(
-      liveFeedFilterRows(hostRows, query, liveFeedShouldMerge(query, cfg)),
+    return liveFeedFinish(
+      host,
+      hostRows,
+      query,
+      liveFeedShouldMerge(query, cfg),
     );
   }
 
@@ -1067,8 +1234,11 @@ function liveSportsAggregateFeed(ctx, params) {
     var hit = liveFeedCacheGet(host, cacheKey);
     // Empty arrays are not a hit — cancelled scrapes must not poison the slot.
     if (hit && Array.isArray(hit.rows) && hit.rows.length) {
-      return Promise.resolve(
-        liveFeedFilterRows(hit.rows, query, liveFeedShouldMerge(query, cfg)),
+      return liveFeedFinish(
+        host,
+        hit.rows,
+        query,
+        liveFeedShouldMerge(query, cfg),
       );
     }
   }
@@ -1079,7 +1249,7 @@ function liveSportsAggregateFeed(ctx, params) {
       function (rows) {
         var normalized = liveFeedNormalizePluginRows(filter, rows);
         liveFeedCacheSet(host, cacheKey, normalized);
-        return liveFeedFilterRows(normalized, query, false);
+        return liveFeedFinish(host, normalized, query, false);
       },
     );
   }
@@ -1136,7 +1306,7 @@ function liveSportsAggregateFeed(ctx, params) {
         }
         return Promise.resolve(host.plugin.run(pluginId, 'catalog', {})).then(
           function (rows) {
-            var collected = liveFeedNormalizePluginRows(pluginId, rows);
+            var collected = liveFeedNormalizePluginRows(pluginId, rows, pluginName);
             liveFeedCacheSet(host, pluginKey, collected);
             collected.forEach(function (row) {
               var id = String((row && row.id) || '');
@@ -1159,7 +1329,12 @@ function liveSportsAggregateFeed(ctx, params) {
         } catch (e) {}
       }
       liveFeedCacheSet(host, cacheKey, raw);
-      return liveFeedFilterRows(raw, query, liveFeedShouldMerge(query, cfg));
+      return liveFeedFinish(
+        host,
+        raw,
+        query,
+        liveFeedShouldMerge(query, cfg),
+      );
     });
   });
 }
