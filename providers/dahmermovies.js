@@ -29,7 +29,7 @@ function extract(ctx) {
 
   ctx.log('start tmdb=' + ctx.tmdbId + ' type=' + (isTv ? 'tv' : 'movie') + ' imdb=' + (ctx.imdbId || ''));
 
-  // PlayTorrio path: st.111477.xyz Stremio-protocol addon → workers.dev/d/… URLs.
+  // path: st.111477.xyz Stremio-protocol addon → workers.dev/d/… URLs.
   // Do NOT scrape a.111477 HTML file links (those redirect to p.111477/bulk → CF).
   function generateManifestBaseUrl() {
     var config = api;
