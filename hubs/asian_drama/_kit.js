@@ -1309,6 +1309,11 @@ function hubKisskhMetaFromRow(row) {
 
 function hubKisskhGet(ctx, path) {
   var cfg = hubConfig(ctx, HUB_KISSKH_DEFAULTS);
+  // enrich-tmdb's config.base is the TMDB API. More Like This runs there, so
+  // a non-KissKH base must not replace these mirrors.
+  if (String(cfg.base || '').indexOf('kisskh.') < 0) {
+    cfg = HUB_KISSKH_DEFAULTS;
+  }
   var bases = [cfg.base].concat(Array.isArray(cfg.mirrors) ? cfg.mirrors : []);
   var seen = {};
   var ordered = [];
@@ -1398,12 +1403,13 @@ function hubKisskhSearchCached(ctx, q) {
       : Promise.resolve(null);
   return Promise.resolve(read)
     .then(function (hit) {
-      if (Array.isArray(hit)) return hit;
+      if (Array.isArray(hit) && hit.length) return hit;
       return hubKisskhSearch(ctx, q).then(function (rows) {
         if (
           cache &&
           typeof cache.diskSet === 'function' &&
-          Array.isArray(rows)
+          Array.isArray(rows) &&
+          rows.length
         ) {
           cache.diskSet(HUB_KISSKH_SEARCH_NS, key, rows, {
             ttlMs: HUB_KISSKH_SEARCH_TTL_MS,
