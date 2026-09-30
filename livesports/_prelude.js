@@ -869,6 +869,91 @@ async function fetchDaddyHtml(ctx, url, referer) {
   return '';
 }
 
+function isVideocdnUrl(url) {
+  try {
+    var u = new URL(String(url || '').trim());
+    var host = u.host.toLowerCase();
+    if (host.indexOf('videocdn') < 0) return false;
+    return u.pathname.toLowerCase().indexOf('/shopping') >= 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function xorDecryptHex(cipherHex, keyHex) {
+  var cHex = String(cipherHex || '');
+  var kHex = String(keyHex || '');
+  if (!cHex || !kHex || cHex.length % 2 || kHex.length % 2) return '';
+  var c = new Uint8Array(cHex.length / 2);
+  var k = new Uint8Array(kHex.length / 2);
+  for (var i = 0; i < c.length; i++) c[i] = parseInt(cHex.substr(i * 2, 2), 16);
+  for (var j = 0; j < k.length; j++) k[j] = parseInt(kHex.substr(j * 2, 2), 16);
+  var s = '';
+  for (var n = 0; n < c.length; n++) s += String.fromCharCode(c[n] ^ k[n % k.length]);
+  return s;
+}
+
+function m3u8FromVideocdnHtml(html) {
+  var body = String(html || '');
+  var c = body.match(/var\s+_c\s*=\s*["']([0-9a-fA-F]+)["']/);
+  var k = body.match(/var\s+_k\s*=\s*["']([0-9a-fA-F]+)["']/);
+  if (!c || !k) return '';
+  var url = xorDecryptHex(c[1], k[1]).trim();
+  if (url.indexOf('https://') !== 0) return '';
+  if (!/\.m3u8/i.test(url)) return '';
+  return url;
+}
+
+async function fetchVideocdnHtml(ctx, url, referer) {
+  var res = await ctx.fetch(String(url), {
+    headers: {
+      'User-Agent': ua(),
+      Accept: 'text/html,application/xhtml+xml',
+      Referer: referer || 'https://streamic.st/',
+    },
+  });
+  if (!res || !res.ok) return '';
+  if (res._bodyB64) {
+    try {
+      var bin = atob(String(res._bodyB64 || ''));
+      if (bin) return bin;
+    } catch (_) {}
+  }
+  if (typeof res.text === 'function') {
+    try {
+      return String(await res.text());
+    } catch (_) {}
+  }
+  return '';
+}
+
+async function resolveVideocdnEmbed(ctx, embedUrl) {
+  var raw = String(embedUrl || '').trim();
+  if (!raw || !isVideocdnUrl(raw)) return null;
+  var origin = '';
+  var referer = 'https://streamic.st/';
+  try {
+    origin = new URL(raw).origin;
+    referer = origin + '/';
+  } catch (_) {}
+  var html = await fetchVideocdnHtml(ctx, raw, referer);
+  var m3u8 = m3u8FromVideocdnHtml(html);
+  if (!m3u8) return null;
+  // Segments are PNG shells around MPEG-TS. directPlayback stays off so
+  // /hls-proxy sees the .png playlist and unwraps them.
+  return [
+    {
+      url: m3u8,
+      headers: {
+        Referer: referer,
+        Origin: origin || referer.replace(/\/$/, ''),
+        'User-Agent': ua(),
+      },
+      directPlayback: false,
+    },
+  ];
+}
+
 async function resolveDaddyLiveEmbed(ctx, embedUrl, cfg) {
   var raw = String(embedUrl || '').trim();
   if (!raw || !isDaddyLiveUrl(raw)) return null;

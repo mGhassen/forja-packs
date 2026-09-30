@@ -269,6 +269,7 @@ function embedPriority(url) {
   }
   if (u.indexOf('strmi.buzz') >= 0 || u.indexOf('strm.buzz') >= 0) return 2;
   if (u.indexOf('streami.fit') >= 0) return 2;
+  if (u.indexOf('videocdn') >= 0) return 1;
   if (u.indexOf('lovetier.bz') >= 0 || u.indexOf('lovecdn.ru') >= 0) return 3;
   return 4;
 }
@@ -357,6 +358,13 @@ async function unlockEmbed(ctx, url, cfg) {
     try {
       var daddy = await resolveDaddyLiveEmbed(ctx, raw, cfg);
       if (daddy && daddy.length) return daddy[0];
+    } catch (_) {}
+  }
+
+  if (isVideocdnUrl(raw)) {
+    try {
+      var vcdn = await resolveVideocdnEmbed(ctx, raw);
+      if (vcdn && vcdn.length) return vcdn[0];
     } catch (_) {}
   }
 

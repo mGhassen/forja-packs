@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports Hub",
   "description": "Live sports schedule and streams.",
   "author": "ForjaHQ",
-  "version": "1.0.50",
+  "version": "1.0.51",
   "tags": [
     "sports",
     "live"
@@ -78,6 +78,24 @@
               {
                 "id": "details",
                 "label": "Detail page"
+              }
+            ]
+          },
+          {
+            "id": "player",
+            "type": "select",
+            "label": "System",
+            "subtitle": "Live Sports or IPTV. The next match you open uses this.",
+            "default": "live_sports",
+            "reloadHub": false,
+            "options": [
+              {
+                "id": "live_sports",
+                "label": "Live Sports"
+              },
+              {
+                "id": "iptv",
+                "label": "IPTV"
               }
             ]
           }

@@ -295,24 +295,21 @@ async function resolveDiscover(ctx, cfg) {
   var list = Object.keys(byId).map(function (k) {
     var m = byId[k];
     var date = Number(m.date || 0);
+    var teams = m && m.teams && typeof m.teams === 'object' ? m.teams : null;
+    var home = teams && teams.home && typeof teams.home === 'object' ? teams.home : null;
+    var away = teams && teams.away && typeof teams.away === 'object' ? teams.away : null;
     return {
       id: String(m.id || ''),
       matchId: String(m.id || ''),
       title: String(m.title || ''),
-      homeTeam: '',
-      awayTeam: '',
+      homeTeam: home && home.name ? String(home.name) : '',
+      awayTeam: away && away.name ? String(away.name) : '',
       dateMs: date > 1e12 ? date : date * 1000,
       sources: m.sources || [],
     };
   });
 
   var mid = String(ctx.matchId || '').trim();
-  var src = String(ctx.source || '').trim();
-
-  // Owned goat slot — list that source only (no unlock).
-  if (mid && isGoatSource(src) && ctx.fixtureSearch !== true) {
-    return listStreamsForSlot(ctx, cfg, src, mid);
-  }
 
   var hit = null;
   if (mid && ctx.fixtureSearch !== true) {
