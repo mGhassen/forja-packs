@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.26",
+  "version": "2.0.27",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -221,39 +221,6 @@
       }
     },
     {
-      "id": "mobikora",
-      "name": "MobiKora",
-      "description": "mobikora.live Arabic football schedule and streams",
-      "entry": "mobikora.js",
-      "types": [
-        "live_sport"
-      ],
-      "kind": "http",
-      "prelude": "_prelude.js",
-      "capabilities": [
-        "catalog",
-        "resolve"
-      ],
-      "defaultCapabilities": {
-        "catalog": true,
-        "resolve": true
-      },
-      "legacyIds": {
-        "catalog": "catalog-mobikora",
-        "resolve": "live-mobikora"
-      },
-      "config": {
-        "matchIdPrefix": "mk_",
-        "origin": "https://mobikora.live",
-        "pages": [
-          "/",
-          "/matches-today/",
-          "/matches-tomorrow/"
-        ],
-        "tzOffset": "+03:00"
-      }
-    },
-    {
       "id": "liveonsat",
       "name": "LiveOnSat",
       "description": "LiveOnSat TV schedule + broadcast channel hints",
@@ -319,7 +286,6 @@
     "timstreams.js",
     "watchfooty.js",
     "streamic.js",
-    "mobikora.js",
     "liveonsat.js",
     "livesoccertv.js",
     "goat/unlock.mjs",
