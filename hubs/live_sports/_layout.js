@@ -175,7 +175,6 @@ function liveSportsLayout() {
                 style: 'list',
                 open: 'panel',
                 openSetting: 'matchOpen',
-                playerSetting: 'player',
                 expand: true,
                 kindMenu: 'kind',
                 catalogMenu: 'catalog',
