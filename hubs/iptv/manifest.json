@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "id": "forjahq-iptv",
+  "name": "ForjaHQ IPTV",
+  "description": "IPTV portals, live channels, movies, and series.",
+  "author": "ForjaHQ",
+      "version": "1.5.69",
+  "tags": [
+    "iptv",
+    "live"
+  ],
+  "plugins": [
+    {
+      "id": "iptv-hub",
+      "name": "IPTV",
+      "description": "IPTV portals, live channels, movies, and series",
+      "entry": "iptv.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "iptv"
+      ],
+      "capabilities": [
+        "nav",
+        "layout",
+        "feed",
+        "details",
+        "searchChannels",
+        "settings",
+        "listPortals",
+        "addPortal",
+        "importPortal",
+        "editPortal",
+        "removePortal",
+        "selectPortal",
+        "scrape",
+        "shareEncode",
+        "shareDecode"
+      ],
+      "enrich": "iptv-enrich-tmdb",
+      "nav": {
+        "tabId": "iptv",
+        "label": "IPTV",
+        "icon": "icons/nav.png",
+        "accent": "#22D3EE",
+        "page": {
+          "action": "layout"
+        }
+      },
+      "settings": {
+        "addon": "iptv",
+        "group": "Details",
+        "order": 10,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ]
+      },
+      "prelude": "_prelude.js,_channels_data.js,_channels.js,_layout.js"
+    },
+    {
+      "id": "iptv-enrich-tmdb",
+      "name": "IPTV TMDB Enrich",
+      "description": "Optional TMDB match enrich for IPTV movie and series details",
+      "entry": "enrich_tmdb.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [
+        "iptv"
+      ],
+      "capabilities": [
+        "enrich"
+      ],
+      "config": {
+        "base": "https://tmdb.forjahq.xyz/3",
+        "imageBase": "https://tmdb.forjahq.xyz/t/p",
+        "apiKey": "",
+        "rails": [
+          "spotlight"
+        ],
+        "limit": 20
+      },
+      "prelude": "_kit.js"
+    }
+  ],
+  "bundle": [
+    "iptv.js",
+    "enrich_tmdb.js",
+    "_kit.js",
+    "_prefs.js",
+    "_platforms.js",
+    "_portals.js",
+    "_details.js",
+    "_prelude.js",
+    "_channels_data.js",
+    "_channels.js",
+    "_layout.js",
+    "channels.json",
+    "icons/nav.png"
+  ]
+}

@@ -1,6 +1,8 @@
 // TMDB enrich companion — not a data source.
 // Host runs this after a catalog plugin that declares `"enrich": "enrich-tmdb"`.
 // KissKH / other sources stay standalone; this pack owns match + apply only.
+// Details enrich fills cast / trailers / logo / facts, then resolves TMDB
+// More Like This titles onto KissKH (open.surface drama).
 
 var ENRICH_TMDB_DEFAULTS = {
   rails: ['spotlight'],
@@ -47,13 +49,29 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (params.meta && typeof params.meta === 'object') {
-    return hubEnrichTmdb(ctx, [params.meta], 1)
+    // More Like This is a second enrich (phase rails). Host paints meta first.
+    if (String(params.phase || '') === 'rails') {
+      return hubResolveTmdbRecsToDrama(ctx, params.meta)
+        .then(function (payload) {
+          return hubOk('enrich', payload, { maxAge: 900, swr: 3600 });
+        })
+        .catch(function (e) {
+          return hubFail('enrich', 'UPSTREAM', e && e.message, true);
+        });
+    }
+    return hubEnrichTmdb(ctx, [params.meta], 1, { details: true })
       .then(function (items) {
-        return hubOk(
-          'enrich',
-          { meta: items[0] || params.meta },
-          { maxAge: 900, swr: 3600 },
-        );
+        var meta = items[0] || params.meta;
+        var recs = meta && meta.recommendations;
+        if (Array.isArray(recs) && recs.length) {
+          meta._hubRecsPending = true;
+          return hubOk(
+            'enrich',
+            { meta: meta, deferRails: { phase: 'rails' } },
+            { maxAge: 900, swr: 3600 },
+          );
+        }
+        return hubOk('enrich', { meta: meta }, { maxAge: 900, swr: 3600 });
       })
       .catch(function (e) {
         return hubFail('enrich', 'UPSTREAM', e && e.message, true);
@@ -65,7 +83,7 @@ function extract(ctx) {
     return hubOk('enrich', { items: items });
   }
 
-  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg))
+  return hubEnrichTmdb(ctx, items, enrichTmdbLimit(cfg), { details: false })
     .then(function (out) {
       return hubOk('enrich', { items: out }, { maxAge: 600, swr: 3600 });
     })

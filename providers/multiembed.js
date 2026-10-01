@@ -29,26 +29,44 @@ function extract(ctx) {
     });
   }
 
+  function originOf(url) {
+    var m = String(url || '').match(/^(https?:\/\/[^/]+)/i);
+    return m ? m[1] : '';
+  }
+
+  function absUrl(u, base) {
+    if (!u) return '';
+    if (/^https?:\/\//i.test(u)) return u;
+    try {
+      return new URL(u, base).toString();
+    } catch (e) {
+      return u;
+    }
+  }
+
+  function classifyServer(url) {
+    var u = String(url || '');
+    if (/streamsrcs\.2embed\.cc\/swish/i.test(u)) return 'swish';
+    if (/streamsrcs\.2embed\.cc\/xps/i.test(u)) return 'xps';
+    if (/streamsrcs\.2embed\.cc\/vesy/i.test(u)) return 'vesy';
+    if (/streamsrcs\.2embed\.cc\/vcr/i.test(u)) return 'vcr';
+    if (/vidsrc\.buzz\//i.test(u)) return 'buzz';
+    if (/videm\.xyz\//i.test(u)) return 'videm';
+    return '';
+  }
+
   function parseServers(html) {
     var servers = [];
-    var re = /onclick="go\('(https:\/\/streamsrcs\.2embed\.cc\/([^?]+)\?([^']*))'\)"/g;
+    var re = /onclick="go\('(https?:\/\/[^']+)'\)"/g;
     var m;
     while ((m = re.exec(html))) {
-      var path = m[2];
-      var type = '';
-      if (path.indexOf('swish') === 0) type = 'swish';
-      else if (path.indexOf('xps') === 0) type = 'xps';
-      else if (path.indexOf('vesy') === 0) type = 'vesy';
-      else if (path.indexOf('vcr') === 0) type = 'vcr';
-      else continue;
+      var type = classifyServer(m[1]);
+      if (!type) continue;
       servers.push({ url: m[1], type: type });
     }
     var ds = (html.match(/data-src="([^"]+)"/) || [])[1];
     if (ds && !servers.some(function (s) { return s.url === ds; })) {
-      var type = 'swish';
-      if (ds.indexOf('/xps') >= 0) type = 'xps';
-      else if (ds.indexOf('/vesy') >= 0) type = 'vesy';
-      else if (ds.indexOf('/vcr') >= 0) type = 'vcr';
+      var type = classifyServer(ds) || 'swish';
       servers.unshift({ url: ds, type: type });
     }
     return servers;
@@ -126,8 +144,10 @@ function extract(ctx) {
   function cdnRank(url) {
     var u = String(url || '');
     if (/1x2\.space\//i.test(u)) return 0;
-    if (/suprox\.xpass\.top/i.test(u)) return 2;
-    return 1;
+    if (/vidsrc\.buzz\/_stream|videm\.xyz\/_stream/i.test(u)) return 0;
+    if (/2vcdn\.skin\/stream\//i.test(u)) return 1;
+    if (/suprox\.xpass\.top/i.test(u)) return 3;
+    return 2;
   }
 
   function rankRows(rows) {
@@ -225,6 +245,131 @@ function extract(ctx) {
     });
   }
 
+  function unpackHtml(html) {
+    try {
+      if (globalThis.__engineUnpack) return globalThis.__engineUnpack(html) || html;
+    } catch (e) {}
+    return html;
+  }
+
+  function followSwish(playerUrl) {
+    var origin = originOf(playerUrl) || 'https://2vcdn.skin';
+    return getText(playerUrl, { Referer: 'https://streamsrcs.2embed.cc/' }).then(function (html) {
+      var unpacked = unpackHtml(html);
+      // Prefer the site's primary playlist (hls4); fall back through mirrors.
+      var preferred =
+        (unpacked.match(/"hls4"\s*:\s*"([^"]+)"/) || [])[1] ||
+        (unpacked.match(/"hls2"\s*:\s*"([^"]+)"/) || [])[1] ||
+        (unpacked.match(/"hls3"\s*:\s*"([^"]+)"/) || [])[1] ||
+        (unpacked.match(/file\s*:\s*["'](https?:[^"']+)["']/) || [])[1] ||
+        (unpacked.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/) || [])[0] ||
+        (html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/) || [])[0] ||
+        '';
+      var u = absUrl(preferred, origin + '/');
+      if (u && !isDeadCdn(u) && (/\.m3u8(\?|$)/i.test(u) || /\/stream\//i.test(u) || /\.txt(\?|$)/i.test(u))) {
+        return [
+          {
+            url: u,
+            name: '2embed Swish',
+            headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+          },
+        ];
+      }
+      return ctx.hop(playerUrl).then(function (hopped) {
+        return hopped && hopped.length ? hopped : [];
+      });
+    });
+  }
+
+  function parsePlayerQ(html) {
+    var key = html.indexOf('var Q =');
+    if (key < 0) key = html.indexOf('var Q=');
+    if (key < 0) return null;
+    var objStart = html.indexOf('{', key);
+    if (objStart < 0) return null;
+    var json = balanced(html, objStart);
+    if (!json) return null;
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function playerApiBase(embedUrl, html) {
+    var origin = originOf(embedUrl);
+    var baseHref = ((html.match(/<base[^>]+href=["']([^"']+)["']/i) || [])[1] || '').trim();
+    if (baseHref) {
+      try {
+        return new URL(baseHref, origin + '/').toString().replace(/\/?$/, '/');
+      } catch (e) {}
+    }
+    if (/vidsrc\.buzz/i.test(origin)) return origin + '/pl/';
+    return origin + '/';
+  }
+
+  function followPlayer(embedUrl) {
+    var origin = originOf(embedUrl);
+    return ctx
+      .fetch(embedUrl, {
+        headers: Object.assign({}, headers, { Referer: embedBase + '/', Origin: origin }),
+      })
+      .then(function (r) {
+        return r.text().then(function (html) {
+          var Q = parsePlayerQ(html);
+          var servers =
+            Q && Q.ssr && Array.isArray(Q.ssr.servers) ? Q.ssr.servers : [];
+          if (!Q || !servers.length) return [];
+          var apiBase = playerApiBase(embedUrl, html);
+          var token = Q.t || '';
+          var labelPrefix = /videm\.xyz/i.test(origin) ? '2embed Videm' : '2embed VidSrc';
+          var tasks = servers.map(function (server) {
+            if (!server || !server.ref) return Promise.resolve(null);
+            var playUrl =
+              apiBase +
+              'api.php?a=play&ref=' +
+              encodeURIComponent(server.ref) +
+              '&t=' +
+              encodeURIComponent(token);
+            return ctx
+              .fetch(playUrl, {
+                headers: {
+                  'User-Agent': ua,
+                  Referer: embedUrl,
+                  Origin: origin,
+                  Accept: 'application/json,*/*',
+                },
+              })
+              .then(function (pr) {
+                return pr.json();
+              })
+              .then(function (j) {
+                if (!j || !j.url) return null;
+                var streamUrl = absUrl(String(j.url), origin + '/');
+                if (!streamUrl) return null;
+                if (/cap\.php/i.test(streamUrl)) return null;
+                if (/\/video\/error|\/error\b/i.test(streamUrl)) return null;
+                var chip = String(server.name || 'Server').replace(/^Server\s+/i, '');
+                return {
+                  url: streamUrl,
+                  name: labelPrefix + ' · ' + chip,
+                  headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+                };
+              })
+              .catch(function () {
+                return null;
+              });
+          });
+          return Promise.all(tasks).then(function (parts) {
+            return rankRows(parts.filter(Boolean));
+          });
+        });
+      })
+      .catch(function () {
+        return [];
+      });
+  }
+
   function embedPath(imdbId) {
     if (mediaType === 'movie') return '/embed/' + (imdbId || tmdbId);
     return '/embedtv/' + tmdbId + '&s=' + season + '&e=' + episode;
@@ -251,50 +396,58 @@ function extract(ctx) {
         ctx.error('multiembed: no embed servers');
         return [];
       }
-      var order = ['xps', 'swish', 'vesy', 'vcr'];
-      var chain = Promise.resolve([]);
+      // Collect every listed server (and nested player chips) — do not stop at first hit.
+      var order = ['swish', 'buzz', 'videm', 'xps', 'vesy', 'vcr'];
+      var seenType = {};
+      var tasks = [];
       order.forEach(function (type) {
-        chain = chain.then(function (acc) {
-          if (acc.length) return acc;
-          var server = null;
-          servers.forEach(function (s) {
-            if (!server && s.type === type) server = s;
-          });
-          if (!server) return acc;
+        servers.forEach(function (server) {
+          if (server.type !== type || seenType[type]) return;
+          seenType[type] = true;
           var finalUrl = resolveSrc(server);
-          if (type === 'xps') return followXps(finalUrl);
-          if (type === 'vcr') {
-            return ctx.hop(finalUrl).then(function (rows) {
-              return rows && rows.length ? rows : acc;
+          var job;
+          if (type === 'xps') job = followXps(finalUrl);
+          else if (type === 'swish') job = followSwish(finalUrl);
+          else if (type === 'buzz' || type === 'videm') job = followPlayer(finalUrl);
+          else if (type === 'vcr') {
+            job = ctx.hop(finalUrl).then(function (rows) {
+              return rows && rows.length ? rows : [];
             });
-          }
-          return getText(finalUrl, { Referer: 'https://streamsrcs.2embed.cc/' })
-            .then(function (playerHtml) {
-              var urls = playerHtml.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/g) || [];
-              var rows = urls.map(function (u) {
-                return {
-                  url: u,
-                  name: '2embed ' + type,
-                  headers: { 'User-Agent': ua, Referer: finalUrl },
-                };
+          } else {
+            job = getText(finalUrl, { Referer: 'https://streamsrcs.2embed.cc/' })
+              .then(function (playerHtml) {
+                var urls = playerHtml.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/g) || [];
+                var rows = urls.map(function (u) {
+                  return {
+                    url: u,
+                    name: '2embed ' + type,
+                    headers: { 'User-Agent': ua, Referer: finalUrl },
+                  };
+                });
+                if (rows.length) return rows;
+                return ctx.hop(finalUrl);
+              })
+              .catch(function () {
+                return [];
               });
-              if (rows.length) return rows;
-              return ctx.hop(finalUrl);
+          }
+          tasks.push(
+            Promise.resolve(job).catch(function () {
+              return [];
             })
-            .catch(function () {
-              return acc;
-            });
+          );
         });
       });
-      return chain.then(function (rows) {
+      return Promise.all(tasks).then(function (groups) {
         var seen = {};
         var out = [];
-        rankRows(rows || []).forEach(function (r) {
+        rankRows([].concat.apply([], groups)).forEach(function (r) {
           if (!r || !r.url || seen[r.url] || isDeadCdn(r.url)) return;
           seen[r.url] = true;
           out.push(r);
         });
         if (!out.length) ctx.error('multiembed: servers did not resolve');
+        ctx.log('multiembed: servers=' + servers.length + ' streams=' + out.length);
         return out;
       });
     })

@@ -338,6 +338,59 @@ function extract(ctx) {
     return appendDownloadQuery(userUrl.replace('/u/', '/api/file/'));
   }
 
+  function unwrapDlPhpLink(url) {
+    var m = String(url || '').match(/[?&]link=([^&]+)/i);
+    if (!m) return '';
+    try {
+      return decodeURIComponent(m[1]);
+    } catch (e) {
+      return m[1] || '';
+    }
+  }
+
+  // gpdl/pixel.hubcloud → workers → gamerxyt.html interstitial — not playable.
+  // Host fetch follows redirects; final URL still has ?link= to the real file.
+  function isPlayableDirect(url) {
+    var u = String(url || '');
+    if (!u) return false;
+    if (/video-downloads\.googleusercontent\.com/i.test(u)) return true;
+    if (/r2\.dev|r2\.cloudflarestorage\.com/i.test(u)) return true;
+    if (/pixeldrain\.(?:net|dev)\/api\/file\//i.test(u)) return true;
+    if (/\.(?:mp4|mkv|webm|m3u8)(?:$|[?#])/i.test(u)) return true;
+    return false;
+  }
+
+  function needsHubCloudDirectize(url) {
+    return /gpdl\.hubcloud\.|pixel\.hubcloud\.|gamerxyt\.com\/dl\.php|360news4u\.net\/dl\.php/i.test(
+      String(url || ''),
+    );
+  }
+
+  function directizeHubCloudUrl(url) {
+    var u = String(url || '')
+      .replace(/&amp;/g, '&')
+      .trim();
+    if (!u) return Promise.resolve('');
+    var fromQuery = unwrapDlPhpLink(u);
+    if (fromQuery && isPlayableDirect(fromQuery)) return Promise.resolve(fromQuery);
+    if (isPlayableDirect(u)) return Promise.resolve(u);
+    if (!needsHubCloudDirectize(u)) return Promise.resolve(u);
+    var start = fromQuery || u;
+    // HEAD only — never GET the eventual googleusercontent body during extract.
+    return ctx
+      .fetch(start, { method: 'HEAD', headers: headers })
+      .then(function (r) {
+        var finalUrl = (r && r.url) || start;
+        var unwrapped = unwrapDlPhpLink(finalUrl);
+        if (unwrapped && isPlayableDirect(unwrapped)) return unwrapped;
+        if (isPlayableDirect(finalUrl)) return finalUrl;
+        return '';
+      })
+      .catch(function () {
+        return '';
+      });
+  }
+
   function collectHubCloudLinks($, meta) {
     var results = [];
     $('a.btn, a').each(function () {
@@ -359,11 +412,35 @@ function extract(ctx) {
         results.push({ source: 'Direct R2', url: href, meta: meta });
       } else if (/ZipDisk/i.test(text) || /workers\.dev/i.test(href)) {
         results.push({ source: 'ZipDisk Server', url: href, meta: meta });
-      } else if (/10Gbps/i.test(text) || /pixel\.hubcloud\./i.test(href)) {
+      } else if (
+        /10Gbps/i.test(text) ||
+        /pixel\.hubcloud\.|gpdl\.hubcloud\./i.test(href)
+      ) {
         results.push({ source: 'HubCloud 10Gbps', url: href, meta: meta });
       }
     });
     return results;
+  }
+
+  function directizeHubCloudLinks(results) {
+    return Promise.all(
+      (results || []).map(function (item) {
+        if (!item || !item.url) return Promise.resolve(null);
+        var raw = String(item.url || '');
+        return directizeHubCloudUrl(raw).then(function (playUrl) {
+          if (!playUrl) return null;
+          // Hop URLs that need unwrap must land on a real file; other mirrors keep as-is.
+          if (needsHubCloudDirectize(raw) && !isPlayableDirect(playUrl)) return null;
+          return {
+            source: item.source,
+            url: playUrl,
+            meta: item.meta,
+          };
+        });
+      }),
+    ).then(function (rows) {
+      return rows.filter(Boolean);
+    });
   }
 
   // HubCloud entry is often /drive/<id> now — that page is a hop to hubcloud.php,
@@ -398,9 +475,10 @@ function extract(ctx) {
             title: titleText || baseMeta.title,
           };
           var results = collectHubCloudLinks($, meta);
-          if (results.length || !linksUrl) return results;
-          // Links page empty — scrape the entry page buttons as fallback.
-          return collectHubCloudLinks($r, meta);
+          if (!results.length && linksUrl) {
+            results = collectHubCloudLinks($r, meta);
+          }
+          return directizeHubCloudLinks(results);
         });
       })
       .catch(function () {

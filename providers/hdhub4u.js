@@ -1,5 +1,5 @@
 var SPECS = {
-  "base": "https://new1.hdhub4u.af",
+  "base": "https://new6.hdhub4u.cl",
   "searchApi": "https://search.pingora.fyi/collections/post/documents/search",
   "domainsUrl": "https://raw.githubusercontent.com/mGhassen/forja-packs/main/domains.json",
   "tmdbKey": "439c478a771f35c05022f9feabcca01c"
@@ -131,11 +131,11 @@ function extract(ctx) {
   }
 
   function hubCloudExtractor(url, referer) {
-    var current = String(url || '').replace(/hubcloud\.(?:ink|lol|cc)/i, 'hubcloud.dad');
-    if (/hubcloud\.cx/i.test(current)) {
-      // keep .cx — drive pages live there now
-    } else if (/hubcloud\./i.test(current) && !/hubcloud\.dad/i.test(current)) {
-      current = current.replace(/hubcloud\.[a-z0-9.-]+/i, 'hubcloud.dad');
+    // Live drive host is hubcloud.ist (.cx redirects there). hubcloud.dad is a
+    // dead parking page — never rewrite working TLDs onto it.
+    var current = String(url || '');
+    if (/hubcloud\.(?:ink|lol|cc|dad)/i.test(current)) {
+      current = current.replace(/hubcloud\.[a-z0-9.-]+/i, 'hubcloud.ist');
     }
     return fetchText(current, { Referer: referer || url })
       .then(function (html) {
@@ -213,7 +213,7 @@ function extract(ctx) {
             else if (/fsl/i.test(text)) label = 'HubCloud - FSL';
             else if (/s3/i.test(text)) label = 'HubCloud - S3';
             else if (/mega/i.test(text)) label = 'HubCloud - Mega';
-            else if (/hubcloud\.(?:cx|dad|fans|lol)/i.test(href) && /download/i.test(text)) {
+            else if (/hubcloud\.(?:cx|ist|dad|fans|lol)/i.test(href) && /download/i.test(text)) {
               label = 'HubCloud';
             } else continue;
             links.push({
@@ -229,6 +229,24 @@ function extract(ctx) {
       }).catch(function () { return []; });
   }
 
+  function extractHubTargets(html, pageUrl) {
+    var tasks = [];
+    var seen = {};
+    var re = /href=["']([^"']*(?:hubcloud|hubdrive|hubcdn)[^"']*)["']/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var href = String(m[1] || '').replace(/&amp;/g, '&');
+      if (!href || seen[href]) continue;
+      seen[href] = true;
+      if (/hubcloud/i.test(href)) tasks.push(hubCloudExtractor(href, pageUrl));
+      else tasks.push(loadExtractor(href, pageUrl));
+    }
+    if (!tasks.length) return Promise.resolve([]);
+    return Promise.all(tasks).then(function (groups) {
+      return [].concat.apply([], groups);
+    });
+  }
+
   function loadExtractor(url, referer) {
     if (!url) return Promise.resolve([]);
     url = String(url).replace(/&amp;/g, '&').trim();
@@ -239,29 +257,26 @@ function extract(ctx) {
       ctx.error('bad url: ' + (e && e.message ? e.message : e));
       return Promise.resolve([]);
     }
-    if (/techyboy4u|gadgetsweb|cryptoinsights|bloggingvector|ampproject|greenmount|[?&]id=/i.test(url) || !hostname) {
+    // Link-shortener / gate pages (greenmotors → hblinks, gadgetsweb, …).
+    if (
+      /techyboy4u|gadgetsweb|cryptoinsights|bloggingvector|ampproject|greenmount|greenmotors|[?&]id=/i.test(url) ||
+      !hostname
+    ) {
       return getRedirectLink(url).then(function (redir) {
         return redir && redir !== url ? loadExtractor(redir, url) : [];
       });
     }
     if (/hubcloud/i.test(hostname)) return hubCloudExtractor(url, referer);
     if (/hubcdn\.|hubdrive/i.test(hostname)) {
-      return fetchText(url, { Referer: referer || url }).then(function (html) {
-        var tasks = [];
-        var seen = {};
-        var re = /href=["']([^"']*hubcloud[^"']*)["']/gi;
-        var m;
-        while ((m = re.exec(html)) !== null) {
-          var href = String(m[1] || '').replace(/&amp;/g, '&');
-          if (!href || seen[href]) continue;
-          seen[href] = true;
-          tasks.push(hubCloudExtractor(href, url));
-        }
-        if (!tasks.length) return [];
-        return Promise.all(tasks).then(function (groups) {
-          return [].concat.apply([], groups);
-        });
-      }).catch(function () { return []; });
+      return fetchText(url, { Referer: referer || url })
+        .then(function (html) { return extractHubTargets(html, url); })
+        .catch(function () { return []; });
+    }
+    // Intermediate archive pages that list HubDrive / HubCloud / HubCDN buttons.
+    if (/hblinks|hublinks|hb-?links/i.test(hostname)) {
+      return fetchText(url, { Referer: referer || url })
+        .then(function (html) { return extractHubTargets(html, url); })
+        .catch(function () { return []; });
     }
     if (/pixeldrain/i.test(hostname)) {
       var pid = url.match(/(?:file|u)\/([A-Za-z0-9]+)/);

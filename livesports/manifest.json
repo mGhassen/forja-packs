@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.10",
+  "version": "2.0.27",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -41,7 +41,6 @@
           "admin",
           "delta",
           "golf",
-          "ppv",
           "bravo"
         ],
         "catalogCap": false
@@ -72,6 +71,9 @@
       "config": {
         "webOrigin": "https://ppv.st",
         "nativeUnlock": "ppv",
+        "ownedSources": [
+          "ppv"
+        ],
         "catalogLayout": "iframe",
         "apis": [
           "https://api.ppv.st/api/streams",
@@ -112,6 +114,7 @@
       "config": {
         "matchIdPrefix": "sf_",
         "origin": "https://streamfree.top",
+        "streamOrigin": "https://strmfree.st",
         "embedOrigin": "https://embed.st"
       }
     },
@@ -218,86 +221,6 @@
       }
     },
     {
-      "id": "mobikora",
-      "name": "MobiKora",
-      "description": "mobikora.live Arabic football schedule and streams",
-      "entry": "mobikora.js",
-      "types": [
-        "live_sport"
-      ],
-      "kind": "http",
-      "prelude": "_prelude.js",
-      "capabilities": [
-        "catalog",
-        "resolve"
-      ],
-      "defaultCapabilities": {
-        "catalog": true,
-        "resolve": true
-      },
-      "legacyIds": {
-        "catalog": "catalog-mobikora",
-        "resolve": "live-mobikora"
-      },
-      "config": {
-        "matchIdPrefix": "mk_",
-        "origin": "https://mobikora.live",
-        "pages": [
-          "/",
-          "/matches-today/",
-          "/matches-tomorrow/"
-        ],
-        "tzOffset": "+03:00"
-      }
-    },
-    {
-      "id": "espn",
-      "name": "ESPN",
-      "description": "ESPN scoreboard schedule catalog",
-      "entry": "espn.js",
-      "types": [
-        "live_sport"
-      ],
-      "kind": "http",
-      "capabilities": [
-        "catalog"
-      ],
-      "defaultCapabilities": {
-        "catalog": true
-      },
-      "legacyIds": {
-        "catalog": "catalog-espn"
-      },
-      "config": {
-        "scheduleHorizon": "fullDay",
-        "daysAhead": 7,
-        "catalogTimeoutSec": 90,
-        "leagues": [
-          "NBA",
-          "NFL",
-          "MLB",
-          "NHL",
-          "WNBA",
-          "NCAAMB",
-          "NCAAWB",
-          "NCAAFB",
-          "EPL",
-          "MLS",
-          "LALIGA",
-          "SERIEA",
-          "BUNDESLIGA",
-          "LIGUE1",
-          "UCL",
-          "EUROPA",
-          "EREDIVISIE",
-          "LIGAPORTUGAL",
-          "LIGAMX",
-          "WORLDCUP",
-          "UFC"
-        ]
-      }
-    },
-    {
       "id": "liveonsat",
       "name": "LiveOnSat",
       "description": "LiveOnSat TV schedule + broadcast channel hints",
@@ -363,8 +286,6 @@
     "timstreams.js",
     "watchfooty.js",
     "streamic.js",
-    "mobikora.js",
-    "espn.js",
     "liveonsat.js",
     "livesoccertv.js",
     "goat/unlock.mjs",

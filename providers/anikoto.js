@@ -391,6 +391,7 @@ function extract(ctx) {
                           name: 'Anikoto ' + item.name,
                           headers: { 'User-Agent': ua, Referer: base + '/watch/' + show.slug },
                           language: audio === 'dub' ? 'Dub' : 'Sub',
+                          pngStrip: 'auto',
                         },
                       ];
                     }
@@ -404,12 +405,17 @@ function extract(ctx) {
                         name: 'Anikoto ' + item.name,
                         headers: { 'User-Agent': ua, Referer: extracted.origin + '/' },
                         language: audio === 'dub' ? 'Dub' : 'Sub',
+                        pngStrip: 'auto',
                       },
                     ];
                   }
                   return ctx.hop(embedUrl).then(function (rows) {
                     return rows.map(function (r) {
-                      return Object.assign({}, r, { name: 'Anikoto ' + item.name, language: audio === 'dub' ? 'Dub' : 'Sub' });
+                      return Object.assign({}, r, {
+                        name: 'Anikoto ' + item.name,
+                        language: audio === 'dub' ? 'Dub' : 'Sub',
+                        pngStrip: 'auto',
+                      });
                     });
                   });
                 });

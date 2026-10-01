@@ -81,12 +81,11 @@ var TMDB_HOME_FETCH_PAGES = 2;
 // Hourly mix — pick distinct TMDB pages in 1..max (Dart home_catalog_rotate).
 var TMDB_HOME_ROTATE_MAX_PAGE = 5;
 
-// Visual priority for pack feed claim (spotlight → featured → popular → new).
+// First-paint feed claim (spotlight → featured → popular). Lower rails lazy.
 var TMDB_FEED_CLAIM = [
   { id: 'spotlight', cap: TMDB_HOME_HERO_CAP, mode: 'exclusive' },
   { id: 'featured', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
   { id: 'popular', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
-  { id: 'new_releases', cap: TMDB_HOME_RAIL_CAP, mode: 'exclusive' },
 ];
 
 function tmdbWatchProviderQuery(filter) {
@@ -141,6 +140,22 @@ function tmdbHasMoodFilter(filter) {
   return !!hubFilterValue(filter, 'mood');
 }
 
+function tmdbMoodHasKeywords(filter) {
+  return (
+    tmdbKeywordsForDiscover(filter, 'tv').length > 0 ||
+    tmdbKeywordsForDiscover(filter, 'movie').length > 0
+  );
+}
+
+// Chrome mood / genre / provider — must use discover, not trending lists.
+function tmdbFilterNeedsDiscover(filter, genres) {
+  return (
+    !!tmdbWatchProviderQuery(filter) ||
+    tmdbHasMoodFilter(filter) ||
+    (genres && genres.length > 0)
+  );
+}
+
 function tmdbFilterWithoutMood(filter) {
   if (!filter || typeof filter !== 'object') return filter;
   var op = String(filter.op || '');
@@ -173,6 +188,25 @@ function tmdbGenresForDiscover(filter, mediaType) {
   return hubFilterValues(filter, 'genre');
 }
 
+// Optional pack keywords on genre / mood specs (TMDB with_keywords).
+// Pipe = OR (any keyword). Comma would be AND (must match every id).
+function tmdbKeywordsForDiscover(filter, mediaType) {
+  var moodId = hubFilterValue(filter, 'mood');
+  if (!moodId) return [];
+  var spec = tmdbMoodSpec(moodId);
+  if (!spec) return [];
+  var ids =
+    mediaType === 'tv'
+      ? spec.tvKeywords || spec.keywords || []
+      : spec.movieKeywords || spec.keywords || [];
+  return (ids || []).map(String);
+}
+
+function tmdbKeywordsQuery(ids) {
+  if (!ids || !ids.length) return '';
+  return ids.map(String).join('|');
+}
+
 function tmdbDiscoverMovie(ctx, cfg, query, filter) {
   var q = Object.assign({ include_adult: 'false' }, query || {});
   var providers = tmdbWatchProviderQuery(filter);
@@ -182,6 +216,8 @@ function tmdbDiscoverMovie(ctx, cfg, query, filter) {
   }
   var genres = tmdbGenresForDiscover(filter, 'movie');
   if (genres.length) q.with_genres = genres.join(',');
+  var keywords = tmdbKeywordsQuery(tmdbKeywordsForDiscover(filter, 'movie'));
+  if (keywords) q.with_keywords = keywords;
   return tmdbGet(ctx, cfg, '/discover/movie', q);
 }
 
@@ -191,6 +227,8 @@ function tmdbDiscoverTv(ctx, cfg, query, filter) {
   var networks = tmdbTvNetworkQuery(filter);
   var genres = tmdbGenresForDiscover(filter, 'tv');
   if (genres.length) q.with_genres = genres.join(',');
+  var keywords = tmdbKeywordsQuery(tmdbKeywordsForDiscover(filter, 'tv'));
+  if (keywords) q.with_keywords = keywords;
   if (providers) {
     q.with_watch_providers = providers;
     q.watch_region = String(cfg.region || 'US');
@@ -302,10 +340,10 @@ function tmdbListPool(ctx, cfg, params, railId) {
     railId === 'spotlight' || railId === 'popular' || railId === 'new_releases';
   var pageNums = preserveRank
     ? (function () {
-        var fixed = [];
-        for (var fp = 1; fp <= TMDB_HOME_FETCH_PAGES; fp++) fixed.push(fp);
-        return fixed;
-      })()
+      var fixed = [];
+      for (var fp = 1; fp <= TMDB_HOME_FETCH_PAGES; fp++) fixed.push(fp);
+      return fixed;
+    })()
     : tmdbPickFetchPages(railId, TMDB_HOME_FETCH_PAGES, TMDB_HOME_ROTATE_MAX_PAGE);
   var pages = [];
   var pi;
@@ -336,6 +374,9 @@ function tmdbListPool(ctx, cfg, params, railId) {
 }
 
 function tmdbHomeFeed(ctx, cfg, params) {
+  // Boot prefetch / legacy callers. First paint on the host fans out
+  // action:'rail' per feedRails id and publishes each slice as it lands
+  // (Spotlight must not wait on a hung Popular).
   var ids = TMDB_FEED_CLAIM.map(function (s) {
     return s.id;
   });
@@ -346,11 +387,34 @@ function tmdbHomeFeed(ctx, cfg, params) {
   ).then(function (results) {
     var pools = {};
     for (var i = 0; i < ids.length; i++) pools[ids[i]] = results[i];
-    return hubOk(
-      'feed',
-      { rails: tmdbClaimRails(pools, TMDB_FEED_CLAIM) },
-      { maxAge: 900, swr: 3600 },
-    );
+    var rails = tmdbClaimRails(pools, TMDB_FEED_CLAIM);
+    return tmdbAttachLogos(
+      ctx,
+      cfg,
+      rails.spotlight || [],
+      TMDB_HOME_HERO_CAP,
+    ).then(function () {
+      // Page feed must stamp paint like action:'rail' — host propsOf only
+      // reads paint.props (not raw name/poster).
+      var painted = {};
+      for (var r = 0; r < ids.length; r++) {
+        var rid = ids[r];
+        var list = rails[rid] || [];
+        painted[rid] =
+          rid === 'spotlight'
+            ? list.map(function (m) {
+              return hubPaintHero(m);
+            })
+            : list.map(function (m) {
+              return hubPaintPoster(m);
+            });
+      }
+      return hubOk(
+        'feed',
+        { rails: painted },
+        { maxAge: 900, swr: 3600 },
+      );
+    });
   });
 }
 
@@ -364,6 +428,9 @@ var TMDB_GENRE_ROWS = [
   { id: 'drama', label: 'Drama', movieGenres: [18], tvGenres: [18] },
   { id: 'family', label: 'Family', movieGenres: [10751], tvGenres: [10751] },
   { id: 'fantasy', label: 'Fantasy', movieGenres: [14], tvGenres: [10765] },
+  // TMDB has no Game Show genre — list keyword ids with commas; discover joins with |.
+  // Do NOT write `4325 | 6784` here — `|` is JS bitwise OR and collapses to one id.
+  { id: 'gameshow', label: 'Game Show', movieGenres: [], tvGenres: [], keywords: [4325, 6784, 160311, 250845] },
   { id: 'horror', label: 'Horror', movieGenres: [27], tvGenres: [9648] },
   { id: 'music', label: 'Music', movieGenres: [10402], tvGenres: [10402] },
   { id: 'mystery', label: 'Mystery', movieGenres: [9648], tvGenres: [9648] },
@@ -452,22 +519,28 @@ function tmdbGenreRowSpec(params) {
 function tmdbGenreDiscover(ctx, cfg, params, filter, spec, typeFilter) {
   var movieGenres = spec.movieGenres || [];
   var tvGenres = spec.tvGenres || [];
+  var movieKeywords = spec.movieKeywords || spec.keywords || [];
+  var tvKeywords = spec.tvKeywords || spec.keywords || [];
   var page = Number(params.page) > 0 ? Number(params.page) : 1;
   var limit = params.limit;
   // Bottom genre rows keep their own TMDB genre — ignore Categories mood.
   var rowFilter = tmdbFilterWithoutMood(filter);
   var movieQ = {
     sort_by: 'popularity.desc',
-    with_genres: movieGenres.join(','),
     page: page,
     'vote_count.gte': 50,
   };
+  if (movieGenres.length) movieQ.with_genres = movieGenres.join(',');
+  var movieKw = tmdbKeywordsQuery(movieKeywords);
+  if (movieKw) movieQ.with_keywords = movieKw;
   var tvQ = {
     sort_by: 'popularity.desc',
-    with_genres: tvGenres.join(','),
     page: page,
     'vote_count.gte': 50,
   };
+  if (tvGenres.length) tvQ.with_genres = tvGenres.join(',');
+  var tvKw = tmdbKeywordsQuery(tvKeywords);
+  if (tvKw) tvQ.with_keywords = tvKw;
   if (typeFilter === 'movie') {
     return tmdbDiscoverMovie(ctx, cfg, movieQ, rowFilter).then(function (json) {
       return tmdbMetas(cfg, json, 'movie', limit);
@@ -525,89 +598,292 @@ function tmdbBecause(ctx, cfg, params) {
       : '/movie/' + tmdbId + '/recommendations';
   var title = String(seed.title || meta.name || '').trim();
   return tmdbGet(ctx, cfg, path, { page: 1 }).then(function (json) {
-    return hubOk(
-      'rail',
-      {
-        items: tmdbMetas(cfg, json, mediaType, TMDB_HOME_RAIL_CAP),
-        heading: title ? 'Because you watched ' + title : 'Because you watched',
-        seedPoster: String(meta.poster || meta.background || ''),
-        canShuffle: seeds.length > 1,
-      },
-      { maxAge: 900, swr: 3600 },
-    );
+    var items = tmdbMetas(cfg, json, mediaType, TMDB_HOME_RAIL_CAP);
+    var env = hubItems('rail', items, { maxAge: 900, swr: 3600 })[0];
+    env.data.heading = title
+      ? 'Because you watched ' + title
+      : 'Because you watched';
+    env.data.seedPoster = String(meta.poster || meta.background || '');
+    env.data.canShuffle = seeds.length > 1;
+    return env;
   });
-}
-
-function tmdbLayout() {
-  var genreWidgets = tmdbPickGenreRows(3).map(function (g) {
-    return {
-      type: 'rail',
-      id: 'genre_' + g.id,
-      title: g.label,
-      rail: 'genre',
-      params: { genreRow: g.id },
-    };
-  });
-  return {
-    pages: {
-      home: {
-        feed: true,
-        pageSize: TMDB_HOME_RAIL_CAP,
-        widgets: [
-          {
-            type: 'vertical_filters',
-            id: 'watch_providers',
-            showSelectedInTopBar: true,
-            options: TMDB_VERTICAL_FILTERS,
-          },
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'Spotlight',
-            rail: 'spotlight',
-            bleed: 'featured',
-          },
-          {
-            type: 'rail',
-            id: 'featured',
-            title: 'Featured This Month',
-            rail: 'featured',
-            hideWhenBleed: true,
-          },
-          {
-            type: 'ranked',
-            id: 'popular',
-            title: 'Popular',
-            rail: 'popular',
-            style: 'numbered',
-          },
-          { type: 'continue', id: 'continue_watching', mergeHomeWatchHistory: true },
-          {
-            type: 'mood',
-            id: 'moods',
-            title: "What's your mood?",
-            options: TMDB_MOODS,
-            rail: 'discover',
-          },
-          { type: 'because', id: 'because', rail: 'because' },
-          { type: 'trakt', id: 'trakt' },
-          {
-            type: 'rail',
-            id: 'new_releases',
-            title: 'New Releases',
-            rail: 'new_releases',
-          },
-        ].concat(genreWidgets),
-      },
-    },
-  };
 }
 
 function tmdbImage(cfg, path, size) {
   var p = String(path || '').trim();
   if (!p) return '';
+  // Android ImageDecoder cannot decode SVG; TMDB serves the same asset as PNG.
+  if (/\.svg$/i.test(p)) p = p.replace(/\.svg$/i, '.png');
   if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
   return String(cfg.imageBase).replace(/\/$/, '') + '/' + size + p;
+}
+
+// Prefer English title logo, then lang-null, then first. Prefer raster over SVG.
+function tmdbPickTitleLogo(cfg, images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  var enSvg = null;
+  var nulSvg = null;
+  var firstSvg = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    var svg = /\.svg$/i.test(String(L.file_path));
+    var lang = L.iso_639_1;
+    if (lang === 'en') {
+      if (svg) {
+        if (!enSvg) enSvg = L;
+      } else if (!en) {
+        en = L;
+      }
+    } else if (lang == null || lang === '') {
+      if (svg) {
+        if (!nulSvg) nulSvg = L;
+      } else if (!nul) {
+        nul = L;
+      }
+    }
+    if (svg) {
+      if (!firstSvg) firstSvg = L;
+    } else if (!first) {
+      first = L;
+    }
+  }
+  var chosen = en || nul || first || enSvg || nulSvg || firstSvg;
+  return chosen ? tmdbImage(cfg, chosen.file_path, 'w500') : '';
+}
+
+// Kit details chrome — same shapes as anime/drama enrich companions.
+function tmdbParseCast(cfg, json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.cast) ? credits.cast : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 20; i++) {
+    var e = list[i] || {};
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      character: String(e.character || '').trim(),
+      profilePath: tmdbImage(cfg, e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function tmdbParseCrew(cfg, json) {
+  var credits = json && json.credits;
+  var list = credits && Array.isArray(credits.crew) ? credits.crew : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 8; i++) {
+    var e = list[i] || {};
+    var job = String(e.job || '').toLowerCase();
+    if (
+      job.indexOf('director') < 0 &&
+      job.indexOf('writer') < 0 &&
+      job.indexOf('creator') < 0
+    ) {
+      continue;
+    }
+    var name = String(e.name || '').trim();
+    if (!name) continue;
+    out.push({
+      name: name,
+      job: String(e.job || '').trim(),
+      profilePath: tmdbImage(cfg, e.profile_path, 'w185'),
+    });
+  }
+  return out;
+}
+
+function tmdbParseTrailers(json) {
+  var videos = json && json.videos;
+  var list = videos && Array.isArray(videos.results) ? videos.results : [];
+  var allow = {
+    Trailer: 0,
+    Teaser: 1,
+    Featurette: 2,
+    Clip: 3,
+    'Behind the Scenes': 4,
+  };
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var v = list[i] || {};
+    if (String(v.site || '') !== 'YouTube') continue;
+    var type = String(v.type || '');
+    if (!(type in allow)) continue;
+    var key = String(v.key || '').trim();
+    if (!key || seen[key]) continue;
+    seen[key] = true;
+    out.push({
+      key: key,
+      name: String(v.name || type).trim() || type,
+      type: type,
+      official: v.official === true,
+      site: 'YouTube',
+    });
+  }
+  out.sort(function (a, b) {
+    if (a.official !== b.official) return a.official ? -1 : 1;
+    var ta = allow[a.type] != null ? allow[a.type] : 99;
+    var tb = allow[b.type] != null ? allow[b.type] : 99;
+    if (ta !== tb) return ta - tb;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return out;
+}
+
+function tmdbParseFacts(json, media) {
+  if (!json) return null;
+  var facts = {
+    mediaType: media,
+    status: String(json.status || '').trim(),
+    originalLanguage: String(json.original_language || '').trim(),
+  };
+  var companies = Array.isArray(json.production_companies)
+    ? json.production_companies
+    : [];
+  var prod = [];
+  for (var i = 0; i < companies.length; i++) {
+    var n = String((companies[i] && companies[i].name) || '').trim();
+    if (n) prod.push(n);
+  }
+  if (prod.length) facts.productionCompanies = prod;
+
+  var langs = Array.isArray(json.spoken_languages) ? json.spoken_languages : [];
+  var spoken = [];
+  for (var li = 0; li < langs.length; li++) {
+    var L = langs[li] || {};
+    var ln = String(L.english_name || L.name || '').trim();
+    if (ln) spoken.push(ln);
+  }
+  if (spoken.length) facts.spokenLanguages = spoken;
+
+  if (media === 'movie') {
+    var runtime = Number(json.runtime);
+    if (runtime > 0) facts.runtimeMinutes = runtime;
+    var release = String(json.release_date || '').trim();
+    if (release) facts.releaseDate = release.substring(0, 10);
+    var budget = Number(json.budget);
+    if (budget > 0) facts.budget = budget;
+    var revenue = Number(json.revenue);
+    if (revenue > 0) facts.revenue = revenue;
+  } else {
+    var epRuntime = Array.isArray(json.episode_run_time)
+      ? json.episode_run_time
+      : [];
+    if (epRuntime.length && Number(epRuntime[0]) > 0) {
+      facts.runtimeMinutes = Number(epRuntime[0]);
+    }
+    var first = String(json.first_air_date || '').trim();
+    if (first) facts.releaseDate = first.substring(0, 10);
+    var last = String(json.last_air_date || '').trim();
+    if (last) facts.lastAirDate = last.substring(0, 10);
+    var seasons = Number(json.number_of_seasons);
+    if (seasons > 0) facts.seasonCount = seasons;
+    var episodes = Number(json.number_of_episodes);
+    if (episodes > 0) facts.episodeCount = episodes;
+    var networks = Array.isArray(json.networks) ? json.networks : [];
+    var nets = [];
+    for (var ni = 0; ni < networks.length; ni++) {
+      var nn = String((networks[ni] && networks[ni].name) || '').trim();
+      if (nn) nets.push(nn);
+    }
+    if (nets.length) facts.networks = nets;
+    var creators = Array.isArray(json.created_by) ? json.created_by : [];
+    var created = [];
+    for (var ci = 0; ci < creators.length; ci++) {
+      var cn = String((creators[ci] && creators[ci].name) || '').trim();
+      if (cn) created.push(cn);
+    }
+    if (created.length) facts.creators = created;
+  }
+  return facts;
+}
+
+function tmdbParseBackdrops(cfg, json) {
+  var images = json && json.images;
+  var list = images && Array.isArray(images.backdrops) ? images.backdrops : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < 12; i++) {
+    var path = list[i] && list[i].file_path;
+    var url = tmdbImage(cfg, path, 'w1280');
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+function tmdbAttachDetailsChrome(cfg, meta, json, type) {
+  if (!meta || !json) return meta;
+  var cast = tmdbParseCast(cfg, json);
+  var crew = tmdbParseCrew(cfg, json);
+  var trailers = tmdbParseTrailers(json);
+  var facts = tmdbParseFacts(json, type);
+  var backdrops = tmdbParseBackdrops(cfg, json);
+  if (cast.length) meta.cast = cast;
+  if (crew.length) meta.crew = crew;
+  if (trailers.length) meta.trailers = trailers;
+  if (facts) meta.facts = facts;
+  if (backdrops.length) meta.backdrops = backdrops;
+
+  if ((!meta.genres || !meta.genres.length) && Array.isArray(json.genres)) {
+    var names = [];
+    for (var gi = 0; gi < json.genres.length; gi++) {
+      var gn = String((json.genres[gi] && json.genres[gi].name) || '').trim();
+      if (gn) names.push(gn);
+    }
+    if (names.length) meta.genres = names;
+  }
+
+  var premiere = String(
+    type === 'movie' ? json.release_date || '' : json.first_air_date || '',
+  ).trim();
+  if (premiere.length >= 10) meta.premiereDate = premiere.substring(0, 10);
+
+  meta._hubTmdbEnriched = true;
+  delete meta.paint;
+  delete meta.meta;
+  return hubPaintHero(meta);
+}
+
+function tmdbAttachLogos(ctx, cfg, items, limit) {
+  if (!Array.isArray(items) || !items.length) return Promise.resolve(items || []);
+  var n = Number(limit) > 0 ? Math.min(items.length, Number(limit)) : items.length;
+  var jobs = [];
+  for (var i = 0; i < n; i++) {
+    (function (idx) {
+      var meta = items[idx];
+      if (!meta || String(meta.logo || '').trim()) return;
+      var tid = meta.ids && meta.ids.tmdb;
+      if (!tid) return;
+      var type = String(meta.type || '') === 'tv' ? 'tv' : 'movie';
+      jobs.push(
+        tmdbGet(ctx, cfg, '/' + type + '/' + tid + '/images', {})
+          .then(function (json) {
+            var logo = tmdbPickTitleLogo(cfg, json);
+            if (logo) {
+              items[idx].logo = logo;
+              // Restamp if this row was already painted (cache / feed reuse).
+              if (items[idx].paint) {
+                delete items[idx].paint;
+                delete items[idx].meta;
+                items[idx] = hubPaintHero(items[idx]);
+              }
+            }
+          })
+          .catch(function () { }),
+      );
+    })(i);
+  }
+  if (!jobs.length) return Promise.resolve(items);
+  return Promise.all(jobs).then(function () {
+    return items;
+  });
 }
 
 var TMDB_MOVIE_GENRE_NAMES = {
@@ -696,6 +972,8 @@ function tmdbMeta(cfg, row, forcedType) {
   if (row.vote_average) meta.rating = Number(row.vote_average);
   var genreNames = tmdbGenreNames(type, row.genre_ids);
   if (genreNames.length) meta.genres = genreNames;
+  var logo = tmdbPickTitleLogo(cfg, row.images);
+  if (logo) meta.logo = logo;
   return meta;
 }
 
@@ -784,6 +1062,9 @@ function tmdbFeaturedForPage(
 ) {
   var win = tmdbMonthWindow();
   var hasProvider = !!watchProviders;
+  // Keyword categories (Game Show, …): first_air_date is the show premiere,
+  // not "aired this month" — Jeopardy! etc. never match the month window.
+  var skipMonthWindow = tmdbMoodHasKeywords(filter);
 
   function loadFeatured(dateGte, dateLte, minRating) {
     var movieQ = { sort_by: 'popularity.desc', page: page };
@@ -799,6 +1080,10 @@ function tmdbFeaturedForPage(
       tvQ['vote_average.gte'] = minRating;
     }
     return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit);
+  }
+
+  if (skipMonthWindow) {
+    return loadFeatured(null, null, null);
   }
 
   return loadFeatured(win.gte, win.lte, hasProvider ? null : 6).then(function (month) {
@@ -835,7 +1120,7 @@ function tmdbNewReleasesForPage(
   };
   return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit).then(
     function (discover) {
-      if (watchProviders || typeFilter) {
+      if (watchProviders || typeFilter || tmdbHasMoodFilter(filter)) {
         return tmdbSortMetasByReleaseDesc(discover);
       }
       return Promise.all([
@@ -877,22 +1162,33 @@ function tmdbList(ctx, cfg, params) {
     var moodId = hubFilterValue(filter, 'mood');
     var movieGenres = genres.slice();
     var tvGenres = genres.slice();
+    var movieKeywords = [];
+    var tvKeywords = [];
     if (moodId) {
       var moodSpec = tmdbMoodSpec(moodId);
       if (moodSpec) {
-        movieGenres = moodSpec.movieGenres.map(String);
-        tvGenres = moodSpec.tvGenres.map(String);
+        movieGenres = (moodSpec.movieGenres || []).map(String);
+        tvGenres = (moodSpec.tvGenres || []).map(String);
+        movieKeywords = (moodSpec.movieKeywords || moodSpec.keywords || []).map(
+          String,
+        );
+        tvKeywords = (moodSpec.tvKeywords || moodSpec.keywords || []).map(
+          String,
+        );
       }
     }
     var mediaType = typeFilter || 'movie';
     var g = mediaType === 'tv' ? tvGenres : movieGenres;
     if (!g.length && genres.length) g = genres;
+    var kw = mediaType === 'tv' ? tvKeywords : movieKeywords;
     var discoverQ = {
       sort_by: String(params.sort || 'popularity.desc'),
-      with_genres: g.join(','),
       page: page,
       'vote_count.gte': 50,
     };
+    if (g.length) discoverQ.with_genres = g.join(',');
+    var discoverKw = tmdbKeywordsQuery(kw);
+    if (discoverKw) discoverQ.with_keywords = discoverKw;
     if (mediaType === 'tv') {
       return tmdbDiscoverTv(ctx, cfg, discoverQ, filter).then(function (json) {
         return tmdbMetas(cfg, json, 'tv', limit);
@@ -931,7 +1227,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (railId === 'popular') {
-    if (watchProviders || tmdbHasMoodFilter(filter)) {
+    if (tmdbFilterNeedsDiscover(filter, genres)) {
       var popularQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -984,7 +1280,7 @@ function tmdbList(ctx, cfg, params) {
   }
 
   if (typeFilter) {
-    if (watchProviders) {
+    if (tmdbFilterNeedsDiscover(filter, genres)) {
       var typedQ = {
         sort_by: 'popularity.desc',
         page: page,
@@ -1010,29 +1306,13 @@ function tmdbList(ctx, cfg, params) {
   if (!spec || !spec.path) {
     return Promise.reject(new Error('unknown rail ' + railId));
   }
-  if (watchProviders && railId === 'spotlight') {
+  if (tmdbFilterNeedsDiscover(filter, genres) && railId === 'spotlight') {
     var spotlightQ = {
       sort_by: 'popularity.desc',
       page: page,
       'vote_count.gte': 50,
     };
     return tmdbFetchMixed(ctx, cfg, filter, typeFilter, spotlightQ, spotlightQ, limit);
-  }
-  if (tmdbHasMoodFilter(filter) && railId === 'spotlight') {
-    var moodSpotlightQ = {
-      sort_by: 'popularity.desc',
-      page: page,
-      'vote_count.gte': 50,
-    };
-    return tmdbFetchMixed(
-      ctx,
-      cfg,
-      filter,
-      typeFilter,
-      moodSpotlightQ,
-      moodSpotlightQ,
-      limit,
-    );
   }
   return tmdbGet(ctx, cfg, spec.path, { page: page }).then(function (json) {
     return tmdbMetas(cfg, json, spec.type, limit);
@@ -1131,22 +1411,34 @@ function tmdbBuildTvVideos(ctx, cfg, tvId, showJson) {
   });
 }
 
+function tmdbDetailsMediaType(params, typeFromId) {
+  var fromId = String(typeFromId || '').toLowerCase();
+  if (fromId === 'movie' || fromId === 'tv') return fromId;
+  var hint = String(
+    (params && params.mediaType) ||
+    (params && params.extract && params.extract.resolveType) ||
+    '',
+  ).toLowerCase();
+  if (hint === 'series') hint = 'tv';
+  if (hint === 'movie' || hint === 'tv') return hint;
+  return 'movie';
+}
+
 function tmdbDetails(ctx, cfg, params) {
   var raw = String(params.id || '').split(':');
   var id = Number(raw.pop());
-  var type = raw.length ? raw.pop() : 'movie';
+  // Bare open.id is numeric only — movie/tv namespaces collide. Prefer
+  // segment in id (tmdb:tv:1396), else params.mediaType / extract.resolveType.
+  var type = tmdbDetailsMediaType(params, raw.length ? raw.pop() : '');
   if (!id) {
     return Promise.resolve(
       hubFail('details', 'INVALID_PARAMS', 'details needs params.id'),
     );
   }
-  if (type !== 'movie' && type !== 'tv') type = 'movie';
-  var append =
-    type === 'tv'
-      ? 'external_ids,recommendations'
-      : 'external_ids,recommendations';
+  var append = 'external_ids,recommendations,images,credits,videos';
   return tmdbGet(ctx, cfg, '/' + type + '/' + id, {
     append_to_response: append,
+    include_image_language: 'en,null',
   }).then(function (json) {
     var meta = tmdbMeta(cfg, json, type);
     if (!meta) return hubFail('details', 'NOT_FOUND', type + ' ' + id);
@@ -1156,6 +1448,11 @@ function tmdbDetails(ctx, cfg, params) {
       meta.ids = meta.ids || {};
       meta.ids.imdb = String(ext.imdb_id);
     }
+    if (!meta.logo) {
+      var logo = tmdbPickTitleLogo(cfg, json.images);
+      if (logo) meta.logo = logo;
+    }
+    tmdbAttachDetailsChrome(cfg, meta, json, type);
 
     var rails = {};
     var sideJobs = [];
@@ -1206,7 +1503,13 @@ function tmdbDetails(ctx, cfg, params) {
     }
 
     return Promise.all(sideJobs).then(function () {
-      var data = { meta: meta };
+      var data = {
+        meta: meta,
+        layout: {
+          fullBleedBackdrop: true,
+          firstBodyRowFraction: 0.65,
+        },
+      };
       if (Object.keys(rails).length) data.rails = rails;
       return hubOk('details', data, { maxAge: 3600, swr: 86400 });
     });
@@ -1278,6 +1581,7 @@ var TMDB_YEAR_RE = /\b((?:19|20)\d{2})\b/;
 var TMDB_SCORE_OP_RE = /(?:^|\s)(>=|<=|>|<)\s*(\d(?:\.\d)?)(?=\s|$)/g;
 var TMDB_SCORE_RANGE_RE = /(?:^|\s)(\d(?:\.\d)?)\s*[-–—]\s*(\d(?:\.\d)?)(?=\s|$)/;
 var TMDB_MEDIA_TYPE_RE = /(?:^|\s)(films?|movies?|series|shows?|tv)(?=\s|$)/i;
+var TMDB_LANG_TOKEN_RE = /(?:^|\s)lang:([a-z]{2})(?=\s|$)/i;
 
 function tmdbEscapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1326,6 +1630,7 @@ function tmdbParseSearchQuery(raw) {
       minScore: null,
       maxScore: null,
       originCountry: null,
+      originalLanguage: null,
     };
   }
 
@@ -1394,6 +1699,14 @@ function tmdbParseSearchQuery(raw) {
   }
   working = working.replace(/\s+/g, ' ').trim();
 
+  var originalLanguage = null;
+  var langMatch = TMDB_LANG_TOKEN_RE.exec(' ' + working + ' ');
+  if (langMatch) {
+    originalLanguage = String(langMatch[1]).toLowerCase();
+    working = (' ' + working + ' ').replace(TMDB_LANG_TOKEN_RE, ' ');
+  }
+  working = working.replace(/\s+/g, ' ').trim();
+
   var originCountry = null;
   if (working) {
     var lower = working.toLowerCase();
@@ -1458,6 +1771,7 @@ function tmdbParseSearchQuery(raw) {
     minScore: minScore,
     maxScore: maxScore,
     originCountry: originCountry,
+    originalLanguage: originalLanguage,
   };
 }
 
@@ -1479,7 +1793,8 @@ function tmdbParsedHasStructuredFilters(p) {
     tmdbParsedHasGenre(p) ||
     tmdbParsedHasScore(p) ||
     !!p.mediaType ||
-    !!p.originCountry
+    !!p.originCountry ||
+    !!p.originalLanguage
   );
 }
 
@@ -1587,6 +1902,7 @@ function tmdbBuildDiscoverQuery(parsed, bounds, page, genres, people, isTv) {
   if (parsed.minScore != null) q['vote_average.gte'] = parsed.minScore;
   if (parsed.maxScore != null) q['vote_average.lte'] = parsed.maxScore;
   if (parsed.originCountry) q.with_origin_country = parsed.originCountry;
+  if (parsed.originalLanguage) q.with_original_language = parsed.originalLanguage;
   return q;
 }
 
@@ -1610,6 +1926,106 @@ function tmdbStructuredDiscoverTv(ctx, cfg, query, filter) {
   return tmdbSafeJson(tmdbGet(ctx, cfg, '/discover/tv', q));
 }
 
+var TMDB_RESULT_PAGE = 20;
+
+// Walk the same order Search shows: film, series, film, series, then whichever side remains.
+function tmdbPlanZip(movieTotal, tvTotal, offset, count) {
+  var movies = [];
+  var shows = [];
+  var mi = 0;
+  var ti = 0;
+  var pos = 0;
+  function emit(type) {
+    var idx = type === 'movie' ? mi++ : ti++;
+    if (pos++ < offset) return;
+    if (type === 'movie') movies.push(idx);
+    else shows.push(idx);
+  }
+  while (movies.length + shows.length < count && (mi < movieTotal || ti < tvTotal)) {
+    if (mi < movieTotal && ti < tvTotal) {
+      emit('movie');
+      if (movies.length + shows.length >= count) break;
+      emit('tv');
+    } else if (mi < movieTotal) {
+      emit('movie');
+    } else {
+      emit('tv');
+    }
+  }
+  return {
+    movies: movies,
+    shows: shows,
+    hasMore: mi < movieTotal || ti < tvTotal,
+  };
+}
+
+function tmdbResultIndices(start, count) {
+  var out = [];
+  var i;
+  for (i = 0; i < count; i++) out.push(start + i);
+  return out;
+}
+
+function tmdbMetasAtIndices(cfg, packs, indices, forcedType, predicate) {
+  var byIndex = {};
+  var p;
+  for (p = 0; p < packs.length; p++) {
+    var rows = (packs[p].json && packs[p].json.results) || [];
+    var base = (packs[p].page - 1) * TMDB_RESULT_PAGE;
+    var r;
+    for (r = 0; r < rows.length; r++) {
+      var row = rows[r];
+      if (row && row.media_type === 'person') continue;
+      var meta = tmdbMeta(cfg, row, forcedType || '');
+      if (!meta) continue;
+      if (predicate && !predicate(meta)) continue;
+      byIndex[base + r] = meta;
+    }
+  }
+  var out = [];
+  var i;
+  for (i = 0; i < indices.length; i++) {
+    if (byIndex[indices[i]]) out.push(byIndex[indices[i]]);
+  }
+  return out;
+}
+
+function tmdbFetchIndexed(cfg, indices, forcedType, fetchPage, predicate) {
+  if (!indices.length) return Promise.resolve([]);
+  var pages = {};
+  var i;
+  for (i = 0; i < indices.length; i++) {
+    pages[Math.floor(indices[i] / TMDB_RESULT_PAGE) + 1] = true;
+  }
+  var pageNums = [];
+  for (var k in pages) {
+    if (Object.prototype.hasOwnProperty.call(pages, k)) pageNums.push(Number(k));
+  }
+  return Promise.all(
+    pageNums.map(function (page) {
+      return fetchPage(page).then(function (json) {
+        return { page: page, json: json || { results: [] } };
+      });
+    }),
+  ).then(function (packs) {
+    return tmdbMetasAtIndices(cfg, packs, indices, forcedType, predicate);
+  });
+}
+
+// Alternate films and series so an All search page is not only the first type.
+function tmdbZipMedia(movies, shows, limit) {
+  var out = [];
+  var i = 0;
+  var j = 0;
+  var cap = limit > 0 ? limit : movies.length + shows.length;
+  while (out.length < cap && (i < movies.length || j < shows.length)) {
+    if (i < movies.length) out.push(movies[i++]);
+    if (out.length >= cap) break;
+    if (j < shows.length) out.push(shows[j++]);
+  }
+  return out;
+}
+
 function tmdbStructuredSearch(ctx, cfg, params) {
   var trimmed = String(params.query || '').trim();
   var filter = params.filter;
@@ -1619,19 +2035,20 @@ function tmdbStructuredSearch(ctx, cfg, params) {
   var parsed = trimmed
     ? tmdbParseSearchQuery(trimmed)
     : {
-        raw: '',
-        remainder: '',
-        year: null,
-        yearStart: null,
-        yearEnd: null,
-        movieGenreIds: [],
-        tvGenreIds: [],
-        matchedGenreLabel: null,
-        mediaType: null,
-        minScore: null,
-        maxScore: null,
-        originCountry: null,
-      };
+      raw: '',
+      remainder: '',
+      year: null,
+      yearStart: null,
+      yearEnd: null,
+      movieGenreIds: [],
+      tvGenreIds: [],
+      matchedGenreLabel: null,
+      mediaType: null,
+      minScore: null,
+      maxScore: null,
+      originCountry: null,
+      originalLanguage: null,
+    };
   var typeFilter = hubFilterValue(filter, 'type');
   if (typeFilter === 'movie' || typeFilter === 'tv') {
     parsed.mediaType = typeFilter;
@@ -1646,34 +2063,49 @@ function tmdbStructuredSearch(ctx, cfg, params) {
   var hasPersonCandidate = parsed.remainder.trim().length >= 2;
   var runMulti =
     parsed.remainder.length > 0 || !tmdbParsedHasStructuredFilters(parsed);
-  var limit = Number(params.limit) > 0 ? Number(params.limit) : 0;
+  var limit = Number(params.limit) > 0 ? Number(params.limit) : TMDB_RESULT_PAGE;
+  var hostPage = Number(params.page) > 0 ? Number(params.page) : 1;
+  var windowStart = (hostPage - 1) * limit;
 
-  // Chunks: { json, forcedType, applyYear }
-  var chunkPromises = [];
-
-  function pushMulti(query, page) {
-    chunkPromises.push(
-      tmdbSearchMultiPage(ctx, cfg, query, page).then(function (json) {
-        return {
-          json: json,
-          forcedType: '',
-          applyYear:
-            bounds != null || tmdbParsedHasScore(parsed) || !!parsed.mediaType,
-        };
-      }),
-    );
+  function passesFilters(meta, applyYearFilter) {
+    if (
+      applyYearFilter &&
+      bounds != null &&
+      !tmdbReleaseInYearBounds(meta.releaseInfo, bounds)
+    ) {
+      return false;
+    }
+    if (parsed.mediaType && meta.type !== parsed.mediaType) return false;
+    var score = Number(meta.rating) || 0;
+    if (parsed.minScore != null && score < parsed.minScore) return false;
+    if (parsed.maxScore != null && score > parsed.maxScore) return false;
+    return true;
   }
 
-  if (runMulti) {
-    pushMulti(trimmed, 1);
-    pushMulti(trimmed, 2);
-    if (
-      parsed.remainder &&
-      parsed.remainder.toLowerCase() !== trimmed.toLowerCase()
-    ) {
-      pushMulti(parsed.remainder, 1);
-      pushMulti(parsed.remainder, 2);
-    }
+  var applyYearMulti =
+    bounds != null || tmdbParsedHasScore(parsed) || !!parsed.mediaType;
+  var applyYearDiscover = tmdbParsedHasScore(parsed) || !!parsed.mediaType;
+
+  function takeMulti(query, start, count) {
+    if (!query) return Promise.resolve({ total: 0, items: [] });
+    return tmdbSearchMultiPage(ctx, cfg, query, 1).then(function (first) {
+      var total = Number(first && first.total_results) || 0;
+      var n = Math.min(count, Math.max(0, total - start));
+      if (n <= 0) return { total: total, items: [] };
+      return tmdbFetchIndexed(
+        cfg,
+        tmdbResultIndices(start, n),
+        '',
+        function (page) {
+          return tmdbSearchMultiPage(ctx, cfg, query, page);
+        },
+        function (meta) {
+          return passesFilters(meta, applyYearMulti);
+        },
+      ).then(function (items) {
+        return { total: total, items: items };
+      });
+    });
   }
 
   var personPromise = hasPersonCandidate
@@ -1681,38 +2113,12 @@ function tmdbStructuredSearch(ctx, cfg, params) {
     : Promise.resolve(null);
 
   return personPromise.then(function (personId) {
-    var discoverPages = 2;
     var wantMovies = !parsed.mediaType || parsed.mediaType === 'movie';
     var wantTv = !parsed.mediaType || parsed.mediaType === 'tv';
-    var applyYearDiscover = tmdbParsedHasScore(parsed) || !!parsed.mediaType;
-
-    function pushDiscover(isTv, genres, people) {
-      var page;
-      for (page = 1; page <= discoverPages; page++) {
-        (function (tvFlag, pageNum) {
-          var q = tmdbBuildDiscoverQuery(
-            parsed,
-            bounds,
-            pageNum,
-            genres,
-            people,
-            tvFlag,
-          );
-          var fetch = tvFlag
-            ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
-            : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
-          chunkPromises.push(
-            fetch.then(function (json) {
-              return {
-                json: json,
-                forcedType: tvFlag ? 'tv' : 'movie',
-                applyYear: applyYearDiscover,
-              };
-            }),
-          );
-        })(isTv, page);
-      }
-    }
+    var movieGenres = null;
+    var tvGenres = null;
+    var discoverPeople = null;
+    var runDiscover = false;
 
     if (
       personId != null ||
@@ -1720,78 +2126,164 @@ function tmdbStructuredSearch(ctx, cfg, params) {
       bounds != null ||
       tmdbParsedHasScore(parsed) ||
       !!parsed.mediaType ||
-      !!parsed.originCountry
+      !!parsed.originCountry ||
+      !!parsed.originalLanguage
     ) {
       if (tmdbParsedHasGenre(parsed)) {
+        runDiscover = true;
+        discoverPeople = personId;
         if (wantMovies && parsed.movieGenreIds.length) {
-          pushDiscover(false, parsed.movieGenreIds, personId);
+          movieGenres = parsed.movieGenreIds;
+        } else {
+          wantMovies = false;
         }
         if (wantTv) {
-          var tvGenres = parsed.tvGenreIds.length
+          tvGenres = parsed.tvGenreIds.length
             ? parsed.tvGenreIds
             : parsed.movieGenreIds;
-          if (tvGenres.length) pushDiscover(true, tvGenres, personId);
+          if (!tvGenres.length) wantTv = false;
         }
-      } else if (personId != null) {
-        if (wantMovies) pushDiscover(false, null, personId);
-        if (wantTv) pushDiscover(true, null, personId);
-      } else if (!hasPersonCandidate) {
-        if (wantMovies) pushDiscover(false, null, null);
-        if (wantTv) pushDiscover(true, null, null);
+      } else if (personId != null || !hasPersonCandidate) {
+        runDiscover = true;
+        discoverPeople = personId;
       }
     }
 
-    return Promise.all(chunkPromises).then(function (chunks) {
-      var seen = {};
-      var out = [];
+    function discoverTotal(isTv, genres) {
+      if ((isTv && !wantTv) || (!isTv && !wantMovies)) {
+        return Promise.resolve(0);
+      }
+      var q = tmdbBuildDiscoverQuery(parsed, bounds, 1, genres, discoverPeople, isTv);
+      var fetch = isTv
+        ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
+        : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
+      return fetch.then(function (json) {
+        return Number(json && json.total_results) || 0;
+      });
+    }
 
-      function passesFilters(meta, applyYearFilter) {
-        if (
-          applyYearFilter &&
-          bounds != null &&
-          !tmdbReleaseInYearBounds(meta.releaseInfo, bounds)
-        ) {
-          return false;
+    function discoverSlice(isTv, genres, indices) {
+      return tmdbFetchIndexed(
+        cfg,
+        indices,
+        isTv ? 'tv' : 'movie',
+        function (page) {
+          var q = tmdbBuildDiscoverQuery(
+            parsed,
+            bounds,
+            page,
+            genres,
+            discoverPeople,
+            isTv,
+          );
+          return isTv
+            ? tmdbStructuredDiscoverTv(ctx, cfg, q, filter)
+            : tmdbStructuredDiscoverMovie(ctx, cfg, q, filter);
+        },
+        function (meta) {
+          return passesFilters(meta, applyYearDiscover);
+        },
+      );
+    }
+
+    var primaryQuery = runMulti ? trimmed : '';
+    var remainderQuery = '';
+    if (
+      runMulti &&
+      parsed.remainder &&
+      parsed.remainder.toLowerCase() !== trimmed.toLowerCase()
+    ) {
+      remainderQuery = parsed.remainder;
+    }
+
+    return Promise.all([
+      takeMulti(primaryQuery, 0, 0).then(function (pack) {
+        return pack.total;
+      }),
+      remainderQuery
+        ? takeMulti(remainderQuery, 0, 0).then(function (pack) {
+          return pack.total;
+        })
+        : Promise.resolve(0),
+      runDiscover ? discoverTotal(false, movieGenres) : Promise.resolve(0),
+      runDiscover ? discoverTotal(true, tvGenres) : Promise.resolve(0),
+    ]).then(function (totals) {
+      var primaryTotal = totals[0];
+      var remainderTotal = totals[1];
+      var movieTotal = wantMovies ? totals[2] : 0;
+      var tvTotal = wantTv ? totals[3] : 0;
+      var cursor = windowStart;
+      var room = limit;
+
+      function claim(total) {
+        var start = 0;
+        var count = 0;
+        if (cursor < total && room > 0) {
+          start = cursor;
+          count = Math.min(room, total - cursor);
+          cursor = 0;
+          room -= count;
+        } else if (cursor >= total) {
+          cursor -= total;
         }
-        if (parsed.mediaType && meta.type !== parsed.mediaType) return false;
-        var score = Number(meta.rating) || 0;
-        if (parsed.minScore != null && score < parsed.minScore) return false;
-        if (parsed.maxScore != null && score > parsed.maxScore) return false;
-        return true;
+        return { start: start, count: count };
       }
 
-      var ci;
-      for (ci = 0; ci < chunks.length; ci++) {
-        var chunk = chunks[ci];
-        var rows = (chunk.json && chunk.json.results) || [];
-        var ri;
-        for (ri = 0; ri < rows.length; ri++) {
-          var row = rows[ri];
-          if (row && row.media_type === 'person') continue;
-          var meta = tmdbMeta(cfg, row, chunk.forcedType || '');
-          if (!meta) continue;
-          if (!passesFilters(meta, chunk.applyYear)) continue;
-          var key = meta.type + ':' + meta.ids.tmdb;
-          if (seen[key]) continue;
-          seen[key] = true;
-          out.push(meta);
-          if (limit > 0 && out.length >= limit) return out;
+      var primary = claim(primaryTotal);
+      var remainder = claim(remainderTotal);
+      var discoverCursor = cursor;
+      var discoverRoom = room;
+      var plan =
+        discoverRoom > 0
+          ? tmdbPlanZip(movieTotal, tvTotal, discoverCursor, discoverRoom)
+          : { movies: [], shows: [], hasMore: movieTotal + tvTotal > discoverCursor };
+
+      return Promise.all([
+        takeMulti(primaryQuery, primary.start, primary.count),
+        takeMulti(remainderQuery, remainder.start, remainder.count),
+        discoverSlice(false, movieGenres, plan.movies),
+        discoverSlice(true, tvGenres, plan.shows),
+      ]).then(function (parts) {
+        var seen = {};
+        var out = [];
+        function pushList(list) {
+          var i;
+          for (i = 0; i < list.length; i++) {
+            var meta = list[i];
+            var key = meta.type + ':' + meta.ids.tmdb;
+            if (seen[key]) continue;
+            seen[key] = true;
+            out.push(meta);
+            if (out.length >= limit) return;
+          }
         }
-      }
-      return limit > 0 ? hubClampList(out, limit) : out;
+        pushList(parts[0].items || []);
+        pushList(parts[1].items || []);
+        pushList(tmdbZipMedia(parts[2], parts[3], discoverRoom));
+        var catalogTotal = primaryTotal + remainderTotal + movieTotal + tvTotal;
+        var hasMore = windowStart + limit < catalogTotal;
+        return {
+          items: out,
+          hasMore: hasMore && out.length > 0,
+        };
+      });
     });
   });
 }
 
 function tmdbCategoryOptions() {
   return TMDB_GENRE_ROWS.map(function (g) {
-    return {
+    var opt = {
       id: g.id,
       label: g.label,
       movieGenres: g.movieGenres,
       tvGenres: g.tvGenres,
       filter: { op: 'eq', field: 'mood', value: g.id },
     };
+    if (g.keywords) opt.keywords = g.keywords;
+    if (g.movieKeywords) opt.movieKeywords = g.movieKeywords;
+    if (g.tvKeywords) opt.tvKeywords = g.tvKeywords;
+    return opt;
   });
 }
 
@@ -1801,7 +2293,8 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (action === 'layout') {
-    return hubOk('layout', tmdbLayout(), { maxAge: 3600, swr: 86400 });
+    // Short TTL so seeded genre rows rotate; rails keep their own longer cache.
+    return hubOk('layout', tmdbLayout(), { maxAge: 300, swr: 900 });
   }
   if (action === 'filters') {
     return hubOk('filters', {
@@ -1843,14 +2336,10 @@ function extract(ctx) {
     }));
   }
   if (action === 'search') {
-    var q = String(params.query || '').trim();
-    var hasFilter = params.filter != null && params.filter !== '';
-    if (!q && !hasFilter) return hubItems('search', []);
-    return wrap(
-      tmdbStructuredSearch(ctx, cfg, params).then(function (items) {
-        return hubItems('search', items, { maxAge: 300 })[0];
-      }),
-    );
+    return wrap(homeSearch(ctx, cfg, params));
+  }
+  if (action === 'search_helpers') {
+    return wrap(homeSearchHelpers(ctx, cfg, params));
   }
   if (action === 'feed') {
     return wrap(
@@ -1863,25 +2352,37 @@ function extract(ctx) {
     return hubFail(action, 'INVALID_ACTION', 'tmdb has no action ' + action);
   }
   if (String(params.rail || '') === 'because') {
-    return wrap(
-      tmdbBecause(ctx, cfg, params).then(function (env) {
-        return env[0];
-      }),
-    );
+    return wrap(tmdbBecause(ctx, cfg, params));
   }
   return wrap(
     tmdbList(ctx, cfg, params).then(function (items) {
       var pageSize =
         Number(params.limit) > 0 ? Number(params.limit) : TMDB_HOME_RAIL_CAP;
-      return hubItems(
-        'rail',
-        items,
-        { maxAge: 900, swr: 3600 },
-        {
-          pageSize: pageSize,
-          hasMore: items.length >= pageSize,
-        },
-      )[0];
+      var page = Number(params.page) > 0 ? Number(params.page) : 1;
+      var maxPages =
+        Number(params.maxPages) > 0 ? Number(params.maxPages) : 4;
+      var railId = String(params.rail || 'spotlight');
+      var attach =
+        railId === 'spotlight'
+          ? tmdbAttachLogos(ctx, cfg, items, TMDB_HOME_HERO_CAP)
+          : Promise.resolve(items);
+      return attach.then(function (withLogos) {
+        var painted =
+          railId === 'spotlight'
+            ? withLogos.map(function (m) {
+              return hubPaintHero(m);
+            })
+            : withLogos;
+        return hubItems(
+          'rail',
+          painted,
+          { maxAge: 900, swr: 3600 },
+          {
+            pageSize: pageSize,
+            hasMore: page < maxPages && painted.length >= pageSize,
+          },
+        )[0];
+      });
     }),
   );
 }

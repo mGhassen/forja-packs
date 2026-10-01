@@ -4,7 +4,7 @@
   "name": "ForjaHQ Torrent",
   "description": "Built-in torrent indexer search for movies and series.",
   "author": "ForjaHQ",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "prelude": "_torrent_common.js",
   "tags": [
     "torrent"
@@ -117,6 +117,18 @@
       "config": {
         "source": "Torrentio"
       }
+    },
+    {
+      "id": "torrentgalaxy",
+      "name": "TorrentGalaxy",
+      "entry": "torrentgalaxy.js",
+      "kind": "torrent",
+      "searchInputs": [
+        "query"
+      ],
+      "config": {
+        "source": "TorrentGalaxy"
+      }
     }
   ],
   "bundle": [
@@ -129,6 +141,7 @@
     "yts.js",
     "solid_torrents.js",
     "therarbg.js",
-    "torrentio.js"
+    "torrentio.js",
+    "torrentgalaxy.js"
   ]
 }

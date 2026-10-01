@@ -4,7 +4,7 @@
   "name": "ForjaHQ Asian Drama",
   "description": "KissKH Asian drama catalog hub.",
   "author": "ForjaHQ",
-  "version": "1.0.16",
+  "version": "1.0.42",
   "tags": [
     "asian-drama",
     "drama"
@@ -26,14 +26,52 @@
         "layout",
         "rail",
         "search",
+        "search_helpers",
         "details",
         "filters",
-        "feed"
+        "feed",
+        "settings"
       ],
       "nav": {
         "label": "Asian Drama",
         "icon": "icons/nav.png",
-        "accent": "#C4B5FD"
+        "accent": "#C4B5FD",
+        "page": {
+          "action": "layout"
+        }
+      },
+      "settings": {
+        "group": "Details",
+        "order": 20,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine"],
+            "preferred": ["engine"],
+            "order": ["engine"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "enrich": "enrich-tmdb",
       "config": {
@@ -48,7 +86,7 @@
           "https://kisskh.id"
         ]
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     },
     {
       "id": "enrich-tmdb",
@@ -65,17 +103,22 @@
         "enrich"
       ],
       "config": {
+        "base": "https://tmdb.forjahq.xyz/3",
+        "imageBase": "https://tmdb.forjahq.xyz/t/p",
+        "apiKey": "",
         "rails": [
           "spotlight"
         ],
         "limit": 5
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     }
   ],
   "bundle": [
     "kisskh.js",
     "_kit.js",
+    "_search.js",
+    "_layout.js",
     "enrich_tmdb.js",
     "icons/nav.png"
   ]

@@ -3,7 +3,7 @@
   "id": "forjahq-arabic",
   "name": "ForjaHQ Arabic",
   "description": "Larozaa Arabic movies and TV hub.",
-  "version": "1.4.9",
+  "version": "1.4.19",
   "tags": [
     "arabic"
   ],
@@ -32,7 +32,10 @@
       "nav": {
         "label": "Arabic",
         "icon": "icons/nav.png",
-        "accent": "#7BA737"
+        "accent": "#7BA737",
+        "page": {
+          "action": "layout"
+        }
       },
       "config": {
         "bootstrap": "https://laaroza.lat",
@@ -43,12 +46,14 @@
           "https://laaroza.pics"
         ]
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     }
   ],
   "bundle": [
     "arabic.js",
     "_kit.js",
+    "_search.js",
+    "_layout.js",
     "icons/nav.png"
   ]
 }

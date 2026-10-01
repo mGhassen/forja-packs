@@ -288,116 +288,6 @@ function arabicHeaders(referer) {
   return h;
 }
 
-function arabicLayout() {
-  return { 
-    pages: {
-      arabic: {
-        feed: true,
-        feedRails: ARABIC_FEED_RAILS.slice(),
-        pageSize: 24,
-        widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'رائج · Spotlight',
-            rail: 'trending',
-            bleed: 'latest',
-          },
-          {
-            type: 'rail',
-            id: 'latest',
-            title: 'أخر الاضافات',
-            rail: 'latest',
-            hideWhenBleed: true,
-          },
-          { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'rail',
-            id: 'series',
-            title: 'مسلسلات عربية',
-            rail: 'series',
-          },
-          { type: 'rail', id: 'movies', title: 'أفلام عربية', rail: 'movies' },
-          {
-            type: 'rail',
-            id: 'turkish',
-            title: 'مسلسلات تركية',
-            rail: 'turkish',
-          },
-          {
-            type: 'rail',
-            id: 'foreign_series',
-            title: 'مسلسلات أجنبية',
-            rail: 'foreign_series',
-          },
-          {
-            type: 'rail',
-            id: 'foreign_movies',
-            title: 'أفلام أجنبية',
-            rail: 'foreign_movies',
-          },
-          {
-            type: 'rail',
-            id: 'indian_series',
-            title: 'مسلسلات هندية',
-            rail: 'indian_series',
-          },
-          {
-            type: 'rail',
-            id: 'indian',
-            title: 'أفلام هندية',
-            rail: 'indian',
-          },
-          {
-            type: 'rail',
-            id: 'asian_series',
-            title: 'مسلسلات آسيوية',
-            rail: 'asian_series',
-          },
-          {
-            type: 'rail',
-            id: 'asian_movies',
-            title: 'أفلام آسيوية',
-            rail: 'asian_movies',
-          },
-          {
-            type: 'rail',
-            id: 'anime_series',
-            title: 'أنمي · مسلسلات',
-            rail: 'anime_series',
-          },
-          {
-            type: 'rail',
-            id: 'anime_movies',
-            title: 'أنمي · أفلام',
-            rail: 'anime_movies',
-          },
-          {
-            type: 'rail',
-            id: 'dubbed',
-            title: 'أفلام مدبلجة',
-            rail: 'dubbed',
-          },
-          {
-            type: 'rail',
-            id: 'turkish_movies',
-            title: 'أفلام تركية',
-            rail: 'turkish_movies',
-          },
-          { type: 'rail', id: 'ramadan', title: 'رمضان 2026', rail: 'ramadan' },
-          {
-            type: 'rail',
-            id: 'tv_programs',
-            title: 'برامج تلفزيونية',
-            rail: 'tv_programs',
-          },
-          { type: 'rail', id: 'plays', title: 'مسرحيات', rail: 'plays' },
-        ],
-      },
-    },
-  };
-}
-
 function arabicAbs(base, url) {
   url = String(url || '').trim();
   if (!url || url.indexOf('data:') === 0) return '';
@@ -802,26 +692,6 @@ function arabicFetchHomeRails(ctx, cfg, limit) {
   });
 }
 
-function arabicSearchLaroza(ctx, cfg, query, opts) {
-  opts = typeof opts === 'object' && opts ? opts : { limit: opts };
-  var limit = Number(opts.limit) > 0 ? Number(opts.limit) : 40;
-  var page = Number(opts.page) > 0 ? Number(opts.page) : 1;
-  return arabicResolveLaroza(ctx, cfg).then(function (base) {
-    var url =
-      base +
-      '/search.php?keywords=' +
-      encodeURIComponent(query) +
-      '&page=' +
-      page;
-    return arabicFetchHtml(ctx, url, base + '/').then(function (got) {
-      var origin = arabicOrigin(got.url) || base;
-      var cards = arabicParseLarozaCards(ctx, got.html, origin, false);
-      var rawCount = cards.length;
-      var grouped = arabicGroupLarozaSearch(cards);
-      return arabicPageResult(grouped, limit, rawCount);
-    });
-  });
-}
 
 function arabicRailItems(ctx, cfg, params) {
   var rail = String(params.rail || '');
@@ -974,27 +844,6 @@ function arabicFeed(ctx, cfg, params) {
     });
 }
 
-function arabicSearch(ctx, cfg, params) {
-  var q = String(params.query || '').trim();
-  if (!q) return Promise.resolve(hubItems('search', []));
-  var limit = arabicLimitOf(params, 40);
-  var page = arabicPageOf(params);
-  return arabicSearchLaroza(ctx, cfg, q, { page: page, limit: limit })
-    .then(function (pageOut) {
-      return hubItems(
-        'search',
-        (pageOut && pageOut.items) || [],
-        { maxAge: 300 },
-        {
-          pageSize: (pageOut && pageOut.pageSize) || limit,
-          hasMore: !!(pageOut && pageOut.hasMore),
-        },
-      );
-    })
-    .catch(function (e) {
-      return hubFail('search', 'UPSTREAM', e && e.message, true);
-    });
-}
 
 function arabicParseShowRef(params) {
   var raw = String(params.id || '').trim();

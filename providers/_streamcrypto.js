@@ -1,5 +1,5 @@
 // STREAMCRYPTO (`enc=2`) — seed + media id → XOR keystream → `mvm1` JSON.
-// Shared by Videasy, VidSrc.sbs nested player, and any provider using enc=2.
+// Provider prelude for Videasy / VidSrc.sbs (and any enc=2 plugin).
 
 (function (global) {
   var MASK = 0xffffffff;

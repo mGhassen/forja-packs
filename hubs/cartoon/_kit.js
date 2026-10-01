@@ -48,20 +48,148 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+
+// Pack owns upcoming / premiereLabel — host only reads these fields.
+
+function hubParseIsoDate(raw) {
+  var s = String(raw || '').trim();
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+  return '';
+}
+
+function hubIsFutureIsoDate(iso) {
+  var s = hubParseIsoDate(iso);
+  if (!s) return false;
+  var parts = s.split('-');
+  var y = Number(parts[0]);
+  var m = Number(parts[1]);
+  var d = Number(parts[2]);
+  if (!(y > 0 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return false;
+  var air = new Date(y, m - 1, d);
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return air.getTime() > today.getTime();
+}
+
+function hubFormatDisplayDate(iso) {
+  var s = hubParseIsoDate(iso);
+  if (!s) return '';
+  var parts = s.split('-');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var m = Number(parts[1]);
+  var d = Number(parts[2]);
+  var y = Number(parts[0]);
+  if (!(m >= 1 && m <= 12)) return s;
+  return months[m - 1] + ' ' + d + ', ' + y;
+}
+
+function hubMetaIsMovie(meta) {
+  if (!meta) return false;
+  if (meta.open && meta.open.movie === true) return true;
+  if (String(meta.badge || '').toUpperCase() === 'MOVIE') return true;
+  if (String(meta.type || '').toLowerCase() === 'movie') return true;
+  if (String(meta.tmdbMediaType || '').toLowerCase() === 'movie') return true;
+  return false;
+}
+
+function hubVideoNotAiredYet(v) {
+  if (!v || typeof v !== 'object') return false;
+  if (v.aired === false) return true;
+  var air = hubParseIsoDate(v.airDate || v.air_date || '');
+  return !!(air && hubIsFutureIsoDate(air));
+}
+
+function hubVideoHasAirSignal(v) {
+  if (!v || typeof v !== 'object') return false;
+  if (v.aired === false) return true;
+  return !!hubParseIsoDate(v.airDate || v.air_date || '');
+}
+
+/** Pack owns upcoming / premiereLabel — host only reads these fields. */
+function hubStampDetailsPaint(meta) {
+  if (!meta || typeof meta !== 'object') return meta;
+  var videos = Array.isArray(meta.videos) ? meta.videos : [];
+  var status = String(meta.status || '').trim().toUpperCase();
+  var premiere = hubParseIsoDate(meta.premiereDate || '');
+  if (!premiere) {
+    var bit = String(meta.releaseInfo || '').split(' • ')[0].trim();
+    premiere = hubParseIsoDate(bit);
+  }
+  var earliest = '';
+  for (var i = 0; i < videos.length; i++) {
+    var day = hubParseIsoDate(videos[i].airDate || videos[i].air_date || '');
+    if (!day) continue;
+    if (!earliest || day < earliest) earliest = day;
+  }
+  var labelIso = premiere || earliest;
+  var upcoming =
+    status === 'NOT_YET_RELEASED' || status === 'UPCOMING';
+  var isMovie = hubMetaIsMovie(meta);
+  if (!upcoming && !isMovie && videos.length) {
+    var dated = [];
+    for (var j = 0; j < videos.length; j++) {
+      if (hubVideoHasAirSignal(videos[j])) dated.push(videos[j]);
+    }
+    if (dated.length) {
+      var allFuture = true;
+      for (var k = 0; k < dated.length; k++) {
+        if (!hubVideoNotAiredYet(dated[k])) {
+          allFuture = false;
+          break;
+        }
+      }
+      if (allFuture) upcoming = true;
+    } else if (labelIso && hubIsFutureIsoDate(labelIso)) {
+      // Stub episodes with no air dates — trust future premiere.
+      upcoming = true;
+    }
+  }
+  if (!upcoming && labelIso && hubIsFutureIsoDate(labelIso)) {
+    if (isMovie || !videos.length) upcoming = true;
+  }
+  meta.upcoming = !!upcoming;
+  if (upcoming && (!status || status === 'UPCOMING')) {
+    meta.status = 'NOT_YET_RELEASED';
+  }
+  if (labelIso) {
+    meta.premiereDate = meta.premiereDate || labelIso;
+    meta.premiereLabel = hubFormatDisplayDate(labelIso);
+  } else if (!meta.premiereLabel) {
+    meta.premiereLabel = '';
+  }
+  return meta;
+}
+
 function hubOk(action, data, cache) {
+  var payload = data || {};
+  if (
+    (String(action) === 'details' || String(action) === 'enrich') &&
+    payload.meta &&
+    typeof payload.meta === 'object'
+  ) {
+    payload = Object.assign({}, payload, { meta: hubStampDetailsPaint(payload.meta) });
+  }
   var env = {
     ok: true,
     kit: HUB_KIT,
     protocol: HUB_PROTOCOL,
     action: action,
-    data: data || {},
+    data: payload,
   };
   if (cache) env.cache = cache;
   return [env];
 }
 
 function hubItems(action, items, cache, paging) {
-  var data = { items: items || [] };
+  var list = items || [];
+  var stamped = [];
+  for (var i = 0; i < list.length; i++) {
+    var m = hubStampDetailsPaint(list[i]);
+    if (!m || typeof m !== 'object') continue;
+    if (!m.paint) m = hubPaintPoster(m);
+    stamped.push(m);
+  }
+  var data = { items: stamped };
   if (paging && typeof paging === 'object') {
     if (Number(paging.pageSize) > 0) data.pageSize = Number(paging.pageSize);
     if (typeof paging.hasMore === 'boolean') data.hasMore = paging.hasMore;
@@ -96,6 +224,101 @@ function hubNotModified(action) {
       data: {},
     },
   ];
+}
+
+
+function hubPaintPoster(item, opts) {
+  opts = opts || {};
+  var meta = item || {};
+  var title = String(meta.name || meta.title || opts.title || '');
+  var imageUrl = String(
+    meta.poster || meta.posterUrl || meta.imageUrl || opts.imageUrl || '',
+  );
+  var paint = {
+    type: 'posterCard',
+    props: {
+      title: title,
+      imageUrl: imageUrl,
+    },
+  };
+  if (meta.rating != null || opts.rating != null) {
+    paint.props.rating = Number(meta.rating != null ? meta.rating : opts.rating);
+  }
+  if (opts.rank != null) paint.props.rank = Number(opts.rank);
+  if (meta.badge || opts.badge) paint.props.badge = String(meta.badge || opts.badge);
+  if (opts.subtitle || meta.releaseInfo) {
+    paint.props.subtitle = String(opts.subtitle || meta.releaseInfo || '');
+  }
+  if (opts.aspect) paint.props.aspect = String(opts.aspect);
+  if (meta.background || meta.backdrop || opts.backdropUrl) {
+    paint.props.backdropUrl = String(
+      meta.background || meta.backdrop || opts.backdropUrl || '',
+    );
+  }
+  if (meta.logo || opts.logoUrl) {
+    paint.props.logoUrl = String(meta.logo || opts.logoUrl || '');
+  }
+  if (meta.description || meta.overview || opts.overview) {
+    paint.props.overview = String(
+      meta.description || meta.overview || opts.overview || '',
+    );
+  }
+  var out = Object.assign({}, meta);
+  out.paint = paint;
+  if (meta.open) out.open = meta.open;
+  if (!out.meta && (meta.id || meta.name)) {
+    out.meta = {
+      id: String(meta.id || ''),
+      type: String(meta.type || ''),
+      name: title,
+      poster: imageUrl,
+      open: meta.open || null,
+    };
+  }
+  return out;
+}
+
+function hubPaintEvent(item, opts) {
+  opts = opts || {};
+  var meta = item || {};
+  var props = Object.assign(
+    {
+      title: String(meta.name || meta.title || opts.title || ''),
+      posterUrl: String(meta.poster || meta.posterUrl || opts.posterUrl || ''),
+    },
+    opts.props || {},
+  );
+  var keys = [
+    'homeTeam',
+    'awayTeam',
+    'homeBadgeUrl',
+    'awayBadgeUrl',
+    'categoryLabel',
+    'scheduleLabel',
+    'timeLabel',
+    'viewers',
+    'live',
+    'width',
+    'height',
+  ];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (opts[k] != null) props[k] = opts[k];
+    else if (meta[k] != null) props[k] = meta[k];
+  }
+  var out = Object.assign({}, meta);
+  out.paint = { type: 'eventCard', props: props };
+  if (meta.open) out.open = meta.open;
+  return out;
+}
+
+function hubWithLoad(node, action, params) {
+  var out = Object.assign({}, node || {});
+  out.load = {
+    action: String(action || ''),
+    params: params && typeof params === 'object' ? params : {},
+  };
+  return out;
 }
 
 function hubClampList(list, limit) {
@@ -236,12 +459,8 @@ function hubTmdbPick(results, media, year) {
   var name = String(
     media === 'movie' ? chosen.title || '' : chosen.name || '',
   );
-  var poster = chosen.poster_path
-    ? 'https://tmdb.forjahq.xyz/t/p/w500' + chosen.poster_path
-    : '';
-  var backdrop = chosen.backdrop_path
-    ? 'https://tmdb.forjahq.xyz/t/p/w1280' + chosen.backdrop_path
-    : '';
+  var poster = hubTmdbAbsArt(chosen.poster_path, 'w500');
+  var backdrop = hubTmdbAbsArt(chosen.backdrop_path, 'w1280');
   var overview = String(chosen.overview || '').trim();
   var rating = Number(chosen.vote_average);
   return {
@@ -256,6 +475,33 @@ function hubTmdbPick(results, media, year) {
   };
 }
 
+function hubTmdbAbsArt(path, size) {
+  var p = String(path || '').trim();
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (p.charAt(0) !== '/') p = '/' + p;
+  return 'https://tmdb.forjahq.xyz/t/p/' + (size || 'w500') + p;
+}
+
+// Prefer English title logo, then lang-null, then first available.
+function hubTmdbPickTitleLogo(images) {
+  var logos = images && Array.isArray(images.logos) ? images.logos : [];
+  if (!logos.length) return '';
+  var en = null;
+  var nul = null;
+  var first = null;
+  for (var i = 0; i < logos.length; i++) {
+    var L = logos[i];
+    if (!L || !L.file_path) continue;
+    if (!first) first = L;
+    var lang = L.iso_639_1;
+    if (lang === 'en' && !en) en = L;
+    if ((lang == null || lang === '') && !nul) nul = L;
+  }
+  var chosen = en || nul || first;
+  return chosen ? hubTmdbAbsArt(chosen.file_path, 'w500') : '';
+}
+
 function hubApplyTmdbHit(meta, hit) {
   if (!meta || !hit || !hit.id) return meta;
   meta.ids = Object.assign({}, meta.ids || {}, { tmdb: String(hit.id) });
@@ -265,6 +511,9 @@ function hubApplyTmdbHit(meta, hit) {
     meta.bannerImage = '';
   } else if (hit.poster && !meta.poster) {
     meta.poster = String(hit.poster);
+  }
+  if (hit.logo && !String(meta.logo || '').trim()) {
+    meta.logo = String(hit.logo);
   }
   // Fill synopsis / score only when the pack left them empty (AniList keeps its own).
   if (hit.overview && !String(meta.description || '').trim()) {

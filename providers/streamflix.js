@@ -1,11 +1,14 @@
 var SPECS = {
   "api": "https://api.streamflix.app",
+  "configPath": "/config/config-streamflix2.json",
   "tmdbKey": "439c478a771f35c05022f9feabcca01c"
 };
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var api = cfg.api.replace(/\/$/, '');
+  var configPath = String(cfg.configPath || '/config/config-streamflix2.json');
+  if (configPath.charAt(0) !== '/') configPath = '/' + configPath;
   var tmdbKey = cfg.tmdbKey;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
@@ -21,6 +24,22 @@ function extract(ctx) {
     return ctx.fetch(url, { headers: headers }).then(function (r) {
       return r.json();
     });
+  }
+
+  function uniqueBases() {
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < arguments.length; i++) {
+      (arguments[i] || []).forEach(function (base) {
+        var k = String(base || '')
+          .trim()
+          .replace(/\/$/, '');
+        if (!k || seen[k]) return;
+        seen[k] = true;
+        out.push(k);
+      });
+    }
+    return out;
   }
 
   function rowsFrom(bases, path, quality) {
@@ -83,7 +102,7 @@ function extract(ctx) {
     return best || null;
   }
 
-  return Promise.all([getJson(api + '/data.json'), getJson(api + '/config/config-streamflixapp.json'), tmdbTitle()])
+  return Promise.all([getJson(api + '/data.json'), getJson(api + configPath), tmdbTitle()])
     .then(function (triple) {
       var catalog = (triple[0] && triple[0].data) || [];
       var config = triple[1] || {};
@@ -92,15 +111,14 @@ function extract(ctx) {
       if (!best) return [];
       if (!isTv) {
         if (!best.movielink) return [];
-        return rowsFrom(config.premium, best.movielink, '1080p').concat(
-          rowsFrom(config.movies, best.movielink, '720p'),
-        );
+        var movieBases = uniqueBases(config.premium, config.movies, config.download);
+        return rowsFrom(movieBases, best.movielink, '1080p');
       }
-      var bases = config.premium || [];
-      if (!bases.length || !best.moviekey) return [];
+      var tvBases = uniqueBases(config.premium, config.tv, config.download);
+      if (!tvBases.length || !best.moviekey) return [];
       var s = ctx.season || 1;
       var e = ctx.episode || 1;
-      return rowsFrom(bases, 'tv/' + best.moviekey + '/s' + s + '/episode' + e + '.mkv', '1080p');
+      return rowsFrom(tvBases, 'tv/' + best.moviekey + '/s' + s + '/episode' + e + '.mkv', '1080p');
     })
     .catch(function () {
       return [];

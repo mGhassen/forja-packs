@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.25",
+  "version": "1.0.72",
   "tags": [
     "home",
     "movies",
@@ -26,16 +26,55 @@
       "capabilities": [
         "nav",
         "layout",
+        "feed",
         "rail",
         "search",
+        "search_helpers",
         "structured_search",
         "filters",
-        "details"
+        "details",
+        "settings"
       ],
       "nav": {
         "label": "Home",
         "icon": "icons/nav.png",
-        "accent": "#1CE783"
+        "accent": "#1CE783",
+        "page": {
+          "action": "layout"
+        }
+      },
+      "settings": {
+        "group": "Details",
+        "order": 20,
+        "fields": [
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine"],
+            "preferred": ["engine"],
+            "order": ["engine"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "config": {
         "base": "https://tmdb.forjahq.xyz/3",
@@ -43,12 +82,14 @@
         "apiKey": "",
         "pageSize": 20
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     }
   ],
   "bundle": [
     "tmdb.js",
     "_kit.js",
+    "_search.js",
+    "_layout.js",
     "icons/nav.png",
     "logos/appletv.svg",
     "logos/crunchyroll.svg",

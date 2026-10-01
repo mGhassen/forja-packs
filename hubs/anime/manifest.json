@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.20",
+  "version": "1.0.49",
   "tags": [
     "anime"
   ],
@@ -26,20 +26,80 @@
         "feed",
         "rail",
         "search",
+        "search_helpers",
         "filters",
-        "details"
+        "details",
+        "settings"
       ],
       "nav": {
         "label": "Anime",
         "icon": "icons/nav.png",
-        "accent": "#FB7185"
+        "accent": "#FB7185",
+        "page": {
+          "action": "layout"
+        }
+      },
+      "settings": {
+        "addon": "anime",
+        "group": "Display",
+        "order": 10,
+        "fields": [
+          {
+            "id": "titleLanguage",
+            "type": "select",
+            "label": "Anime title language",
+            "subtitle": "Title language in the Anime hub, details, and player. Default is Romaji. Stream matching still tries romaji, then English, native, and synonyms.",
+            "default": "romaji",
+            "options": [
+              {
+                "id": "romaji",
+                "label": "Romaji"
+              },
+              {
+                "id": "english",
+                "label": "English"
+              },
+              {
+                "id": "native",
+                "label": "Native"
+              }
+            ]
+          },
+          {
+            "id": "episodeView",
+            "type": "select",
+            "label": "Episode list",
+            "subtitle": "Cards with stills, or numbered chips in a grid",
+            "default": "cards",
+            "options": [
+              {
+                "id": "cards",
+                "label": "Cards"
+              },
+              {
+                "id": "chips",
+                "label": "Number chips"
+              }
+            ]
+          }
+        ],
+        "greenPlay": {
+          "technologies": {
+            "allowlist": ["engine"],
+            "preferred": ["engine"],
+            "order": ["engine"]
+          },
+          "providers": {
+            "engine": { "allowlist": [], "preferred": [], "order": [] }
+          }
+        }
       },
       "enrich": "anime-enrich-tmdb",
       "config": {
         "graphql": "https://graphql.anilist.co",
         "perPage": 24
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js,_layout.js"
     },
     {
       "id": "anime-enrich-tmdb",
@@ -56,17 +116,22 @@
         "enrich"
       ],
       "config": {
+        "base": "https://tmdb.forjahq.xyz/3",
+        "imageBase": "https://tmdb.forjahq.xyz/t/p",
+        "apiKey": "",
         "rails": [
           "spotlight"
         ],
         "limit": 5
       },
-      "prelude": "_kit.js"
+      "prelude": "_kit.js,_search.js"
     }
   ],
   "bundle": [
     "anilist.js",
     "_kit.js",
+    "_search.js",
+    "_layout.js",
     "enrich_tmdb.js",
     "icons/nav.png"
   ]

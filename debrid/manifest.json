@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "id": "forjahq-debrid",
+  "name": "ForjaHQ Debrid",
+  "description": "Resolve magnets to direct links via Real-Debrid, TorBox, AllDebrid, Premiumize, or Debrid-Link.",
+  "author": "ForjaHQ",
+  "version": "1.0.0",
+  "prelude": "_debrid_common.js",
+  "tags": ["debrid", "torrent"],
+  "plugins": [
+    {
+      "id": "realdebrid",
+      "name": "Real-Debrid",
+      "entry": "realdebrid.js",
+      "kind": "debrid",
+      "capabilities": ["resolve", "settings"],
+      "settings": {
+        "addon": "debrid",
+        "group": "Real-Debrid",
+        "order": 10,
+        "fields": [
+          {
+            "id": "apiKey",
+            "type": "password",
+            "label": "API key",
+            "subtitle": "From real-debrid.com/apitoken"
+          }
+        ]
+      }
+    },
+    {
+      "id": "torbox",
+      "name": "TorBox",
+      "entry": "torbox.js",
+      "kind": "debrid",
+      "capabilities": ["resolve", "settings"],
+      "settings": {
+        "addon": "debrid",
+        "group": "TorBox",
+        "order": 20,
+        "fields": [
+          {
+            "id": "apiKey",
+            "type": "password",
+            "label": "API key",
+            "subtitle": "From torbox.app"
+          }
+        ]
+      }
+    },
+    {
+      "id": "alldebrid",
+      "name": "AllDebrid",
+      "entry": "alldebrid.js",
+      "kind": "debrid",
+      "capabilities": ["resolve", "settings"],
+      "settings": {
+        "addon": "debrid",
+        "group": "AllDebrid",
+        "order": 30,
+        "fields": [
+          {
+            "id": "apiKey",
+            "type": "password",
+            "label": "API key",
+            "subtitle": "From alldebrid.com/apikeys"
+          }
+        ]
+      }
+    },
+    {
+      "id": "premiumize",
+      "name": "Premiumize",
+      "entry": "premiumize.js",
+      "kind": "debrid",
+      "capabilities": ["resolve", "settings"],
+      "settings": {
+        "addon": "debrid",
+        "group": "Premiumize",
+        "order": 40,
+        "fields": [
+          {
+            "id": "apiKey",
+            "type": "password",
+            "label": "API key",
+            "subtitle": "From premiumize.me"
+          }
+        ]
+      }
+    },
+    {
+      "id": "debrid_link",
+      "name": "Debrid-Link",
+      "entry": "debrid_link.js",
+      "kind": "debrid",
+      "capabilities": ["resolve", "settings"],
+      "settings": {
+        "addon": "debrid",
+        "group": "Debrid-Link",
+        "order": 50,
+        "fields": [
+          {
+            "id": "apiKey",
+            "type": "password",
+            "label": "API key",
+            "subtitle": "From debrid-link.com/webapp/apikey"
+          }
+        ]
+      }
+    }
+  ],
+  "bundle": [
+    "_debrid_common.js",
+    "realdebrid.js",
+    "torbox.js",
+    "alldebrid.js",
+    "premiumize.js",
+    "debrid_link.js"
+  ]
+}

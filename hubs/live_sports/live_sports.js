@@ -1,258 +1,343 @@
 // Live Sports hub — schedule browse; list/cards + panel/details via host prefs.
-// Schedule rows: MetaRuntime `feed` composes via ctx.host.liveFeed.load.
-// Live TV: MetaRuntime `liveTv` → ctx.host.iptv.searchChannels (RFC-096 A09).
+// Schedule rows: MetaRuntime `feed` → pack aggregate via ctx.host.plugin.* (RFC-109).
+// Live TV: MetaRuntime `liveTv` → IPTV hub `searchChannels` via plugin.run (RFC-109 C).
 
-function liveSportsKindIcons() {
-  return {
-    football: 'soccer',
-    soccer: 'soccer',
-    fifa: 'soccer',
-    'premier-league': 'soccer',
-    'la-liga': 'soccer',
-    'serie-a': 'soccer',
-    bundesliga: 'soccer',
-    'american-football': 'football',
-    nfl: 'football',
-    ncaaf: 'football',
-    basketball: 'basketball',
-    nba: 'basketball',
-    ncaab: 'basketball',
-    wnba: 'basketball',
-    baseball: 'baseball',
-    mlb: 'baseball',
-    hockey: 'hockey',
-    nhl: 'hockey',
-    tennis: 'tennis',
-    tenis: 'tennis',
-    atp: 'tennis',
-    cricket: 'cricket',
-    krykiet: 'cricket',
-    ipl: 'cricket',
-    rugby: 'rugby',
-    nrl: 'rugby',
-    afl: 'rugby',
-    'australian-football': 'rugby',
-    golf: 'golf',
-    volleyball: 'volleyball',
-    volley: 'volleyball',
-    handball: 'handball',
-    wrestling: 'mma',
-    wwe: 'mma',
-    ufc: 'mma',
-    mma: 'mma',
-    boxing: 'mma',
-    fight: 'mma',
-    combat: 'mma',
-    'combat-sports': 'mma',
-    martial: 'mma',
-    motor: 'motorsport',
-    motorsport: 'motorsport',
-    racing: 'motorsport',
-    f1: 'motorsport',
-    nascar: 'motorsport',
-    formula: 'motorsport',
-    dart: 'darts',
-    darts: 'darts',
-    snooker: 'billiards',
-    billiard: 'billiards',
-    pool: 'billiards',
-    '8-ball': 'billiards',
-    swim: 'swim',
-    aquatic: 'swim',
-    ski: 'ski',
-    snow: 'ski',
-    winter: 'ski',
-    esport: 'esports',
-    esports: 'esports',
-    'e-sport': 'esports',
-    gaming: 'esports',
-    '24-7': 'tv',
-    '24/7': 'tv',
-    'live-tv': 'tv',
-    livetv: 'tv',
-    'tv-show': 'tv',
-    stream: 'tv',
-    other: 'sports',
-    misc: 'sports',
-    general: 'sports',
-  };
+function liveSportsAbsUrl(raw) {
+  var p = String(raw || '').trim();
+  if (p.indexOf('http://') === 0 || p.indexOf('https://') === 0) return p;
+  return '';
 }
 
-function liveSportsCatalogActions() {
-  return [
-    {
-      id: 'catalog',
-      label: 'Catalog',
-      icon: 'filter',
-      dynamicCatalogs: true,
-      items: [
-        { id: 'all', label: 'All' },
-      ],
-    },
-    {
-      id: 'horizon',
-      label: 'Schedule',
-      icon: 'schedule',
-      default: 'airing|1h',
-      items: [
-        { id: 'airing|1h', label: 'Airing' },
-        { id: 'upcoming|1h', label: 'Next · 1h' },
-        { id: 'upcoming|3h', label: 'Next · 3h' },
-        { id: 'upcoming|6h', label: 'Next · 6h' },
-        { id: 'upcoming|24h', label: 'Next · 24h' },
-        { id: 'both|1h', label: '1h' },
-        { id: 'both|3h', label: '3h' },
-        { id: 'both|6h', label: '6h' },
-        { id: 'both|24h', label: '24h' },
-      ],
-    },
-    {
-      id: 'refresh',
-      label: 'Refresh',
-      icon: 'refresh',
-      action: 'refresh',
-    },
-    {
-      id: 'search',
-      label: 'Search',
-      action: 'eventSearch',
-      trailing: true,
-      placeholder: 'Team, match, sport…',
-    },
-    {
-      id: 'view',
-      label: 'View',
-      trailing: true,
-      items: [
-        { id: 'list', label: 'List' },
-        { id: 'cards', label: 'Cards' },
-      ],
-    },
-    {
-      id: 'portals',
-      label: 'Portals',
-      action: 'portals',
-      trailing: true,
-    },
-  ];
+function liveSportsClockHm(dateMs) {
+  var n = Number(dateMs) || 0;
+  if (n <= 0) return '';
+  var d = new Date(n);
+  if (isNaN(d.getTime())) return '';
+  var h = d.getHours();
+  var m = d.getMinutes();
+  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
 }
 
-function liveSportsLayout() {
-  return {
-    pages: {
-      live_sports: {
-        widgets: [
-          kitStack('page', { expand: true }, [
-            kitTopBar('chrome', {
-              // ↓ from Catalog / Portals restores last schedule row (not All).
-              focusDown: 'schedule',
-              actions: liveSportsCatalogActions(),
-            }),
-            kitCategoryBar('kind', {
-              source: 'live_schedule',
-              dynamic: true,
-              default: 'all',
-              items: [{ id: 'all', label: 'All', icon: 'grid' }],
-              kindIcons: liveSportsKindIcons(),
-              focusUp: 'chrome',
-              focusDown: 'schedule',
-            }),
-            kitList('schedule', {
-              source: 'live_schedule',
-              style: 'list',
-              open: 'panel',
-              openSetting: 'matchOpen',
-              expand: true,
-              kindMenu: 'kind',
-              catalogMenu: 'catalog',
-              horizonMenu: 'horizon',
-              panelTab: 'providers',
-              panelTabs: [
-                { id: 'providers', label: 'Providers', icon: 'dns' },
-                { id: 'live_tv', label: 'Live TV', icon: 'tv', browse: true, action: 'liveTv' },
-              ],
-              focusRight: 'sources-kind',
-            }),
-          ]),
-        ],
-      },
-    },
-  };
+function liveSportsNum(v) {
+  if (typeof v === 'number' && isFinite(v)) return v;
+  var s = String(v == null ? '' : v)
+    .trim()
+    .replace(/,/g, '');
+  if (!s) return 0;
+  var n = Number(s);
+  return isFinite(n) ? n : 0;
 }
 
+/** Flat paint contract for host EventCard / dense tiles — no Dart product merge. */
 function liveSportsShapeRow(row) {
   if (!row || typeof row !== 'object') return null;
   var out = Object.assign({}, row);
   if (!out.name && out.title) out.name = out.title;
+  if (!out.title && out.name) out.title = out.name;
   if (!out.type) out.type = 'live_match';
   if (!out.open && out.id) {
-    out.open = { surface: 'live', id: String(out.id) };
-  }
-  if (!out.sportMatchGame || typeof out.sportMatchGame !== 'object') {
-    var title = String(out.title || out.name || '');
-    var home = String(out.homeTeam || '');
-    var away = String(out.awayTeam || '');
-    var category = String(out.category || out.sport || '');
-    var dateMs = Number(out.dateMs) || 0;
-    out.sportMatchGame = {
-      id: String(out.id || ''),
-      title: title,
-      homeTeam: home,
-      awayTeam: away,
-      sport: category,
-      category: category,
-      dateMs: dateMs,
+    out.open = {
+      surface: 'live',
+      id: String(out.id),
+      tabId: 'live_sports',
     };
+  } else if (out.open && typeof out.open === 'object' && !out.open.tabId) {
+    out.open.tabId = 'live_sports';
   }
-  return out;
+
+  var game =
+    out.sportMatchGame && typeof out.sportMatchGame === 'object'
+      ? out.sportMatchGame
+      : null;
+  var title = String(out.title || out.name || (game && game.title) || '').trim();
+  var home = String(out.homeTeam || (game && game.homeTeam) || '').trim();
+  var away = String(out.awayTeam || (game && game.awayTeam) || '').trim();
+  var homeBadge = liveSportsAbsUrl(
+    out.homeBadge || (game && game.homeBadge) || '',
+  );
+  var awayBadge = liveSportsAbsUrl(
+    out.awayBadge || (game && game.awayBadge) || '',
+  );
+  var category = String(
+    out.category || out.sport || out.badge || (game && (game.category || game.sport)) || '',
+  ).trim();
+  var dateMs =
+    liveSportsNum(out.dateMs) ||
+    liveSportsNum(out.startsAt) ||
+    liveSportsNum(out.date) ||
+    (game ? liveSportsNum(game.dateMs) : 0) ||
+    0;
+  var catLower = category.toLowerCase();
+  var alwaysLive =
+    out.alwaysLive === true ||
+    out.always_live === true ||
+    out.alwaysLive === 1 ||
+    out.always_live === 1 ||
+    catLower.indexOf('24/7') >= 0 ||
+    catLower.indexOf('24-7') >= 0;
+  var endMs = liveSportsNum(out.endsAt || out.ends_at);
+  if (endMs > 0 && endMs < 1e12) endMs = endMs * 1000;
+  var scheduledFuture = dateMs > Date.now();
+  var scheduledEnded = endMs > 0 && endMs < Date.now();
+  var airing =
+    alwaysLive ||
+    ((out.airing === true || out.live === true) &&
+      !scheduledFuture &&
+      !scheduledEnded);
+  var viewers = liveSportsNum(out.viewers);
+  var poster = liveSportsAbsUrl(out.poster || out.posterPath || '');
+  var live = airing || alwaysLive;
+  var clock = liveSportsClockHm(dateMs);
+  var timeLabel = live ? 'live' : dateMs > Date.now() ? clock : '';
+  var scheduleLabel = alwaysLive || dateMs <= 0 ? '' : clock;
+
+  out.title = title;
+  out.name = title || out.name;
+  out.homeTeam = home;
+  out.awayTeam = away;
+  out.homeBadge = homeBadge;
+  out.awayBadge = awayBadge;
+  out.category = category;
+  out.badge = category;
+  if (category && !out.kind) out.kind = category;
+  out.dateMs = dateMs;
+  out.startsAt = dateMs > 0 ? String(dateMs) : out.startsAt || '';
+  out.airing = airing;
+  out.live = airing;
+  out.alwaysLive = alwaysLive;
+  out.viewers = viewers;
+  out.poster = poster;
+  if (poster) out.posterPath = poster;
+  out.timeLabel = timeLabel;
+  out.scheduleLabel = scheduleLabel;
+  out.searchText = [title, home, away, category, out.sport, out.league, out.kind]
+    .map(function (x) {
+      return String(x || '').trim();
+    })
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  var broadcasts = [];
+  var seenCh = {};
+  function pushCh(raw) {
+    if (!Array.isArray(raw)) return;
+    for (var i = 0; i < raw.length; i++) {
+      var name = String(raw[i] || '').trim();
+      if (!name) continue;
+      var k = name.toLowerCase();
+      if (seenCh[k]) continue;
+      seenCh[k] = 1;
+      broadcasts.push(name);
+    }
+  }
+  pushCh(out.broadcastChannels);
+  pushCh(out.broadcast_channels);
+  if (game) {
+    pushCh(game.broadcastChannels);
+    pushCh(game.broadcast_channels);
+  }
+  if (broadcasts.length) {
+    out.broadcastChannels = broadcasts.slice();
+  }
+
+  var catalogs = [];
+  var seenCat = {};
+  function pushCat(raw) {
+    var name = String(raw || '').trim();
+    if (!name || name.indexOf('stremio:') === 0) return;
+    var key = name.toLowerCase();
+    if (seenCat[key]) return;
+    seenCat[key] = 1;
+    catalogs.push(name);
+  }
+  if (Array.isArray(out.catalogs)) {
+    for (var c = 0; c < out.catalogs.length; c++) {
+      var cat = out.catalogs[c];
+      if (typeof cat === 'string') pushCat(cat);
+      else if (cat && typeof cat === 'object') {
+        pushCat(cat.name || cat.label || cat.id);
+      }
+    }
+  }
+  if (!catalogs.length) {
+    pushCat(out.catalogName || out.pluginName || out.stremioAddonName);
+  }
+
+  var gameOut = game
+    ? Object.assign({}, game)
+    : {
+        id: String(out.id || ''),
+        title: title,
+        homeTeam: home,
+        awayTeam: away,
+        sport: category,
+        category: category,
+        dateMs: dateMs,
+      };
+  if (broadcasts.length) {
+    gameOut.broadcastChannels = broadcasts.slice();
+  }
+  out.sportMatchGame = gameOut;
+  var paintProps = {};
+  if (broadcasts.length) paintProps.broadcastChannels = broadcasts.slice();
+  if (catalogs.length) paintProps.catalogs = catalogs.slice();
+  return hubPaintEvent(out, {
+    homeBadgeUrl: homeBadge,
+    awayBadgeUrl: awayBadge,
+    categoryLabel: category,
+    scheduleLabel: scheduleLabel,
+    timeLabel: timeLabel,
+    viewers: viewers,
+    live: live,
+    props: paintProps,
+  });
+}
+
+function liveSportsParseHorizonPref(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return { status: 'airing', horizon: 'h1' };
+  var parts = s.split('|');
+  if (parts.length === 2) {
+    var status = String(parts[0] || '').trim().toLowerCase();
+    var horizonTok = String(parts[1] || '').trim().toLowerCase();
+    var horizon =
+      horizonTok === '1h' || horizonTok === 'h1'
+        ? 'h1'
+        : horizonTok === '3h' || horizonTok === 'h3'
+          ? 'h3'
+          : horizonTok === '6h' || horizonTok === 'h6'
+            ? 'h6'
+            : 'h24';
+    if (status === 'live') status = 'airing';
+    if (status !== 'airing' && status !== 'upcoming' && status !== 'both') {
+      status = 'airing';
+    }
+    return { status: status, horizon: horizon };
+  }
+  var low = s.toLowerCase();
+  if (low === 'live' || low === 'airing') return { status: 'airing', horizon: 'h1' };
+  if (low === 'upcoming') return { status: 'upcoming', horizon: 'h24' };
+  if (low === '1h') return { status: 'both', horizon: 'h1' };
+  if (low === '3h') return { status: 'both', horizon: 'h3' };
+  if (low === '6h') return { status: 'both', horizon: 'h6' };
+  if (
+    low === '12h' ||
+    low === '24h' ||
+    low === 'all' ||
+    low === 'day' ||
+    low === 'both'
+  ) {
+    return { status: 'both', horizon: 'h24' };
+  }
+  return { status: 'airing', horizon: 'h1' };
 }
 
 function liveSportsLoadFeed(ctx, params) {
+  var p = params || {};
   var host = ctx && ctx.host;
-  var liveFeed = host && host.liveFeed;
-  // Missing bridge → reject (empty ok envelope would skip host flutter_js fallback).
-  if (!liveFeed || typeof liveFeed.load !== 'function') {
-    return Promise.reject(new Error('HOST_LIVE_FEED_REQUIRED'));
+  var hasRows = Array.isArray(p.rows);
+  if (
+    !hasRows &&
+    (!host || !host.plugin || typeof host.plugin.run !== 'function')
+  ) {
+    return Promise.reject(new Error('HOST_PLUGIN_RUN_REQUIRED'));
   }
-  return Promise.resolve(
-    liveFeed.load({
-      catalogFilter: (params && params.catalogFilter) || 'all',
-      sportFilter: (params && params.sportFilter) || 'all',
-      scheduleStatus: (params && params.scheduleStatus) || 'airing',
-      scheduleHorizon: (params && params.scheduleHorizon) || 'h1',
-    }),
-  ).then(function (rows) {
+  var status = String(p.scheduleStatus || '').trim();
+  var horizon = String(p.scheduleHorizon || '').trim();
+  if (!status || !horizon) {
+    var parsed = liveSportsParseHorizonPref(p.horizon || p.schedule || '');
+    if (!status) status = parsed.status;
+    if (!horizon) horizon = parsed.horizon;
+  }
+  var q = String(p.q || p.query || '')
+    .trim()
+    .toLowerCase();
+  var qTokens = q
+    ? q.split(/\s+/).filter(function (t) {
+        return !!t;
+      })
+    : [];
+  return liveSportsAggregateFeed(ctx, {
+    catalogFilter: p.catalogFilter || 'all',
+    sportFilter: p.sportFilter || 'all',
+    scheduleStatus: status || 'airing',
+    scheduleHorizon: horizon || 'h1',
+    force: !!(p.force || p.forceRefresh),
+    rows: hasRows ? p.rows : undefined,
+  }).then(function (rows) {
     if (!Array.isArray(rows)) return [];
     var out = [];
     for (var i = 0; i < rows.length; i++) {
       var shaped = liveSportsShapeRow(rows[i]);
-      if (shaped) out.push(shaped);
+      if (!shaped) continue;
+      if (qTokens.length) {
+        var hay = String(shaped.searchText || shaped.name || '').toLowerCase();
+        var ok = true;
+        for (var t = 0; t < qTokens.length; t++) {
+          if (hay.indexOf(qTokens[t]) < 0) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) continue;
+      }
+      out.push(shaped);
     }
     return out;
   });
 }
 
 function liveSportsGameFromRow(row) {
+  var props =
+    row && row.paint && row.paint.props && typeof row.paint.props === 'object'
+      ? row.paint.props
+      : {};
   var game =
     row && row.sportMatchGame && typeof row.sportMatchGame === 'object'
       ? Object.assign({}, row.sportMatchGame)
       : {
           id: String((row && row.id) || ''),
-          title: String((row && (row.title || row.name)) || ''),
-          homeTeam: String((row && row.homeTeam) || ''),
-          awayTeam: String((row && row.awayTeam) || ''),
-          sport: String((row && (row.category || row.sport)) || ''),
-          category: String((row && (row.category || row.sport)) || ''),
-          dateMs: Number(row && row.dateMs) || 0,
+          title: String(
+            (row && (row.title || row.name)) || props.title || '',
+          ),
+          homeTeam: String(
+            (row && row.homeTeam) || props.homeTeam || '',
+          ),
+          awayTeam: String(
+            (row && row.awayTeam) || props.awayTeam || '',
+          ),
+          sport: String(
+            (row && (row.category || row.sport)) ||
+              props.categoryLabel ||
+              '',
+          ),
+          category: String(
+            (row && (row.category || row.sport)) ||
+              props.categoryLabel ||
+              '',
+          ),
+          dateMs:
+            Number(row && row.dateMs) ||
+            Number(props.startsAt) ||
+            0,
         };
-  var broadcasts = (row && row.broadcastChannels) || game.broadcastChannels;
+  if (!game.homeTeam && props.homeTeam) game.homeTeam = String(props.homeTeam);
+  if (!game.awayTeam && props.awayTeam) game.awayTeam = String(props.awayTeam);
+  if (!game.title && (props.title || (row && row.title))) {
+    game.title = String(props.title || row.title || '');
+  }
+  var broadcasts =
+    (row && row.broadcastChannels) ||
+    game.broadcastChannels ||
+    props.broadcastChannels;
   if (Array.isArray(broadcasts) && broadcasts.length) {
     game.broadcastChannels = broadcasts.slice();
   }
   return game;
 }
 
-/// Live TV tab — pack owns Forja Sports gate + searchChannels trigger.
+/// Live TV tab — pack calls IPTV hub `searchChannels` via plugin.run (RFC-109 C).
 function liveSportsLiveTv(ctx, params) {
   var cfg = hubConfig(ctx, {});
   if (cfg.forjaSportsEnabled === false) {
@@ -261,20 +346,61 @@ function liveSportsLiveTv(ctx, params) {
   var row = (params && params.row) || {};
   var game = liveSportsGameFromRow(row);
   var host = ctx && ctx.host;
-  var iptv = host && host.iptv;
-  if (!iptv || typeof iptv.searchChannels !== 'function') {
-    return Promise.reject(new Error('HOST_IPTV_SEARCH_REQUIRED'));
+  if (!host || !host.plugin || typeof host.plugin.run !== 'function') {
+    return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
   }
   var force = !!(params && params.force);
   return Promise.resolve(
-    iptv.searchChannels({ game: game, force: force }),
-  ).then(function (sources) {
-    return hubOk(
-      'liveTv',
-      { sources: Array.isArray(sources) ? sources : [] },
-      { maxAge: 60, swr: 120 },
-    );
-  });
+    host.plugin.list({ type: 'iptv' }),
+  )
+    .then(function (plugins) {
+      var list = Array.isArray(plugins) ? plugins : [];
+      var iptvId = '';
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        var id = String((p && (p.pluginId || p.id)) || '');
+        var types = (p && p.types) || [];
+        if (
+          id &&
+          (types.indexOf('iptv') >= 0 ||
+            id.indexOf('iptv') >= 0 ||
+            String((p && p.kind) || '') === 'catalog')
+        ) {
+          if (types.indexOf('iptv') >= 0 || id.indexOf('iptv') >= 0) {
+            iptvId = id;
+            break;
+          }
+        }
+      }
+      if (!iptvId) {
+        for (var j = 0; j < list.length; j++) {
+          var q = list[j];
+          var qid = String((q && (q.pluginId || q.id)) || '');
+          if (qid.indexOf('iptv') >= 0) {
+            iptvId = qid;
+            break;
+          }
+        }
+      }
+      if (!iptvId) {
+        return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
+      }
+      return Promise.resolve(
+        host.plugin.run(iptvId, 'searchChannels', {
+          game: game,
+          force: force,
+        }),
+      ).then(function (rows) {
+        return hubOk(
+          'liveTv',
+          { sources: Array.isArray(rows) ? rows : [] },
+          { maxAge: 60, swr: 120 },
+        );
+      });
+    })
+    .catch(function () {
+      return hubOk('liveTv', { sources: [] }, { maxAge: 30 });
+    });
 }
 
 function extract(ctx) {
@@ -285,7 +411,7 @@ function extract(ctx) {
   }
   if (action === 'feed' || action === 'rail') {
     return liveSportsLoadFeed(ctx, params).then(function (items) {
-      return hubItems(action, items, { maxAge: 60, swr: 300 });
+      return hubItems(action, items, { maxAge: 300, swr: 900 });
     });
   }
   if (action === 'liveTv') {

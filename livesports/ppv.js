@@ -38,6 +38,22 @@ function ppvHeaders(cfg) {
   };
 }
 
+function ppvFlag(v) {
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
+// Site countdown is starts_at. Waiting-room viewers are not on air.
+function ppvIsAiring(s) {
+  if (ppvFlag(s && s.always_live)) return true;
+  var now = Date.now() / 1000;
+  var starts = Number((s && s.starts_at) || 0);
+  var ends = Number((s && s.ends_at) || 0);
+  if (!(starts > 0)) return false;
+  if (now < starts) return false;
+  if (ends > 0 && now > ends) return false;
+  return true;
+}
+
 async function catalogExtract(ctx) {
   var action = String(ctx.action || 'catalog');
   if (action !== 'catalog') return [];
@@ -67,12 +83,12 @@ async function catalogExtract(ctx) {
             date: starts > 0 ? starts * 1000 : 0,
             poster: String(s.poster || ''),
             popular: Number(s.viewers || 0) > 50,
-            airing: Number(s.viewers || 0) > 0,
+            airing: ppvIsAiring(s),
             viewers: Number(s.viewers || 0),
             starts_at: Number(s.starts_at || 0),
             ends_at: Number(s.ends_at || 0),
             category_name: category,
-            always_live: s.always_live === true,
+            always_live: ppvFlag(s.always_live),
             sources: [{
               source: 'ppv',
               id: String(s.id),

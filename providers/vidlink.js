@@ -176,17 +176,21 @@ function extract(ctx) {
 
   function headersForUrl(url, upstream) {
     var host = String(url || '').toLowerCase();
-    if (host.indexOf('hakunaymatata.com') >= 0) {
-      var hakuna = { 'User-Agent': headers['User-Agent'] };
+    if (
+      host.indexOf('mooncase.online') >= 0 ||
+      host.indexOf('suubmon.store') >= 0 ||
+      host.indexOf('hakunaymatata.com') >= 0
+    ) {
+      var bare = { 'User-Agent': headers['User-Agent'] };
       if (upstream) {
         for (var hk in upstream) {
           if (!Object.prototype.hasOwnProperty.call(upstream, hk)) continue;
           var lk = String(hk).toLowerCase();
           if (lk === 'referer' || lk === 'origin') continue;
-          if (typeof upstream[hk] === 'string' && upstream[hk]) hakuna[hk] = upstream[hk];
+          if (typeof upstream[hk] === 'string' && upstream[hk]) bare[hk] = upstream[hk];
         }
       }
-      return hakuna;
+      return bare;
     }
     var out = {
       'User-Agent': headers['User-Agent'],
@@ -207,26 +211,16 @@ function extract(ctx) {
     function push(url, quality, upstream, needsProxy) {
       if (!url) return;
       var hdrs = headersForUrl(url, upstream);
-      var playUrl = url;
-      var useSeekProxy = false;
-      if (needsProxy) {
-        var proxied = buildMwVaultMpProxy(url, hdrs);
-        if (proxied) {
-          playUrl = proxied;
-          hdrs = {};
-        } else {
-          useSeekProxy = true;
-        }
-      }
       var q = quality && quality !== 'Auto' ? quality : '';
       var row = {
-        url: playUrl,
+        url: url,
         name: 'Vidlink',
         quality: q,
         headers: hdrs,
       };
-      if (useSeekProxy) row.requiresProxy = true;
+      if (needsProxy) row.requiresProxy = true;
       out.push(row);
+      if (ctx.emit) ctx.emit(row);
     }
     var stream = data.stream;
     var playlistUrl = stream && stream.playlist;
@@ -253,31 +247,10 @@ function extract(ctx) {
       push(data.url, 'Auto', null, false);
     }
     if (!playlists.length) return Promise.resolve(out);
-    return Promise.all(
-      playlists.map(function (pl) {
-        return req(pl, { headers: headers })
-          .then(function (r) {
-            return r.text();
-          })
-          .then(function (text) {
-            return parseM3u8(text, pl);
-          })
-          .catch(function () {
-            return [{ url: pl, quality: 'Auto' }];
-          });
-      }),
-    ).then(function (groups) {
-      for (var g = 0; g < groups.length; g++) {
-        var items = groups[g] || [];
-        for (var j = 0; j < items.length; j++) {
-          var item = items[j];
-          push(item.url, item.quality, null, false);
-          if (item.audio && out.length) out[out.length - 1].audio = item.audio;
-        }
-      }
-      if (!out.length && playlists.length) push(playlists[0], 'Auto', null, false);
-      return out;
-    });
+    for (var p = 0; p < playlists.length; p++) {
+      push(playlists[p], 'Auto', null, false);
+    }
+    return Promise.resolve(out);
   }
 
   function log(msg) {

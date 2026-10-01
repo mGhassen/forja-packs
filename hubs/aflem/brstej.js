@@ -1,12 +1,12 @@
 // Brstej hub — browse / search / details (protocol 1).
-// Aflem hub — scrape Brstej (uo.brstej.com). Playback: provider `brstej`.
+// Aflem hub — scrape Brstej (hd1.brstej.com). Playback: provider `brstej`.
 // Host surface: arabic.
 
 var BRSTEJ_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
 var BRSTEJ_DEFAULTS = {
-  origin: 'https://uo.brstej.com',
+  origin: 'https://hd1.brstej.com',
 };
 
 var BRSTEJ_FEED_RAILS = ['spotlight', 'latest', 'series'];
@@ -336,42 +336,6 @@ function brstejMeta(id, title, poster, opts) {
   return meta;
 }
 
-function brstejLayout() {
-  return {
-    pages: {
-      aflem: {
-        feed: true,
-        feedRails: BRSTEJ_FEED_RAILS.slice(),
-        pageSize: 24,
-        widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'أحدث المسلسلات',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
-          {
-            type: 'rail',
-            id: 'latest',
-            title: 'أخر الاضافات',
-            rail: 'latest',
-            hideWhenBleed: true,
-          },
-          { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'ranked',
-            id: 'series',
-            title: 'مسلسلات',
-            rail: 'series',
-            style: 'numbered',
-          },
-        ],
-      },
-    },
-  };
-}
-
 function brstejStripPrefix(title) {
   return String(title || '')
     .replace(/^مسلسل\s+/, '')
@@ -391,24 +355,34 @@ function brstejNormTitle(title) {
     .trim();
 }
 
+function brstejSerieHrefId(href) {
+  var m = /(?:view-serie|series1)\.php\?id=(\d+)/.exec(String(href || ''));
+  return m ? m[1] : '';
+}
+
+function brstejHtmlHasNextPage(html, page) {
+  var next = (Number(page) || 1) + 1;
+  return new RegExp('[?&]page=' + next + '([^0-9]|$)').test(String(html || ''));
+}
+
 function brstejParseSerieCards(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = [];
   var seen = {};
   if (!$) return out;
-  $('li[class*="col-xs-6"]').each(function () {
-    var card = $(this);
-    var a = card.find('a[href*="view-serie.php"]').first();
-    if (!a.length) a = card.find('a[href]').first();
-    if (!a.length) return;
+  function push(card, a) {
+    if (!a || !a.length) return;
     var href = a.attr('href') || '';
-    var m = /view-serie\.php\?id=(\d+)/.exec(href);
-    if (!m) return;
-    var id = m[1];
-    if (seen[id]) return;
-    seen[id] = true;
-    var title = brstejStripPrefix((a.attr('title') || a.text() || '').trim());
+    var id = brstejSerieHrefId(href);
+    if (!id || seen[id]) return;
+    var title = (a.attr('title') || '').trim();
+    if (!title) {
+      var h3 = card.find('h3').first();
+      title = (h3.text() || a.text() || '').trim();
+    }
+    title = brstejStripPrefix(title);
     if (!title) return;
+    seen[id] = true;
     var meta = brstejMeta(
       'serie:' + id,
       title,
@@ -416,7 +390,25 @@ function brstejParseSerieCards(ctx, html, base) {
       { url: brstejAbs(base, href) },
     );
     if (meta) out.push(meta);
+  }
+  $('article.psd-card').each(function () {
+    var card = $(this);
+    var a = card
+      .find('h3 a[href*="series1.php"], h3 a[href*="view-serie.php"]')
+      .first();
+    if (!a.length) {
+      a = card.find('a[href*="series1.php"], a[href*="view-serie.php"]').first();
+    }
+    push(card, a);
   });
+  $('a.pcg-series-card, a[href*="series1.php?id="], a[href*="view-serie.php"]').each(
+    function () {
+      var a = $(this);
+      var card = a.closest('article, li');
+      if (!card.length) card = a;
+      push(card, a);
+    },
+  );
   return out;
 }
 
@@ -487,10 +479,12 @@ function brstejBrowseSeries(ctx, cfg, opts) {
   var url = base + '/moslslat.php?page=' + page;
   return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
     var origin = brstejOrigin(got.url) || base;
-    return brstejPageResult(
+    var pageOut = brstejPageResult(
       brstejParseSerieCards(ctx, got.html, origin),
       limit,
     );
+    if (brstejHtmlHasNextPage(got.html, page)) pageOut.hasMore = true;
+    return pageOut;
   });
 }
 
@@ -557,7 +551,11 @@ function brstejBrowsePath(ctx, cfg, path, opts) {
   return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
     var origin = brstejOrigin(got.url) || base;
     var series = brstejParseSerieCards(ctx, got.html, origin);
-    if (series.length) return brstejPageResult(series, limit);
+    if (series.length) {
+      var seriesPage = brstejPageResult(series, limit);
+      if (brstejHtmlHasNextPage(got.html, page)) seriesPage.hasMore = true;
+      return seriesPage;
+    }
     var episodes = brstejParseEpisodeCards(ctx, got.html, origin);
     var grouped = brstejGroupCategoryCards(episodes, !!opts.asMovies);
     // hasMore from raw episode cards — grouping collapses many eps → few shows.
@@ -620,119 +618,6 @@ function brstejFilteredFeed(ctx, cfg, params) {
   });
 }
 
-function brstejSearchScore(title, query) {
-  var t = brstejNormTitle(title);
-  var q = brstejNormTitle(query);
-  if (!t || !q) return 0;
-  if (t === q) return 100;
-  if (t.indexOf(q) === 0) return 80;
-  if (t.indexOf(q) >= 0) return 60;
-  var parts = q.split(' ').filter(Boolean);
-  if (!parts.length) return 0;
-  var hit = 0;
-  for (var i = 0; i < parts.length; i++) {
-    if (t.indexOf(parts[i]) >= 0) hit++;
-  }
-  if (hit === parts.length) return 40;
-  if (hit > 0) return 10 + hit;
-  return 0;
-}
-
-function brstejMergeSearchPage(episodes, byKey, order) {
-  for (var i = 0; i < (episodes || []).length; i++) {
-    var ep = episodes[i];
-    if (!ep || !ep.name) continue;
-    var key = brstejNormTitle(ep.name);
-    if (!key) continue;
-    if (!byKey[key]) {
-      order.push(key);
-      byKey[key] = brstejMeta(
-        ep.ids.brstej,
-        brstejIsMovieTitle(ep.name)
-          ? brstejStripMoviePrefix(ep.name)
-          : brstejStripPrefix(brstejStripEpisode(ep.name)),
-        ep.poster,
-        { url: ep.ids.url },
-      );
-      if (byKey[key] && brstejIsMovieTitle(ep.name)) {
-        byKey[key].badge = 'MOVIE';
-      }
-    }
-  }
-}
-
-/** Host search is single-shot (no page scroll) — walk upstream pages. */
-function brstejSearch(ctx, cfg, params) {
-  var q = String(params.query || '').trim();
-  if (!q) return Promise.resolve(hubItems('search', []));
-  var limit = brstejLimitOf(params, 40);
-  var base = brstejBase(cfg);
-  // Cap walks so a broad query cannot hammer ~3000 result pages.
-  var maxPages = Number(params.maxPages) > 0 ? Number(params.maxPages) : 12;
-  var byKey = {};
-  var order = [];
-
-  function bestScore() {
-    var best = 0;
-    for (var i = 0; i < order.length; i++) {
-      var m = byKey[order[i]];
-      if (!m) continue;
-      var s = brstejSearchScore(m.name, q);
-      if (s > best) best = s;
-    }
-    return best;
-  }
-
-  function fetchPage(page) {
-    var url =
-      base +
-      '/search.php?keywords=' +
-      encodeURIComponent(q) +
-      '&page=' +
-      page;
-    return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
-      var origin = brstejOrigin(got.url) || base;
-      return brstejParseEpisodeCards(ctx, got.html, origin);
-    });
-  }
-
-  function walk(page) {
-    return fetchPage(page).then(function (episodes) {
-      brstejMergeSearchPage(episodes, byKey, order);
-      var lastPage = episodes.length < 24;
-      // Strong title hit (exact / prefix) → stop early.
-      if (lastPage || page >= maxPages || bestScore() >= 80) {
-        return null;
-      }
-      return walk(page + 1);
-    });
-  }
-
-  return walk(1).then(function () {
-    var scored = [];
-    for (var i = 0; i < order.length; i++) {
-      var meta = byKey[order[i]];
-      if (!meta) continue;
-      scored.push({
-        meta: meta,
-        score: brstejSearchScore(meta.name, q),
-        idx: i,
-      });
-    }
-    scored.sort(function (a, b) {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.idx - b.idx;
-    });
-    var out = [];
-    for (i = 0; i < scored.length && out.length < limit; i++) {
-      out.push(scored[i].meta);
-    }
-    return hubItems('search', out, { maxAge: 300 }, {
-      pageSize: limit,
-      hasMore: false,
-    });
-  });
-}
 
 function brstejRailItems(ctx, cfg, params) {
   var rail = String(params.rail || '');
@@ -870,6 +755,32 @@ function brstejParseEpisodeAnchors($, anchors, base) {
   return list;
 }
 
+function brstejAppendPdsSeasons($, base, out) {
+  var sections = $('section.pds-season');
+  if (!sections.length) return;
+  sections.each(function (si) {
+    var section = $(this);
+    var idAttr = section.attr('id') || '';
+    var idMatch = /pds-season-(\d+)/.exec(idAttr);
+    var heading = (section.find('h3').first().text() || '').trim();
+    var headMatch = /الموسم\s+(\d+)/.exec(heading);
+    var seasonNum = idMatch
+      ? Number(idMatch[1])
+      : headMatch
+        ? Number(headMatch[1])
+        : si + 1;
+    var eps = brstejParseEpisodeAnchors(
+      $,
+      section.find('a[href*="watch.php"]'),
+      base,
+    );
+    for (var i = 0; i < eps.length; i++) {
+      eps[i].season = seasonNum;
+      out.videos.push(eps[i]);
+    }
+  });
+}
+
 function brstejParseSerieHtml(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = { title: '', poster: '', description: '', videos: [] };
@@ -904,6 +815,7 @@ function brstejParseSerieHtml(ctx, html, base) {
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
+  if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
   return out;
 }
@@ -944,6 +856,7 @@ function brstejParseWatchHtml(ctx, html, base) {
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
+  if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
   return out;
 }
@@ -985,10 +898,9 @@ function brstejDetails(ctx, cfg, params) {
     url = base + '/watch.php?vid=' + encodeURIComponent(showId.substring(6));
     fromWatch = true;
   } else if (showId.indexOf('serie:') === 0) {
-    url =
-      base + '/view-serie.php?id=' + encodeURIComponent(showId.substring(6));
+    url = base + '/series1.php?id=' + encodeURIComponent(showId.substring(6));
   } else {
-    url = base + '/view-serie.php?id=' + encodeURIComponent(showId);
+    url = base + '/series1.php?id=' + encodeURIComponent(showId);
   }
   return brstejFetchHtml(ctx, url, base + '/')
     .then(function (got) {

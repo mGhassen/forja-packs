@@ -208,6 +208,9 @@ function preferDirectPlayback(m3u8Url) {
   if (host.indexOf('strmd.st') >= 0 && path.indexOf('/streamfree/stream/') >= 0) {
     return true;
   }
+  if (host.indexOf('strmd.st') >= 0 && path.indexOf('/rtmp/stream/') >= 0) {
+    return true;
+  }
   if (
     (host.indexOf('streamfree.top') >= 0 || host.indexOf('strmfree.st') >= 0) &&
     (path.indexOf('/live/') >= 0 ||
@@ -382,17 +385,150 @@ async function resolveGolf(ctx, slot, cfg) {
   return JSON.parse('[' + m3u8M[1] + ']').join('');
 }
 
-async function probePlayableM3u8(ctx, url, headers) {
+function resolvePlaylistUri(baseUrl, ref) {
+  var t = String(ref || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  try {
+    return new URL(t, baseUrl).href;
+  } catch (_) {
+    return '';
+  }
+}
+
+/** WAF decoy segment URIs (still images), including TikTok `.image` hosts. */
+function isImageBaitUri(uri) {
+  var path = String(uri || '').split('?')[0].toLowerCase();
+  if (!path) return false;
+  if (/\.(png|jpe?g|gif|webp|svg|image)$/i.test(path)) return true;
+  if (path.indexOf('tiktokcdn') >= 0 && path.indexOf('.image') >= 0) return true;
+  return false;
+}
+
+function isImageMagicBytes(u8) {
+  if (!u8 || u8.length < 12) return false;
+  if (u8[0] === 0x89 && u8[1] === 0x50) return true; // PNG
+  if (u8[0] === 0xff && u8[1] === 0xd8) return true; // JPEG
+  if (u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) return true; // GIF
+  // RIFF....WEBP
+  return (
+    u8[0] === 0x52 &&
+    u8[1] === 0x49 &&
+    u8[2] === 0x46 &&
+    u8[3] === 0x46 &&
+    u8[8] === 0x57 &&
+    u8[9] === 0x45 &&
+    u8[10] === 0x42 &&
+    u8[11] === 0x50
+  );
+}
+
+function firstMediaPlaylistUri(masterBody, masterUrl) {
+  var entries = masterVariantEntries(masterBody, masterUrl);
+  return entries.length ? entries[0].url : '';
+}
+
+function masterVariantEntries(masterBody, masterUrl) {
+  var out = [];
+  var lines = String(masterBody || '').split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line.indexOf('#EXT-X-STREAM-INF') !== 0) continue;
+    var bw = 0;
+    var m = line.match(/BANDWIDTH=(\d+)/i);
+    if (m) bw = parseInt(m[1], 10) || 0;
+    for (var j = i + 1; j < lines.length; j++) {
+      var next = lines[j].trim();
+      if (!next || next.charAt(0) === '#') continue;
+      var abs = resolvePlaylistUri(masterUrl, next);
+      if (abs) out.push({ url: abs, bandwidth: bw });
+      break;
+    }
+  }
+  out.sort(function (a, b) {
+    return (b.bandwidth || 0) - (a.bandwidth || 0);
+  });
+  return out;
+}
+
+function playlistSegmentUris(body, baseUrl) {
+  var out = [];
+  var lines = String(body || '').split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line || line.charAt(0) === '#') continue;
+    var abs = resolvePlaylistUri(baseUrl, line);
+    if (abs) out.push(abs);
+  }
+  return out;
+}
+
+async function mediaPlaylistIsPlayable(ctx, mediaUrl, headers, bodyText) {
+  var text = bodyText;
+  if (text == null) {
+    var mediaRes = await ctx.fetch(mediaUrl, { headers: headers || {} });
+    if (!mediaRes.ok) return false;
+    text = String(await mediaRes.text() || '').replace(/^\s+/, '');
+  }
+  if (text.indexOf('#EXTM3U') !== 0) return false;
+  var segs = playlistSegmentUris(text, mediaUrl);
+  if (!segs.length) return false;
+  var bait = 0;
+  for (var i = 0; i < segs.length; i++) {
+    if (isImageBaitUri(segs[i])) bait++;
+  }
+  if (bait === segs.length) return false;
+  var sample = segs[0];
+  for (var j = 0; j < segs.length; j++) {
+    if (!isImageBaitUri(segs[j])) {
+      sample = segs[j];
+      break;
+    }
+  }
+  var segRes = await ctx.fetch(sample, { headers: headers || {} });
+  if (!segRes.ok) return false;
+  var buf = await arrayBuffer(segRes);
+  var u8 = new Uint8Array(buf);
+  if (isImageMagicBytes(u8)) return false;
+  return u8.length > 0;
+}
+
+/**
+ * Highest-bandwidth playable media playlist (skip TikTok WebP bait variants).
+ */
+async function selectPlayableM3u8(ctx, url, headers) {
   var target = String(url || '').trim();
-  if (!target) return false;
+  if (!target) return '';
+  // nginx 403s non-browser HTTP on this CDN. MediaKit plays the playlist direct.
+  try {
+    if (new URL(target).host.toLowerCase().indexOf('indianservers.st') >= 0) {
+      return target;
+    }
+  } catch (_) {}
   try {
     var res = await ctx.fetch(target, { headers: headers || {} });
-    if (!res.ok) return false;
+    if (!res.ok) return '';
     var text = String(await res.text() || '').replace(/^\s+/, '');
-    return text.indexOf('#EXTM3U') === 0;
+    if (text.indexOf('#EXTM3U') !== 0) return '';
+    if (text.indexOf('#EXT-X-STREAM-INF') < 0) {
+      return (await mediaPlaylistIsPlayable(ctx, target, headers, text))
+        ? target
+        : '';
+    }
+    var variants = masterVariantEntries(text, target);
+    for (var i = 0; i < variants.length; i++) {
+      if (await mediaPlaylistIsPlayable(ctx, variants[i].url, headers)) {
+        return variants[i].url;
+      }
+    }
+    return '';
   } catch (_) {
-    return false;
+    return '';
   }
+}
+
+async function probePlayableM3u8(ctx, url, headers) {
+  return !!(await selectPlayableM3u8(ctx, url, headers));
 }
 
 async function resolveGoatEmbed(ctx, embedUrl, cfg) {
@@ -415,16 +551,13 @@ async function resolveGoatEmbed(ctx, embedUrl, cfg) {
   }
   if (!m3u8) return null;
   var headers = playbackHeadersForSlot(slot, cfg);
-  // Dead/gated slots still crack to a signed CDN URL that 403s on open.
-  var src = String(slot.source || '').toLowerCase();
-  if (src === 'echo' || src === 'streamed') {
-    if (!(await probePlayableM3u8(ctx, m3u8, headers))) return null;
-  }
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) return null;
   return [
     {
-      url: m3u8,
+      url: playable,
       headers: headers,
-      directPlayback: preferDirectPlayback(m3u8),
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }
@@ -547,12 +680,17 @@ async function resolveEpiEmbeds(ctx, embedUrl, cfg) {
   if (ctx.live && typeof ctx.live.sniffEmbed === 'function') {
     var ref = epiEmbedsReferer(raw);
     var m3u8 = await ctx.live.sniffEmbed(raw, ref);
-    if (m3u8) {
+      if (m3u8) {
       var origin = ref.replace(/\/$/, '');
+      var headers = { Referer: raw, Origin: origin, 'User-Agent': ua() };
+      var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+      if (!playable) return null;
       return [
         {
-          url: m3u8,
-          headers: { Referer: raw, Origin: origin, 'User-Agent': ua() },
+          url: playable,
+          headers: headers,
+          // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
+          directPlayback: preferDirectPlayback(playable),
         },
       ];
     }
@@ -573,10 +711,16 @@ async function resolveEmbedIndia(ctx, embedUrl, cfg) {
     m3u8 = await ctx.live.sniffEmbed(embedUrl, embedUrl);
   }
   if (!m3u8) return null;
+  var headers = playbackHeadersForEmbedIndia(slot, embedUrl);
+  // Dead JW sniff / gated slots still yield a signed URL that EOFs in the player.
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) return null;
   return [
     {
-      url: m3u8,
-      headers: playbackHeadersForEmbedIndia(slot, embedUrl),
+      url: playable,
+      headers: headers,
+      // rustls /hls-proxy is 403'd on *.indianservers.st — MediaKit direct.
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }
@@ -657,6 +801,91 @@ async function fetchDaddyHtml(ctx, url, referer) {
     } catch (_) {}
   }
   return '';
+}
+
+function isVideocdnUrl(url) {
+  try {
+    var u = new URL(String(url || '').trim());
+    var host = u.host.toLowerCase();
+    if (host.indexOf('videocdn') < 0) return false;
+    return u.pathname.toLowerCase().indexOf('/shopping') >= 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function xorDecryptHex(cipherHex, keyHex) {
+  var cHex = String(cipherHex || '');
+  var kHex = String(keyHex || '');
+  if (!cHex || !kHex || cHex.length % 2 || kHex.length % 2) return '';
+  var c = new Uint8Array(cHex.length / 2);
+  var k = new Uint8Array(kHex.length / 2);
+  for (var i = 0; i < c.length; i++) c[i] = parseInt(cHex.substr(i * 2, 2), 16);
+  for (var j = 0; j < k.length; j++) k[j] = parseInt(kHex.substr(j * 2, 2), 16);
+  var s = '';
+  for (var n = 0; n < c.length; n++) s += String.fromCharCode(c[n] ^ k[n % k.length]);
+  return s;
+}
+
+function m3u8FromVideocdnHtml(html) {
+  var body = String(html || '');
+  var c = body.match(/var\s+_c\s*=\s*["']([0-9a-fA-F]+)["']/);
+  var k = body.match(/var\s+_k\s*=\s*["']([0-9a-fA-F]+)["']/);
+  if (!c || !k) return '';
+  var url = xorDecryptHex(c[1], k[1]).trim();
+  if (url.indexOf('https://') !== 0) return '';
+  if (!/\.m3u8/i.test(url)) return '';
+  return url;
+}
+
+async function fetchVideocdnHtml(ctx, url, referer) {
+  var res = await ctx.fetch(String(url), {
+    headers: {
+      'User-Agent': ua(),
+      Accept: 'text/html,application/xhtml+xml',
+      Referer: referer || 'https://streamic.st/',
+    },
+  });
+  if (!res || !res.ok) return '';
+  if (res._bodyB64) {
+    try {
+      var bin = atob(String(res._bodyB64 || ''));
+      if (bin) return bin;
+    } catch (_) {}
+  }
+  if (typeof res.text === 'function') {
+    try {
+      return String(await res.text());
+    } catch (_) {}
+  }
+  return '';
+}
+
+async function resolveVideocdnEmbed(ctx, embedUrl) {
+  var raw = String(embedUrl || '').trim();
+  if (!raw || !isVideocdnUrl(raw)) return null;
+  var origin = '';
+  var referer = 'https://streamic.st/';
+  try {
+    origin = new URL(raw).origin;
+    referer = origin + '/';
+  } catch (_) {}
+  var html = await fetchVideocdnHtml(ctx, raw, referer);
+  var m3u8 = m3u8FromVideocdnHtml(html);
+  if (!m3u8) return null;
+  // Segments are PNG shells around MPEG-TS. directPlayback stays off so
+  // /hls-proxy sees the .png playlist and unwraps them.
+  return [
+    {
+      url: m3u8,
+      headers: {
+        Referer: referer,
+        Origin: origin || referer.replace(/\/$/, ''),
+        'User-Agent': ua(),
+      },
+      directPlayback: false,
+    },
+  ];
 }
 
 async function resolveDaddyLiveEmbed(ctx, embedUrl, cfg) {
@@ -803,20 +1032,56 @@ function nestExtractOkRuHls(html) {
   return nestUniq(out);
 }
 
+/** syria-player etc. hide the player HTML inside document.write("\\x3c…"). */
+function nestDecodeJsStringEscapes(s) {
+  return String(s || '')
+    .replace(/\\x([0-9a-fA-F]{2})/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\u([0-9a-fA-F]{4})/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\(["'\\])/g, '$1');
+}
+
+function nestExpandDocumentWrites(html) {
+  var text = String(html || '');
+  var out = [text];
+  var re = /document\.write\(\s*(["'])([\s\S]*?)\1\s*\)/gi;
+  var m;
+  while ((m = re.exec(text))) {
+    out.push(nestDecodeJsStringEscapes(m[2]));
+  }
+  return out.join('\n');
+}
+
 function nestExtractM3u8(html) {
   var out = nestExtractOkRuHls(html);
-  var text = nestHtmlUnescape(html);
+  var text = nestHtmlUnescape(nestExpandDocumentWrites(html));
+  // syria-player uses JS escapes inside document.write (`https:\/\/…`).
+  text = text.replace(/\\\//g, '/');
   var re = /https?:\/\/[^\s"'<>\\]+?\.m3u8[^\s"'<>\\]*/gi;
   var m;
   while ((m = re.exec(text))) {
     var url = m[0].replace(/\\+$/, '').replace(/&amp;/g, '&');
     if (nestIsCleanPlayUrl(url)) out.push(url);
   }
-  var srcRe = /(?:source|file|src)\s*[:=]\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/gi;
+  var srcRe = /(?:source|file|src|streamUrl)\s*[:=]\s*["'](https?:\/\/[^"']+)["']/gi;
   while ((m = srcRe.exec(text))) {
-    if (nestIsCleanPlayUrl(m[1])) out.push(m[1]);
+    var cand = String(m[1] || '').replace(/\\+$/, '').replace(/&amp;/g, '&');
+    if (nestIsSyriaPlayerProxy(cand) || /\.m3u8(\?|$)/i.test(cand)) {
+      if (nestIsCleanPlayUrl(cand)) out.push(cand);
+    }
   }
   return nestUniq(out);
+}
+
+function nestIsSyriaPlayerProxy(url) {
+  var u = String(url || '');
+  return /syria-player\./i.test(u) && /proxy\.php/i.test(u) && /[?&]stream=/i.test(u);
 }
 
 function nestExtractIframeSrcs(html) {
@@ -853,6 +1118,8 @@ function nestNestedEmbedUrls(html, baseUrl) {
       continue;
     }
     if (!/^https?:\/\//i.test(abs)) continue;
+    // YouTube embeds are not native HLS — skip (no WebView fallback).
+    if (/youtube\.com|youtu\.be|googlevideo\.com/i.test(abs)) continue;
     try {
       var nestU = new URL(abs);
       if (!nestU.hostname || nestU.hostname.indexOf('.') < 0) continue;

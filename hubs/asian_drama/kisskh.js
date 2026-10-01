@@ -14,79 +14,18 @@ var KISSKH_RAILS = {
   trending: '/DramaList/MostSearch?ispc=false',
   most_viewed: '/DramaList/MostView',
   upcoming: '/DramaList/Upcoming?ispc=false',
-  anime: '/DramaList/Animate?ispc=false',
 };
-
-function kisskhLayout() {
-  return {
-    pages: {
-      asian_drama: {
-        feed: true,
-        feedRails: [
-          'spotlight',
-          'latest',
-          'trending',
-          'most_viewed',
-          'upcoming',
-        ],
-        pageSize: 24,
-        widgets: [
-          {
-            type: 'hero',
-            id: 'spotlight',
-            title: 'Spotlight',
-            rail: 'spotlight',
-            bleed: 'latest',
-          },
-          { type: 'continue', id: 'continue_watching' },
-          {
-            type: 'rail',
-            id: 'latest',
-            title: 'Latest Update',
-            rail: 'latest',
-            hideWhenBleed: true,
-            aspect: 'landscape',
-          },
-          {
-            type: 'rail',
-            id: 'trending',
-            title: 'Trending',
-            rail: 'trending',
-            aspect: 'landscape',
-          },
-          {
-            type: 'ranked',
-            id: 'popular',
-            title: 'Popular',
-            rail: 'most_viewed',
-            aspect: 'landscape',
-          },
-          {
-            type: 'rail',
-            id: 'anime',
-            title: 'Anime',
-            rail: 'anime',
-            aspect: 'landscape',
-            hideWhenTypeFilter: true,
-          },
-          {
-            type: 'rail',
-            id: 'upcoming',
-            title: 'Upcoming',
-            rail: 'upcoming',
-            aspect: 'landscape',
-          },
-        ],
-      },
-    },
-  };
-}
 
 function kisskhCover(raw) {
   var url = String(raw || '').trim();
   if (!url) return '';
   url = url.replace('media.themoviedb.org/t/p', 'tmdb.forjahq.xyz/t/p');
   url = url.replace('image.tmdb.org/t/p', 'tmdb.forjahq.xyz/t/p');
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.indexOf('//') === 0) return 'https:' + url;
+  if (url.charAt(0) === '/') {
+    return 'https://tmdb.forjahq.xyz/t/p/w500' + url;
+  }
   return url;
 }
 
@@ -109,6 +48,12 @@ function kisskhInferMediaType(row) {
   return '';
 }
 
+/// Dual movie/TV scrapers key off resolveType === 'movie'.
+/// Keep panelCategory=drama for Sources chips; never leave resolveType=drama.
+function kisskhExtractResolveType(mediaType) {
+  return mediaType === 'movie' ? 'movie' : 'tv';
+}
+
 function kisskhMeta(row) {
   if (!row || !row.id) return null;
   var name = String(row.title || '').trim();
@@ -117,7 +62,12 @@ function kisskhMeta(row) {
   var tmdb = row.tmdbID || row.tmdbId || row.tmdb_id;
   if (tmdb) ids.tmdb = String(tmdb);
   var release = String(row.releaseDate || '').trim();
+  if (!release) {
+    var titleYear = String(row.title || '').match(/\((19|20)\d{2}\)/);
+    if (titleYear) release = titleYear[0].slice(1, 5);
+  }
   var premiere = hubParseIsoDate(release);
+  var mediaType = kisskhInferMediaType(row);
   var meta = {
     id: 'kisskh:' + row.id,
     type: 'drama',
@@ -131,20 +81,21 @@ function kisskhMeta(row) {
       // Host: open.torrentEp → search Title 05 (not SxxExx).
       torrentEp: true,
       extract: {
-        resolveType: 'drama',
+        resolveType: kisskhExtractResolveType(mediaType),
         panelCategory: 'drama',
         ctx: { kisskhId: Number(row.id) },
       },
     },
   };
   if (premiere) meta.premiereDate = premiere;
+  var status = String(row.status || '').trim();
+  if (status) meta.status = status;
   var label = String(row.label || '').trim();
   if (label) meta.badge = label;
   var desc = String(row.description || '').trim();
   if (desc) meta.description = hubStripHtml(desc);
-  var mediaType = kisskhInferMediaType(row);
   if (mediaType) meta.tmdbMediaType = mediaType;
-  return meta;
+  return hubPaintPoster(meta);
 }
 
 function kisskhGet(ctx, cfg, path) {
@@ -260,17 +211,42 @@ function kisskhDetails(ctx, cfg, params) {
         return a.episode - b.episode;
       });
       if (videos.length) meta.videos = videos;
-      else if (
+      // KissKH "Upcoming" (+ future premiere with no eps) → stamp Coming soon.
+      if (
+        !meta.status &&
         meta.premiereDate &&
         hubIsFutureIsoDate(meta.premiereDate)
       ) {
         meta.status = 'NOT_YET_RELEASED';
       }
+      // Details often omit drama.releaseDate — use earliest episode air date.
+      if (!String(meta.releaseInfo || '').trim()) {
+        var earliest = '';
+        for (var ei = 0; ei < videos.length; ei++) {
+          var day = videos[ei].airDate;
+          if (!day) continue;
+          if (!earliest || day < earliest) earliest = day;
+        }
+        if (earliest) {
+          meta.releaseInfo = earliest.slice(0, 4);
+          if (!meta.premiereDate) meta.premiereDate = earliest;
+        }
+      }
       var bg = String(raw.thumbnail || raw.cover || '').trim();
       if (bg) meta.background = kisskhCover(bg);
       var desc = String(raw.description || '').trim();
       if (desc) meta.description = hubStripHtml(desc);
-      return hubOk('details', { meta: meta }, { maxAge: 900, swr: 3600 });
+      return hubOk(
+        'details',
+        {
+          meta: meta,
+          layout: {
+            fullBleedBackdrop: true,
+            firstBodyRowFraction: 0.75,
+          },
+        },
+        { maxAge: 900, swr: 3600 },
+      );
     },
   );
 }
@@ -449,28 +425,18 @@ function extract(ctx) {
     });
   }
   if (action === 'search') {
-    var q = String(params.query || '').trim();
-    if (!q) return hubItems('search', []);
-    return kisskhList(
-      ctx,
-      cfg,
-      '/DramaList/Search?q=' + encodeURIComponent(q) + '&type=0',
-      params.limit,
-    )
-      .then(function (items) {
-        return hubItems('search', items, { maxAge: 300 });
-      })
-      .catch(function (e) {
-        return hubFail('search', 'UPSTREAM', e && e.message, true);
-      });
+    return kisskhSearch(ctx, cfg, params);
+  }
+  if (action === 'search_helpers') {
+    return kisskhSearchHelpers(ctx, cfg, params).catch(function (e) {
+      return hubFail('search_helpers', 'UPSTREAM', e && e.message, true);
+    });
   }
   if (action !== 'rail') {
     return hubFail(action, 'INVALID_ACTION', 'kisskh has no action ' + action);
   }
 
   if (kisskhChromeFiltered(params)) {
-    var railId = String(params.rail || '');
-    if (railId === 'anime') return hubItems('rail', []);
     return kisskhList(ctx, cfg, kisskhExplorePath(params), params.limit)
       .then(function (items) {
         var pageSize = Number(params.limit) > 0 ? Number(params.limit) : 24;

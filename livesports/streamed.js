@@ -83,7 +83,6 @@ function isGoatSourceToken(source) {
     case 'admin':
     case 'delta':
     case 'golf':
-    case 'ppv':
     case 'bravo':
       return true;
     default:
@@ -187,7 +186,6 @@ function isGoatSource(source) {
     case 'admin':
     case 'delta':
     case 'golf':
-    case 'ppv':
     case 'bravo':
       return true;
     default:
@@ -297,24 +295,21 @@ async function resolveDiscover(ctx, cfg) {
   var list = Object.keys(byId).map(function (k) {
     var m = byId[k];
     var date = Number(m.date || 0);
+    var teams = m && m.teams && typeof m.teams === 'object' ? m.teams : null;
+    var home = teams && teams.home && typeof teams.home === 'object' ? teams.home : null;
+    var away = teams && teams.away && typeof teams.away === 'object' ? teams.away : null;
     return {
       id: String(m.id || ''),
       matchId: String(m.id || ''),
       title: String(m.title || ''),
-      homeTeam: '',
-      awayTeam: '',
+      homeTeam: home && home.name ? String(home.name) : '',
+      awayTeam: away && away.name ? String(away.name) : '',
       dateMs: date > 1e12 ? date : date * 1000,
       sources: m.sources || [],
     };
   });
 
   var mid = String(ctx.matchId || '').trim();
-  var src = String(ctx.source || '').trim();
-
-  // Owned goat slot — list that source only (no unlock).
-  if (mid && isGoatSource(src) && ctx.fixtureSearch !== true) {
-    return listStreamsForSlot(ctx, cfg, src, mid);
-  }
 
   var hit = null;
   if (mid && ctx.fixtureSearch !== true) {
@@ -377,17 +372,15 @@ async function resolveStream(ctx, cfg) {
   }
   if (!m3u8) throw new Error('goat unlock failed');
   var headers = playbackHeadersForSlot(slot, cfg);
-  var src = String(slot.source || '').toLowerCase();
-  if (src === 'echo' || src === 'streamed') {
-    if (!(await probePlayableM3u8(ctx, m3u8, headers))) {
-      throw new Error('goat m3u8 not playable');
-    }
-  }
+  // Admin goat: master lists 1080p WebP bait then playable 540p — pin the
+  // highest playable media playlist (MediaKit does not ABR-fallback like web).
+  var playable = await selectPlayableM3u8(ctx, m3u8, headers);
+  if (!playable) throw new Error('goat m3u8 not playable');
   return [
     {
-      url: m3u8,
+      url: playable,
       headers: headers,
-      directPlayback: preferDirectPlayback(m3u8),
+      directPlayback: preferDirectPlayback(playable),
     },
   ];
 }

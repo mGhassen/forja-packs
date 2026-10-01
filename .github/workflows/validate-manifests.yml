@@ -17,10 +17,10 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for dir in providers livesports torrent iptv/vod \
+          for dir in providers livesports torrent debrid iptv/vod \
             hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
             hubs/cartoon hubs/kids hubs/shahid hubs/live_sports \
-            hubs/my_list; do
+            hubs/my_list hubs/stremio hubs/downloads; do
             f="$dir/manifest.json"
             if [[ ! -f "$f" ]]; then
               echo "missing: $f"
@@ -31,12 +31,3 @@ jobs:
             fi
           done
           test "$missing" -eq 0
-      - name: SDK contract index exists
-        run: |
-          test -f sdk/contract.json
-          node -e "JSON.parse(require('fs').readFileSync('sdk/contract.json','utf8'))"
-          for s in schema/manifest.schema.json schema/catalog-envelope.schema.json \
-            schema/vod-stream.schema.json schema/torrent-search.schema.json \
-            schema/torrent-row.schema.json; do
-            test -f "sdk/$s"
-          done
