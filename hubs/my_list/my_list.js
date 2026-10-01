@@ -505,7 +505,7 @@ function extract(ctx) {
   }
   if (action === 'feed' || action === 'rail') {
     return myListLoadFeed(ctx, params).then(function (items) {
-      return hubItems(action, items, { maxAge: 30, swr: 120 });
+      return hubItems(action, items, { maxAge: 600, swr: 3600 });
     });
   }
   return hubFail(

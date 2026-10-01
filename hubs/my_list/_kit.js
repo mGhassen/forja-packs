@@ -180,19 +180,12 @@ function myListNeedsEnrich(row) {
   if (!(tmdbId > 0)) return false;
   var poster = String(row.posterPath || row.poster || '').trim();
   var title = String(row.title || row.name || '').trim();
-  var vote = row.voteAverage != null ? row.voteAverage : row.rating;
-  var logo = String(row.logo || '').trim();
   var release = String(
     row.releaseDate || row.releaseInfo || row.year || '',
   ).trim();
-  return (
-    !poster ||
-    !title ||
-    vote == null ||
-    Number(vote) === 0 ||
-    !logo ||
-    !release
-  );
+  // Poster, title, or year only. A zero score or a missing logo used to
+  // refetch TMDB details (with images) for every Simkl card on each tab.
+  return !poster || !title || !release;
 }
 
 function myListMediaType(row) {
@@ -279,7 +272,7 @@ function myListApplyTmdbDetails(row, data, mediaType) {
   return next;
 }
 
-function hubTmdbGetDetails(ctx, mediaType, id) {
+function hubTmdbGetDetails(ctx, mediaType, id, opts) {
   var n = Number(id);
   if (!(n > 0)) return Promise.resolve(null);
   var media = String(mediaType || 'movie') === 'tv' ? 'tv' : 'movie';
@@ -292,14 +285,10 @@ function hubTmdbGetDetails(ctx, mediaType, id) {
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) {
     return Promise.resolve(null);
   }
-  var url =
-    base +
-    '/' +
-    media +
-    '/' +
-    n +
-    '?append_to_response=images' +
-    (key ? '&api_key=' + encodeURIComponent(key) : '');
+  var wantImages = !opts || opts.images !== false;
+  var q = wantImages ? 'append_to_response=images' : '';
+  if (key) q += (q ? '&' : '') + 'api_key=' + encodeURIComponent(key);
+  var url = base + '/' + media + '/' + n + (q ? '?' + q : '');
   return ctx
     .fetch(url)
     .then(function (res) {
@@ -325,17 +314,19 @@ function hubEnrichMyListRows(ctx, items, limit) {
   for (var i = 0; i < out.length && jobs.length < n; i++) {
     if (!myListNeedsEnrich(out[i])) continue;
     (function (idx) {
+      var row = out[idx];
+      var poster = String(row.posterPath || row.poster || '').trim();
       jobs.push(
-        hubTmdbGetDetails(ctx, myListMediaType(out[idx]), out[idx].tmdbId).then(
-          function (data) {
-            if (!data) return;
-            out[idx] = myListApplyTmdbDetails(
-              out[idx],
-              data,
-              myListMediaType(out[idx]),
-            );
-          },
-        ),
+        hubTmdbGetDetails(ctx, myListMediaType(row), row.tmdbId, {
+          images: !poster,
+        }).then(function (data) {
+          if (!data) return;
+          out[idx] = myListApplyTmdbDetails(
+            out[idx],
+            data,
+            myListMediaType(out[idx]),
+          );
+        }),
       );
     })(i);
   }
