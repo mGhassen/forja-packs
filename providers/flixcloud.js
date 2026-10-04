@@ -26,18 +26,26 @@ function extract(ctx) {
     return page;
   }
 
+  function isChallengePage(html) {
+    return /Just a moment|Performing security verification|cf-browser-verification|<title>\s*Just a moment/i.test(
+      html,
+    );
+  }
+
   function extractDataBlock(html) {
     if (!html) return null;
-    if (
-      /Just a moment|challenge-platform|Performing security verification|cf-browser-verification/i.test(
-        html,
-      )
-    ) {
-      return { error: 'cloudflare' };
-    }
+    // Parse SSR data first. Live embeds include Cloudflare's jsd beacon
+    // (`challenge-platform/scripts/jsd`) even when the player payload is present.
     var marker = html.search(/type:\s*"data"\s*,\s*data:\s*\{/);
     if (marker < 0) marker = html.search(/type:\s*'data'\s*,\s*data:\s*\{/);
-    if (marker < 0) return { error: 'missing' };
+    if (marker < 0) {
+      return {
+        error:
+          isChallengePage(html) || /cdn-cgi\/challenge-platform/i.test(html)
+            ? 'cloudflare'
+            : 'missing',
+      };
+    }
     var start = html.indexOf('{', html.indexOf('data:', marker));
     if (start < 0) return { error: 'missing' };
     var depth = 0;

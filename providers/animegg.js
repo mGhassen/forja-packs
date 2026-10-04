@@ -105,16 +105,15 @@ function extract(ctx) {
   function search(query) {
     return fetchText(base + '/search/?q=' + encodeURIComponent(query)).then(function (html) {
       var results = [];
-      var re = /<a\b[^>]*class=["'][^"']*\bmse\b[^"']*["'][^>]*>[\s\S]*?<\/a>/gi;
+      var re = /<a\b([^>]*\bmse\b[^>]*)>([\s\S]*?)<\/a>/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
-        var tag = (m[0].match(/<a\b[^>]*>/i) || [])[0] || '';
-        var hrefM = tag.match(/href=["']([^"']+)["']/i);
+        var hrefM = m[1].match(/href=["']([^"']+)["']/i);
         var href = hrefM ? hrefM[1] : '';
-        var slugM = href.match(/^\/series\/([^/?#]+)/);
+        var slugM = href.match(/\/series\/([^/?#]+)/);
         if (!slugM) continue;
-        var strongM = m[0].match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
-        var text = strongM ? strongM[1].replace(/<[^>]+>/g, '').trim() : slugM[1].replace(/-/g, ' ');
+        var titleM = m[2].match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) || m[2].match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
+        var text = titleM ? titleM[1].replace(/<[^>]+>/g, '').trim() : slugM[1].replace(/-/g, ' ');
         results.push({ slug: slugM[1], text: text });
       }
       return results;
@@ -124,8 +123,12 @@ function extract(ctx) {
   function pickSlug(results, query) {
     if (!results.length) return null;
     var target = normalize(query);
-    for (var i = 0; i < results.length; i++) {
-      if (normalize(results[i].text) === target || normalize(results[i].text).indexOf(target) >= 0) return results[i].slug;
+    var i;
+    for (i = 0; i < results.length; i++) {
+      if (normalize(results[i].text) === target) return results[i].slug;
+    }
+    for (i = 0; i < results.length; i++) {
+      if (normalize(results[i].text).indexOf(target) >= 0) return results[i].slug;
     }
     return results[0].slug;
   }
@@ -133,25 +136,23 @@ function extract(ctx) {
   function scrapeSeries(slug) {
     return fetchText(base + '/series/' + slug).then(function (html) {
       var episodes = [];
-      var re = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+      var re = /<a\b([^>]*\banm_det_pop\b[^>]*)>([\s\S]*?)<\/a>/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
-        var block = m[1];
-        if (block.indexOf('anm_det_pop') < 0) continue;
-        var linkM = block.match(/<a\b[^>]*class=["'][^"']*anm_det_pop[^"']*["'][^>]*href=["']([^"']+)["']/i);
-        if (!linkM) continue;
-        var href = linkM[1].replace(/#.*$/, '').replace(/^\//, '');
-        var strongM = block.match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
-        var strong = strongM ? strongM[1].replace(/<[^>]+>/g, '').trim() : '';
+        var hrefM = m[1].match(/href=["']([^"']+)["']/i);
+        if (!hrefM) continue;
+        var href = hrefM[1].replace(/#.*$/, '').replace(/^\//, '');
+        var strong = m[2].replace(/<[^>]+>/g, '').trim();
         var rangeMatch = strong.match(/(\d+)-(\d+)\s*$/);
-        var numMatch = rangeMatch || strong.match(/(\d+)\s*$/);
+        var numMatch = rangeMatch || strong.match(/(\d+)\s*$/) || href.match(/episode-(\d+)/i);
         if (!numMatch) continue;
         var number = parseInt(numMatch[1], 10);
+        var trail = html.slice(m.index + m[0].length, m.index + m[0].length + 400);
         episodes.push({
           number: number,
           epSlug: href,
-          hasSub: /\bbtn-subbed\b/.test(block),
-          hasDub: /\bbtn-dubbed\b/.test(block),
+          hasSub: /\bbtn-subbed\b/.test(trail),
+          hasDub: /\bbtn-dubbed\b/.test(trail),
         });
       }
       return episodes;
@@ -225,8 +226,9 @@ function extract(ctx) {
         var slug = pickSlug(results, query);
         if (!slug) return [];
         return scrapeSeries(slug).then(function (episodes) {
+          var want = Number(state.mappedEp || ctx.episode || 1) || 1;
           var ep = episodes.find(function (e) {
-            return e.number === state.mappedEp;
+            return e.number === want;
           });
           if (!ep) return [];
           var cats =

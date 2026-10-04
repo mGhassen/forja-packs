@@ -305,9 +305,22 @@ function findBalancedBlock(text, start) {
 
 function normalizeCryptoConfig(out) {
   if (!out?.buildId || !Array.isArray(out.maskParts) || out.maskParts.length < 4) return null;
+  const params = out.params && typeof out.params === "object" ? out.params : {};
+  const num = (value, fallback) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
   return {
     buildId: String(out.buildId),
-    maskParts: out.maskParts.slice(0, 4).map(String)
+    maskParts: out.maskParts.slice(0, 4).map(String),
+    saltMul: num(params.saltMul, 17),
+    saltAdd: num(params.saltAdd, 31),
+    fragMul: num(params.fragMul, 41),
+    fragAdd: num(params.fragAdd, 7),
+    envXor: num(params.envXor, 0),
+    bootPrefix: params.bootPrefix != null && String(params.bootPrefix) ? String(params.bootPrefix) : "aa-boot:",
+    join: params.join != null && String(params.join) ? String(params.join) : ":",
+    parts: Array.isArray(params.parts) && params.parts.length ? params.parts.map(String) : ["buildId", "group", "host", "epoch", "lane"]
   };
 }
 
@@ -356,7 +369,36 @@ function evalModernCryptoChunk(chunk) {
   return normalizeCryptoConfig(Function(head + body)());
 }
 
+function evalObfuscatedCryptoChunk(chunk) {
+  const saltAt = chunk.indexOf("{v:1,saltMul:");
+  if (saltAt < 0) return null;
+  const rotWindow = chunk.slice(Math.max(0, saltAt - 20000), saltAt);
+  const rotHits = [...rotWindow.matchAll(/\}\)\(([A-Za-z_$][\w$]*),[^;]+\)/g)];
+  const tableName = rotHits.at(-1)?.[1];
+  if (!tableName) return null;
+  const tableRe = new RegExp(`function\\s+${tableName}\\(\\)\\{const e=\\[[\\s\\S]*?return ${tableName}=function\\(\\)\\{return e\\},${tableName}\\(\\)\\}`);
+  const tableMatch = chunk.match(tableRe);
+  const unRe = new RegExp(`function\\s+([A-Za-z_$][\\w$]*)\\(e,t\\)\\{return e=e-\\([^)]+\\),\\s*${tableName}\\(\\)\\[e\\]\\}`);
+  const unMatch = chunk.match(unRe);
+  const rotCallIdx = chunk.indexOf("})(" + tableName + ",");
+  const rotStart = rotCallIdx >= 0 ? chunk.lastIndexOf("(function(e,t){", rotCallIdx) : -1;
+  const rotEnd = rotCallIdx >= 0 ? chunk.indexOf(";", rotCallIdx) : -1;
+  const rotMatch = rotStart >= 0 && rotEnd > rotStart ? [chunk.slice(rotStart, rotEnd + 1)] : null;
+  const blockWindow = chunk.slice(Math.max(0, saltAt - 2500), Math.min(chunk.length, saltAt + 600));
+  const blockMatch = blockWindow.match(/function\s+[A-Za-z_$][\w$]*\(e,t\)\{return [A-Za-z_$][\w$]*\(t-\s*-?\d+\)\}const\s+([A-Za-z_$][\w$]*)=[A-Za-z_$][\w$]*\(\d+,\d+\);function\s+[A-Za-z_$][\w$]*\(e,t\)\{return [A-Za-z_$][\w$]*\([^)]+\)\}[\s\S]*?envXor:\d+\}/);
+  if (!tableMatch || !unMatch || !rotMatch || !blockMatch) return null;
+  const buildName = blockMatch[1];
+  const maskMatch = blockMatch[0].match(/,([A-Za-z_$][\w$]*)=\[[^\]]+\],(\$f|[A-Za-z_$][\w$]*)=\{v:1,saltMul/);
+  if (!maskMatch) return null;
+  const code = `${tableMatch[0]}\n${unMatch[0]}\n${rotMatch[0]}\n${blockMatch[0]}\nreturn { buildId: ${buildName}, maskParts: ${maskMatch[1]}, params: ${maskMatch[2]} };`;
+  return normalizeCryptoConfig(Function(code)());
+}
+
 function evalCryptoChunk(chunk) {
+  try {
+    const obfuscated = evalObfuscatedCryptoChunk(chunk);
+    if (obfuscated) return obfuscated;
+  } catch {}
   try {
     return evalModernCryptoChunk(chunk);
   } catch {}
@@ -443,23 +485,28 @@ async function discoverCryptoConfig(force = false) {
   }
 }
 
-function buildMaskSeed(buildId) {
-  const n = String(buildId || "");
+function buildMaskSeed(config) {
+  const n = String(config.buildId || "");
+  const mul = Number.isFinite(config.saltMul) ? config.saltMul : 17;
+  const add = Number.isFinite(config.saltAdd) ? config.saltAdd : 31;
   const out = Buffer.alloc(32);
   for (let i = 0; i < 32; i++) {
-    out[i] = (n.charCodeAt(i % n.length) || 0) ^ ((i * 17 + 31) & 255);
+    out[i] = (n.charCodeAt(i % n.length) || 0) ^ ((i * mul + add) & 255);
   }
   return out;
 }
 
-function buildMask(buildId, maskParts) {
-  const seed = buildMaskSeed(buildId);
+function buildMask(config) {
+  const maskParts = config.maskParts || [];
+  const seed = buildMaskSeed(config);
+  const fragMul = Number.isFinite(config.fragMul) ? config.fragMul : 41;
+  const fragAdd = Number.isFinite(config.fragAdd) ? config.fragAdd : 7;
   const out = Buffer.alloc(32);
   for (let i = 0; i < maskParts.length; i++) {
     const part = Buffer.from(maskParts[i], "base64");
     const offset = i * 8;
     for (let j = 0; j < 8; j++) {
-      out[offset + j] = (part[j] ^ seed[offset + j]) ^ ((i * 41 + j * 7) & 255);
+      out[offset + j] = (part[j] ^ seed[offset + j]) ^ ((i * fragMul + j * fragAdd) & 255);
     }
   }
   return out;
@@ -471,10 +518,26 @@ function currentEpochs(now = Date.now()) {
   return [...new Set([previousGrace, epoch])];
 }
 
+function bootPayload(config, epoch, lane = CONTENT_LANE) {
+  const values = {
+    buildId: String(config.buildId || ""),
+    group: KEY_GROUP,
+    host: REFERER_HOST,
+    epoch: String(epoch),
+    lane: String(lane || "")
+  };
+  const parts = Array.isArray(config.parts) && config.parts.length
+    ? config.parts
+    : ["buildId", "group", "host", "epoch", "lane"];
+  const join = config.join || ":";
+  return parts.map((part) => values[part] ?? "").join(join);
+}
+
 function makeBootToken(config, epoch, lane = CONTENT_LANE) {
-  const mask = buildMask(config.buildId, config.maskParts);
-  const bootKey = hmacBytes(mask, `aa-boot:${config.buildId}`);
-  return bytesToHex(hmacBytes(bootKey, `${config.buildId}:${KEY_GROUP}:${REFERER_HOST}:${epoch}:${lane}`));
+  const mask = buildMask(config);
+  const prefix = config.bootPrefix || "aa-boot:";
+  const bootKey = hmacBytes(mask, `${prefix}${config.buildId}`);
+  return bytesToHex(hmacBytes(bootKey, bootPayload(config, epoch, lane)));
 }
 
 async function isValidCryptoConfig(config, lane = CONTENT_LANE) {
@@ -532,7 +595,7 @@ async function fetchBootstrap(lane = CONTENT_LANE, force = false) {
 
 function deriveLaneKey(partB, config) {
   const encrypted = Buffer.from(partB, "base64");
-  const mask = buildMask(config.buildId, config.maskParts);
+  const mask = buildMask(config);
   const key = Buffer.alloc(32);
   for (let i = 0; i < 32; i++) {
     key[i] = encrypted[i] ^ mask[i % mask.length];
@@ -1160,6 +1223,23 @@ async function extractSource(src) {
   };
 }
 
+async function handleWatch(anilistId, audio, epNum) {
+  const key = `${anilistId}:${audio}:${epNum}`;
+  const cached = watchMemoryCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+  const { showId, show } = await resolveMkissaId(anilistId);
+  await warmWatchPage(showId, show, epNum, audio);
+  const episode = await getEpisodeSources(showId, epNum, audio);
+  const urls = Array.isArray(episode?.sourceUrls) ? episode.sourceUrls : [];
+  const sources = [];
+  for (let i = 0; i < urls.length; i++) {
+    sources.push(await extractSource(urls[i]));
+  }
+  const data = { sources, showId, episode };
+  watchMemoryCache.set(key, { data, expiresAt: Date.now() + WATCH_MEMORY_TTL });
+  return data;
+}
+
 async function fetchAniListFull(anilistId) {
   const q = `
   query ($id: Int) {
@@ -1333,15 +1413,24 @@ async function handleEpisodesRoute(anilistId) {
   };
 }
 
-  return resolveMal().then(function (mal) {
-    if (!mal) return [];
-    return resolveAnilist(mal).then(function (alId) {
-      if (!alId) return [];
-      return handleWatch(alId, 'sub', epNum).then(function (data) {
-        return rowsFromWatch(data).then(function (sub) {
-          if (sub.length) return sub;
-          return handleWatch(alId, 'dub', epNum).then(function (dubData) { return rowsFromWatch(dubData); });
-        });
+  function resolveAnilistId() {
+    var fromCtx = Number(ctx.anilistId) || 0;
+    if (fromCtx) return Promise.resolve(fromCtx);
+    if (ctx.malId) {
+      return resolveAnilist(ctx.malId).then(function (alId) {
+        if (alId) return alId;
+        return resolveMal().then(function (mal) { return mal ? resolveAnilist(mal) : null; });
+      });
+    }
+    return resolveMal().then(function (mal) { return mal ? resolveAnilist(mal) : null; });
+  }
+
+  return resolveAnilistId().then(function (alId) {
+    if (!alId) return [];
+    return handleWatch(alId, 'sub', epNum).then(function (data) {
+      return rowsFromWatch(data).then(function (sub) {
+        if (sub.length) return sub;
+        return handleWatch(alId, 'dub', epNum).then(function (dubData) { return rowsFromWatch(dubData); });
       });
     });
   }).catch(function () { return []; });

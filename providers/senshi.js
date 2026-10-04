@@ -1,5 +1,5 @@
 var SPECS = {
-  "base": "https://senshi.live",
+  "base": "https://senshi.to",
   "mapApi": "https://id-mapping-api-malid.hf.space/api/resolve",
   "tmdbKey": "1865f43a0549ca50d341dd9ab8b29f49",
   "jikan": "https://api.jikan.moe/v4/anime"
@@ -12,7 +12,7 @@ function extract(ctx) {
   var jikan = cfg.jikan;
   var tmdbKey = cfg.tmdbKey;
   var ua = 'Mozilla/5.0 (X11; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0';
-  // ninstream and similar CDNs whitelist senshi.live — keep Referer fixed.
+  // Stream CDNs whitelist the site origin — keep Referer/Origin on the live base.
   var hdrs = { 'User-Agent': ua, Referer: base + '/', Origin: base, Accept: 'application/json,*/*' };
   var isTv = ctx.type !== 'movie';
   var epNum = isTv ? ctx.episode || 1 : 1;

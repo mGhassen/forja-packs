@@ -1,5 +1,5 @@
 var SPECS = {
-  "base": "https://anidao.to",
+  "base": "https://anidao.es",
   "tmdbKey": "1865f43a0549ca50d341dd9ab8b29f49"
 };
 
@@ -32,6 +32,19 @@ function extract(ctx) {
       });
   }
 
+  function decodeB64(s) {
+    try {
+      return atob(String(s || '').replace(/\s/g, ''));
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function slugFromWatchPath(path) {
+    var m = String(path || '').match(/\/watch\/([^/?#]+)/i);
+    return m ? m[1] : '';
+  }
+
   function resolveTitle() {
     if (ctx.title) return Promise.resolve(String(ctx.title));
     var kind = isTv ? 'tv' : 'movie';
@@ -47,31 +60,48 @@ function extract(ctx) {
     });
   }
 
-  function search(query) {
-    return fetchText(base + '/search.html?keyword=' + encodeURIComponent(query)).then(function (html) {
-      var results = [];
-      var re = /href="(\/anime\/[^"?#]+)"[^>]*>[\s\S]{0,400}?>([^<]{2,120})</gi;
-      var m;
-      while ((m = re.exec(html)) !== null) {
-        var id = m[1].split('/').filter(Boolean).pop();
-        if (id && !results.some(function (r) { return r.id === id; })) {
-          results.push({ id: id, href: m[1], title: m[2].trim() });
-        }
+  function parseHits(html) {
+    var results = [];
+    var re =
+      /href="(?:https?:\/\/[^"]+)?(\/watch\/([^"/?#]+))(?:\/ep-[\d.]+)?"[\s\S]{0,1200}?class="name d-title[^"]*"[^>]*>([^<]+)/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var slug = m[2];
+      if (slug && !results.some(function (r) { return r.slug === slug; })) {
+        results.push({ slug: slug, title: m[3].trim() });
       }
-      return results;
+    }
+    return results;
+  }
+
+  function search(query) {
+    return fetchJson(
+      base +
+        '/wp-json/v1/aniwaves/search/suggestions?keyword=' +
+        encodeURIComponent(query),
+    ).then(function (data) {
+      return parseHits((data && data.html) || '');
     });
   }
 
+  function pickHit(hits, query) {
+    var q = String(query || '').trim().toLowerCase();
+    return (
+      hits.find(function (h) {
+        return String(h.title || '').trim().toLowerCase() === q;
+      }) || hits[0]
+    );
+  }
+
   function episodes(slug) {
-    var clean = String(slug).replace(/-\d+$/, '');
-    return fetchText(base + '/anime/' + clean).then(function (html) {
+    return fetchText(base + '/watch/' + slug).then(function (html) {
       var eps = [];
-      var re = /href="(\/watch-online\/[^"]*episode-(\d+(?:\.\d+)?)[^"]*)"/gi;
+      var re = /href="(?:https?:\/\/[^"]+)?\/watch\/[^"/]+\/ep-(\d+(?:\.\d+)?)"/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
-        var num = Number(m[2]);
+        var num = Number(m[1]);
         if (num > 0 && !eps.some(function (e) { return e.num === num; })) {
-          eps.push({ num: num, href: m[1] });
+          eps.push({ num: num, href: base + '/watch/' + slug + '/ep-' + m[1] });
         }
       }
       return eps.sort(function (a, b) {
@@ -80,69 +110,71 @@ function extract(ctx) {
     });
   }
 
-  function servers(href) {
-    return fetchText(href).then(function (html) {
-      var out = [];
-      var re = /data-an-video=["']([^"']+)["'][^>]*>([\s\S]*?)<\/[^>]+>/gi;
-      var m;
-      while ((m = re.exec(html)) !== null) {
-        out.push({
-          sourceId: m[1],
-          name: m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() || 'Server',
-        });
-      }
-      if (out.length) return out;
-      var re2 = /data-an-video=["']([^"']+)["']/gi;
-      while ((m = re2.exec(html)) !== null) out.push({ sourceId: m[1], name: 'Server' });
-      return out;
-    });
+  function parseServers(html) {
+    var out = [];
+    var re =
+      /data-server-name=["']([^"']+)["'][^>]*data-link-id=["']([^"']+)["']|data-link-id=["']([^"']+)["'][^>]*data-server-name=["']([^"']+)["']/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var name = m[1] || m[4] || 'Server';
+      var id = m[2] || m[3] || '';
+      if (id) out.push({ name: name, linkId: id });
+    }
+    if (out.length) return out;
+    var re2 = /data-link-id=["']([^"']+)["']/gi;
+    while ((m = re2.exec(html)) !== null) out.push({ name: 'Server', linkId: m[1] });
+    return out;
   }
 
-  function resolveSource(sourceId) {
-    if (/^https?:\/\//i.test(sourceId)) return Promise.resolve(sourceId);
-    return fetchJson(base + '/ajax/v2/episode/sources?id=' + encodeURIComponent(sourceId))
-      .then(function (data) {
-        return (data && (data.link || data.url)) || '';
-      })
-      .catch(function () {
-        return '';
+  function servers(watchUrl) {
+    return fetchText(watchUrl).then(parseServers);
+  }
+
+  function playUrl(linkId) {
+    var embed = /^https?:\/\//i.test(linkId) ? linkId : decodeB64(linkId);
+    if (!embed) return '';
+    var play = embed.match(/https?:\/\/(?:www\.)?(?:my\.)?1anime\.site\/play\/([a-f0-9]+)/i);
+    if (play) return 'https://my.1anime.site/stream/' + play[1];
+    return embed;
+  }
+
+  function resolveEmbed(s) {
+    var url = playUrl(s.linkId);
+    if (!url) return Promise.resolve([]);
+    if (/1anime\.site\/stream\//i.test(url) || /\.m3u8|\.mp4/i.test(url)) {
+      var referer = /1anime\.site/i.test(url) ? 'https://my.1anime.site/' : base + '/';
+      return Promise.resolve([
+        {
+          url: url,
+          name: 'AniDao ' + s.name,
+          headers: { 'User-Agent': ua, Referer: referer },
+        },
+      ]);
+    }
+    return ctx.hop(url).then(function (rows) {
+      return (rows || []).map(function (r) {
+        return Object.assign({}, r, { name: r.name || 'AniDao ' + s.name });
       });
+    });
   }
 
   return resolveTitle()
     .then(function (title) {
       if (!title) return [];
       return search(title).then(function (hits) {
-        var hit = hits[0];
+        var hit = pickHit(hits, title);
         if (!hit) return [];
-        return episodes(hit.id).then(function (eps) {
-          var ep =
-            eps.find(function (e) {
-              return e.num === Number(epNum);
-            }) || eps[0];
-          if (!ep) return [];
-          return servers(ep.href).then(function (svs) {
-            return Promise.all(
-              svs.slice(0, 4).map(function (s) {
-                return resolveSource(s.sourceId).then(function (embed) {
-                  if (!embed) return [];
-                  if (/\.m3u8|\.mp4/i.test(embed)) {
-                    return [
-                      {
-                        url: embed,
-                        name: 'AniDao ' + s.name,
-                        headers: { 'User-Agent': ua, Referer: base + '/' },
-                      },
-                    ];
-                  }
-                  return ctx.hop(embed).then(function (rows) {
-                    return (rows || []).map(function (r) {
-                      return Object.assign({}, r, { name: r.name || 'AniDao ' + s.name });
-                    });
-                  });
-                });
-              }),
-            ).then(function (groups) {
+        return episodes(hit.slug).then(function (eps) {
+          var watchUrl = base + '/watch/' + hit.slug;
+          if (eps.length) {
+            var ep =
+              eps.find(function (e) {
+                return e.num === Number(epNum);
+              }) || eps[0];
+            watchUrl = ep.href;
+          }
+          return servers(watchUrl).then(function (svs) {
+            return Promise.all(svs.slice(0, 4).map(resolveEmbed)).then(function (groups) {
               return [].concat.apply([], groups);
             });
           });

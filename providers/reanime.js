@@ -135,8 +135,22 @@ function extract(ctx) {
     });
   }
 
+  function itemTitle(item, fallback) {
+    var t = item && (item.title || item.name);
+    if (t && typeof t === 'object') return t.english || t.romaji || t.native || fallback;
+    return t || fallback;
+  }
+
+  function usableSlug(raw) {
+    var slug = String(raw || '').replace(/^\/+|\/+$/g, '');
+    if (!slug || slug.indexOf('/') >= 0) return '';
+    if (/^(search|cover|watch|anime|api)$/i.test(slug)) return '';
+    return slug;
+  }
+
   function searchReanime(query, year, targetAlId) {
     var endpoints = [
+      '/api/v1/search?q=' + encodeURIComponent(query),
       '/api/search?q=' + encodeURIComponent(query),
       '/api/anime/search?q=' + encodeURIComponent(query),
       '/search?keyword=' + encodeURIComponent(query),
@@ -153,17 +167,23 @@ function extract(ctx) {
               var arr = json.data || json.results || json.anime || json;
               if (Array.isArray(arr)) {
                 arr.forEach(function (item) {
-                  var slug = item.anime_id || item.slug || item.id;
+                  var slug = usableSlug(item.anime_id || item.slug || item.id);
                   if (!slug) return;
-                  var cleanSlug = String(slug).replace(/-[a-z0-9]{6}$/, '');
-                  list.push({ slug: cleanSlug, anilistId: item.anilist_id || item.anilistId, title: item.title || item.name || cleanSlug });
+                  list.push({
+                    slug: slug,
+                    anilistId: item.anilist_id || item.anilistId,
+                    title: itemTitle(item, slug),
+                  });
                 });
               }
             } catch (e) {}
           } else {
             var re = /\/(?:anime|watch)\/([^?#"'\s]+)/g;
             var m;
-            while ((m = re.exec(text)) !== null) list.push({ slug: m[1], title: query, anilistId: null });
+            while ((m = re.exec(text)) !== null) {
+              var slug = usableSlug(m[1]);
+              if (slug) list.push({ slug: slug, title: query, anilistId: null });
+            }
           }
           return list;
         }).catch(function () { return []; });

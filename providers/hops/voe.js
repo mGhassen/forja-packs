@@ -35,12 +35,27 @@ function extract(ctx) {
     var step5 = b64(step4.split('').reverse().join(''));
     try { return JSON.parse(step5); } catch (e) { return null; }
   }
+  function jsonPayload(inner) {
+    inner = String(inner || '').trim();
+    if (!inner) return '';
+    try {
+      var parsed = JSON.parse(inner);
+      if (Array.isArray(parsed)) {
+        for (var i = 0; i < parsed.length; i++) {
+          if (typeof parsed[i] === 'string' && parsed[i]) return parsed[i];
+        }
+      }
+      if (typeof parsed === 'string') return parsed;
+    } catch (e) {}
+    if (inner.charAt(0) === '"' && inner.charAt(inner.length - 1) === '"') {
+      try { return JSON.parse(inner); } catch (e2) { return inner.slice(1, -1); }
+    }
+    try { return JSON.parse('"' + inner + '"'); } catch (e3) { return inner; }
+  }
   function sourceFromHtml(html) {
     var blocks = String(html).match(/<script[^>]*type=["']application\/json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
     for (var i = 0; i < blocks.length; i++) {
-      var inner = blocks[i].replace(/^[\s\S]*?>/, '').replace(/<\/script>$/i, '').trim();
-      if (inner.charAt(0) === '"' && inner.charAt(inner.length - 1) === '"') inner = inner.slice(1, -1);
-      try { inner = JSON.parse('"' + inner + '"'); } catch (e) {}
+      var inner = jsonPayload(blocks[i].replace(/^[\s\S]*?>/, '').replace(/<\/script>$/i, '').trim());
       var decoded = decodeVoe(inner);
       if (decoded && decoded.source) return decoded.source;
     }

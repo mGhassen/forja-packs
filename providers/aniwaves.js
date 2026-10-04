@@ -23,13 +23,38 @@ function extract(ctx) {
     return ctx
       .fetch(url, {
         headers: Object.assign({}, hdrs, extra || {}, {
-          Accept: 'application/json,*/*',
+          Accept: extra && extra.Accept ? extra.Accept : 'application/json,*/*',
           'X-Requested-With': 'XMLHttpRequest',
         }),
       })
       .then(function (r) {
-        return r.json();
+        return r.json().catch(function () {
+          return null;
+        });
       });
+  }
+
+  function decodeEntities(s) {
+    return String(s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#(\d+);/g, function (_, n) {
+      return String.fromCharCode(Number(n));
+    });
+  }
+
+  function normalize(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function scoreTitle(query, title) {
+    var needle = normalize(query);
+    var hay = normalize(title);
+    if (!needle || !hay) return 0;
+    if (hay === needle) return 100;
+    var ratio = Math.min(needle.length, hay.length) / Math.max(needle.length, hay.length);
+    if (hay.indexOf(needle) === 0 || needle.indexOf(hay) === 0) return ratio >= 0.6 ? 80 : Math.floor(ratio * 60);
+    if (hay.indexOf(needle) >= 0 || needle.indexOf(hay) >= 0) return ratio >= 0.6 ? 60 : Math.floor(ratio * 45);
+    return 0;
   }
 
   function resolveTitle() {
@@ -43,22 +68,40 @@ function extract(ctx) {
         '?api_key=' +
         encodeURIComponent(tmdbKey),
     ).then(function (d) {
-      return d.name || d.title || '';
+      return (d && (d.name || d.title)) || '';
     });
   }
 
   function search(query) {
     return fetchText(base + '/filter?keyword=' + encodeURIComponent(query)).then(function (html) {
       var results = [];
-      var re = /href="(\/watch\/([^"?#]+))"[^>]*>[\s\S]{0,300}?class="(?:name|d-title)"[^>]*>([^<]+)/gi;
+      var seen = {};
+      var re = /class="name d-title"[^>]*href="\/watch\/([^"?#]+)"[^>]*>([^<]+)/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
-        results.push({ slug: m[2], title: m[3].trim() });
+        if (seen[m[1]]) continue;
+        seen[m[1]] = true;
+        results.push({ slug: m[1], title: m[2].trim() });
       }
       if (!results.length) {
-        var re2 = /href="\/watch\/([^"?#]+)"/gi;
-        while ((m = re2.exec(html)) !== null) results.push({ slug: m[1], title: query });
+        var re2 = /href="\/watch\/([^"?#]+)"[^>]*class="name d-title"[^>]*>([^<]+)/gi;
+        while ((m = re2.exec(html)) !== null) {
+          if (seen[m[1]]) continue;
+          seen[m[1]] = true;
+          results.push({ slug: m[1], title: m[2].trim() });
+        }
       }
+      if (!results.length) {
+        var re3 = /href="\/watch\/([^"?#]+)"/gi;
+        while ((m = re3.exec(html)) !== null) {
+          if (seen[m[1]]) continue;
+          seen[m[1]] = true;
+          results.push({ slug: m[1], title: query });
+        }
+      }
+      results.sort(function (a, b) {
+        return scoreTitle(query, b.title) - scoreTitle(query, a.title);
+      });
       return results;
     });
   }
@@ -79,37 +122,75 @@ function extract(ctx) {
     return fetchJson(base + '/ajax/episode/list/' + id, { Referer: base + '/watch/' + slug }).then(function (data) {
       var html = (data && (data.result || data.html)) || '';
       var eps = [];
-      var re = /data-ids="([^"]+)"[^>]*data-num="(\d+)"/gi;
+      var re = /data-ids="([^"]+)"[^>]*data-num="(\d+(?:\.\d+)?)"/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
-        eps.push({ ids: m[1], num: Number(m[2]) });
+        eps.push({ ids: decodeEntities(m[1]), num: Number(m[2]) });
       }
       if (!eps.length) {
-        var re2 = /data-num="(\d+)"[^>]*data-ids="([^"]+)"/gi;
-        while ((m = re2.exec(html)) !== null) eps.push({ ids: m[2], num: Number(m[1]) });
+        var re2 = /data-num="(\d+(?:\.\d+)?)"[^>]*data-ids="([^"]+)"/gi;
+        while ((m = re2.exec(html)) !== null) eps.push({ ids: decodeEntities(m[2]), num: Number(m[1]) });
       }
       return eps;
     });
   }
 
   function servers(ids) {
-    return fetchJson(base + '/ajax/server/list?servers=' + encodeURIComponent(ids)).then(function (data) {
+    var q = decodeEntities(ids);
+    if (!/^\d+(?:&eps=[\d.]+)?$/.test(q)) return Promise.resolve([]);
+    return fetchJson(base + '/ajax/server/list?servers=' + q).then(function (data) {
       var html = (data && (data.result || data.html)) || '';
       var out = [];
-      var re = /data-link-id="([^"]+)"[^>]*>([\s\S]*?)<\/li>/gi;
-      var m;
-      while ((m = re.exec(html)) !== null) {
-        out.push({
-          linkId: m[1],
-          name: m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() || 'Server',
-        });
-      }
+      var parts = String(html).split(/<div class="type"/i);
+      parts.forEach(function (part, i) {
+        var audio = 'sub';
+        if (i > 0) {
+          var tm = part.match(/^[^>]*data-type="([^"]+)"/i);
+          if (tm) audio = String(tm[1]).toLowerCase();
+        }
+        var re = /data-link-id="([^"]+)"[^>]*>([\s\S]*?)<\/li>/gi;
+        var m;
+        while ((m = re.exec(part)) !== null) {
+          out.push({
+            linkId: m[1],
+            audio: audio,
+            name: m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() || 'Server',
+          });
+        }
+      });
       if (!out.length) {
         var re2 = /data-link-id="([^"]+)"/gi;
-        while ((m = re2.exec(html)) !== null) out.push({ linkId: m[1], name: 'Server' });
+        var m2;
+        while ((m2 = re2.exec(html)) !== null) out.push({ linkId: m2[1], name: 'Server', audio: 'sub' });
       }
       return out;
     });
+  }
+
+  function echoPlaylist(embed) {
+    var m = String(embed || '').match(/^(https?:\/\/[^/]+)\/(embed-\d+)\/([^/?#]+)/i);
+    if (!m) return Promise.resolve('');
+    var origin = m[1];
+    var embedPath = m[2];
+    var id = m[3];
+    var page = origin + '/' + embedPath + '/' + id + '?v=1&asi=0&autoPlay=0&ao=0';
+    return fetchJson(origin + '/' + embedPath + '/getSources?id=' + encodeURIComponent(id), {
+      Referer: page,
+      Origin: origin,
+      Accept: '*/*',
+    })
+      .then(function (data) {
+        if (!data) return '';
+        if (typeof data.sources === 'string' && data.sources) return data.sources;
+        if (Array.isArray(data.sources) && data.sources[0]) {
+          var first = data.sources[0];
+          return (first && (first.file || first.src || first.url)) || '';
+        }
+        return data.url || data.link || '';
+      })
+      .catch(function () {
+        return '';
+      });
   }
 
   function embed(linkId) {
@@ -122,6 +203,43 @@ function extract(ctx) {
       .catch(function () {
         return '';
       });
+  }
+
+  function rowsFromServer(s) {
+    var lang = s.audio === 'dub' ? 'Dub' : s.audio === 'raw' ? 'Raw' : 'Sub';
+    var label = 'AniWaves ' + s.name + ' ' + lang;
+    return embed(s.linkId).then(function (url) {
+      if (!url) return [];
+      function row(playUrl, extra) {
+        extra = extra || {};
+        return {
+          url: playUrl,
+          name: extra.name || label,
+          language: lang,
+          headers: extra.headers || { 'User-Agent': ua, Referer: base + '/' },
+        };
+      }
+      if (/\.m3u8|\.mp4/i.test(url)) return [row(url)];
+      if (/echovideo\.ru/i.test(url)) {
+        return echoPlaylist(url).then(function (play) {
+          if (!play) return [];
+          var origin = 'https://play.echovideo.ru';
+          try {
+            origin = new URL(url).origin;
+          } catch (e) {}
+          return [
+            row(play, {
+              headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+            }),
+          ];
+        });
+      }
+      return ctx.hop(url).then(function (rows) {
+        return (rows || []).map(function (r) {
+          return Object.assign({}, r, { name: r.name || label, language: lang });
+        });
+      });
+    });
   }
 
   return resolveTitle()
@@ -139,28 +257,15 @@ function extract(ctx) {
               }) || eps[0];
             if (!ep) return [];
             return servers(ep.ids).then(function (svs) {
-              return Promise.all(
-                svs.slice(0, 4).map(function (s) {
-                  return embed(s.linkId).then(function (url) {
-                    if (!url) return [];
-                    if (/\.m3u8|\.mp4/i.test(url)) {
-                      return [
-                        {
-                          url: url,
-                          name: 'AniWaves ' + s.name,
-                          headers: { 'User-Agent': ua, Referer: base + '/' },
-                        },
-                      ];
-                    }
-                    return ctx.hop(url).then(function (rows) {
-                      return (rows || []).map(function (r) {
-                        return Object.assign({}, r, { name: r.name || 'AniWaves ' + s.name });
-                      });
-                    });
-                  });
-                }),
-              ).then(function (groups) {
-                return [].concat.apply([], groups);
+              return Promise.all(svs.slice(0, 6).map(rowsFromServer)).then(function (groups) {
+                var seen = {};
+                var out = [];
+                ;[].concat.apply([], groups).forEach(function (r) {
+                  if (!r || !r.url || seen[r.url]) return;
+                  seen[r.url] = true;
+                  out.push(r);
+                });
+                return out;
               });
             });
           });

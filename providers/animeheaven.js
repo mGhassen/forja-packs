@@ -45,14 +45,20 @@ function extract(ctx) {
   function search(query) {
     return fetchText(base + '/fastsearch.php?xhr=1&s=' + encodeURIComponent(query)).then(function (html) {
       var results = [];
-      var re = /href="([^"]*anime\.php\?([^"]+))"[^>]*>[\s\S]*?class="fastname"[^>]*>([^<]+)/gi;
+      var seen = {};
+      var re =
+        /href=['"]([^'"]*anime\.php\?([^'"]+))['"][\s\S]*?class=['"][^'"]*fastname[^'"]*['"][^>]*>([^<]+)/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
+        if (seen[m[2]]) continue;
+        seen[m[2]] = true;
         results.push({ id: m[2], title: m[3].trim() });
       }
       if (!results.length) {
         var re2 = /anime\.php\?([^"'&\s]+)/g;
         while ((m = re2.exec(html)) !== null) {
+          if (seen[m[1]]) continue;
+          seen[m[1]] = true;
           results.push({ id: m[1], title: query });
         }
       }
@@ -95,16 +101,23 @@ function extract(ctx) {
   function episodes(animeId) {
     return fetchText(base + '/anime.php?' + animeId).then(function (html) {
       var eps = [];
-      var re = /gate[ha]\("([^"]+)"\)[\s\S]{0,200}?class="watch2"[^>]*>([^<]+)/gi;
+      var seen = {};
+      var re =
+        /gatea\(\s*"([^"]+)"\s*\)[\s\S]{0,400}?class=\s*['"][^'"]*watch2[^'"]*['"][^>]*>([^<]+)/gi;
       var m;
       while ((m = re.exec(html)) !== null) {
         var num = parseInt(String(m[2]).replace(/^0+(\d)/, '$1'), 10);
-        if (num > 0) eps.push({ id: m[1], num: num });
+        if (num > 0 && !seen[m[1]]) {
+          seen[m[1]] = true;
+          eps.push({ id: m[1], num: num });
+        }
       }
       if (!eps.length) {
-        var re2 = /gate[ha]\("([^"]+)"\)/g;
+        var re2 = /gatea\(\s*"([^"]+)"\s*\)/g;
         var n = 0;
         while ((m = re2.exec(html)) !== null) {
+          if (seen[m[1]]) continue;
+          seen[m[1]] = true;
           n += 1;
           eps.push({ id: m[1], num: n });
         }
@@ -126,7 +139,7 @@ function extract(ctx) {
         var re = /<source[^>]+src=["']([^"']+)["']/gi;
         var m;
         while ((m = re.exec(html)) !== null) {
-          if (/^https?:/i.test(m[1])) sources.push(m[1]);
+          if (/^https?:/i.test(m[1]) && m[1].indexOf('&error') < 0) sources.push(m[1]);
         }
         var primary = sources.find(function (u) {
           return u.indexOf('/video.mp4') >= 0;

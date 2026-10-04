@@ -1,136 +1,151 @@
 var SPECS = {
-  "domains": ["https://dulo.gd", "https://dulo.cx"],
-  "playbackReferer": "https://d.dulo.gd/",
-  "playbackOrigin": "https://d.dulo.gd"
+  base: 'https://dulo.mov',
 };
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var domains = Array.isArray(cfg.domains) ? cfg.domains : SPECS.domains;
+  var base = String(cfg.base || SPECS.base).replace(/\/$/, '');
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   var playbackHeaders = {
     'User-Agent': ua,
-    Referer: cfg.playbackReferer || 'https://d.dulo.gd/',
-    Origin: cfg.playbackOrigin || 'https://d.dulo.gd',
+    Referer: base + '/',
+    Origin: base,
   };
-  var isTv = ctx.type === 'tv' || ctx.type === 'series';
   var tmdbId = String(ctx.tmdbId || '').trim();
   if (!tmdbId) return Promise.resolve([]);
 
-  var payload = isTv
-    ? {
-        type: 'tv',
-        tmdbId: Number(tmdbId) || tmdbId,
-        season: ctx.season || 1,
-        episode: ctx.episode || 1,
-      }
-    : {
-        type: 'movie',
-        tmdbId: Number(tmdbId) || tmdbId,
-      };
+  var isTv = ctx.type === 'tv' || ctx.type === 'series';
+  var season = Number(ctx.season || 1) || 1;
+  var episode = Number(ctx.episode || 1) || 1;
+  var title = String(ctx.title || '').trim();
+  var year = ctx.year ? String(ctx.year) : '';
+  var runtime = Number(ctx.runtime || 0) || 0;
 
-  function getSessionCookie(domain) {
+  function encodeQs(params) {
+    return Object.keys(params)
+      .filter(function (k) {
+        return params[k] !== '' && params[k] != null;
+      })
+      .map(function (k) {
+        return encodeURIComponent(k) + '=' + encodeURIComponent(String(params[k]));
+      })
+      .join('&');
+  }
+
+  function qualityFromLabel(label) {
+    var text = String(label || '');
+    if (/\b4k\b/i.test(text) || /\b2160p\b/i.test(text)) return '2160p';
+    var m = text.match(/\b(\d{3,4})p\b/i);
+    return m ? m[1] + 'p' : '1080p';
+  }
+
+  function subtitlesFrom(item) {
+    var caps = item && Array.isArray(item.captions) ? item.captions : [];
+    var rows = [];
+    for (var i = 0; i < caps.length; i++) {
+      var cap = caps[i];
+      var url = cap && String(cap.url || '');
+      if (!url || url.indexOf('http') !== 0) continue;
+      rows.push({
+        url: url,
+        lang: String(cap.display || cap.language || 'Unknown'),
+      });
+    }
+    return rows;
+  }
+
+  function parsePayload(data, seen) {
+    var rows = [];
+    var list = data && Array.isArray(data.sources) ? data.sources : [];
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (!item || typeof item !== 'object') continue;
+      var url = String(item.url || '');
+      if (!url || url.indexOf('http') !== 0 || seen[url]) continue;
+      seen[url] = true;
+      var label = String(item.label || 'Stream');
+      var quality = qualityFromLabel(label);
+      var row = {
+        url: url,
+        name: 'Dulo · ' + label,
+        quality: quality,
+        headers: playbackHeaders,
+      };
+      var subs = subtitlesFrom(item);
+      if (subs.length) row.subtitles = subs;
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function getJson(path) {
     return ctx
-      .fetch(domain + '/api/session', {
+      .fetch(base + path, {
         headers: {
           'User-Agent': ua,
           Accept: 'application/json',
-          Referer: domain + '/',
-          Origin: domain,
+          Referer: base + '/',
+          Origin: base,
         },
       })
       .then(function (r) {
         if (!r.ok) return null;
-        var setCookie = '';
-        if (r.headers) {
-          if (typeof r.headers.getSetCookie === 'function') {
-            var arr = r.headers.getSetCookie();
-            setCookie = Array.isArray(arr) ? arr.join('; ') : String(arr || '');
-          } else if (typeof r.headers.get === 'function') {
-            setCookie = r.headers.get('set-cookie') || '';
-          }
-        }
-        if (!setCookie) return null;
-        var match = setCookie.match(/(__Host-amri_session=[^;]+)/);
-        return match ? match[1] : setCookie.split(';')[0];
+        return r.json().catch(function () {
+          return null;
+        });
       })
       .catch(function () {
         return null;
       });
   }
 
-  function parseSseSources(body, seen) {
-    var rows = [];
-    var lines = String(body || '').split(/\r?\n/);
-    for (var i = 0; i < lines.length; i++) {
-      var trimmed = lines[i].trim();
-      if (trimmed.indexOf('event: complete') === 0) break;
-      if (trimmed.indexOf('data:') !== 0) continue;
-      var jsonPart = trimmed.substring(5).trim();
-      if (!jsonPart || jsonPart.indexOf('{') !== 0) continue;
-      try {
-        var data = JSON.parse(jsonPart);
-        if (!data || !Array.isArray(data.sources)) continue;
-        data.sources.forEach(function (item) {
-          if (!item || typeof item !== 'object') return;
-          var url = String(item.url || '');
-          if (!url || url.indexOf('http') !== 0 || seen[url]) return;
-          seen[url] = true;
-          var titleLabel = String(item.title || 'Stream');
-          var quality = String(item.quality || 'Auto');
-          var qualityLabel =
-            quality && quality !== 'Auto' ? quality : '1080p';
-          rows.push({
-            url: url,
-            name: 'Dulo · ' + titleLabel + ' · ' + qualityLabel,
-            quality: qualityLabel,
-            headers: playbackHeaders,
-          });
-        });
-      } catch (e) {}
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function fetchSources(path, extra, seen, attemptsLeft) {
+    var params = { tmdbId: tmdbId, type: isTv ? 'tv' : 'movie' };
+    if (isTv) {
+      params.seasonId = String(season);
+      params.episodeId = String(episode);
     }
-    return rows;
-  }
-
-  function fetchDomain(domain, seen) {
-    return getSessionCookie(domain).then(function (cookie) {
-      var reqHeaders = {
-        'User-Agent': ua,
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        Referer: domain + '/',
-        Origin: domain,
-      };
-      if (cookie) reqHeaders.Cookie = cookie;
-      return ctx
-        .fetch(domain + '/api/source', {
-          method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify(payload),
-        })
-        .then(function (r) {
-          if (r.status === 401 || r.status === 403) return [];
-          if (!r.ok) return [];
-          return r.text().then(function (body) {
-            return parseSseSources(body, seen);
+    Object.assign(params, extra || {});
+    return getJson(path + '?' + encodeQs(params)).then(function (data) {
+      var rows = parsePayload(data, seen);
+      var pending = !!(data && data.pending);
+      if (pending && attemptsLeft > 0) {
+        return delay(rows.length ? 4000 : 2500).then(function () {
+          return fetchSources(path, extra, seen, attemptsLeft - 1).then(function (more) {
+            return rows.concat(more);
           });
-        })
-        .catch(function () {
-          return [];
         });
+      }
+      return rows;
     });
   }
 
-  function tryDomains(index, seen) {
-    if (index >= domains.length) return Promise.resolve([]);
-    return fetchDomain(domains[index], seen).then(function (rows) {
-      if (rows && rows.length) return rows;
-      return tryDomains(index + 1, seen);
-    });
-  }
+  var extra = { progressive: 'true' };
+  if (title) extra.title = title;
+  if (year) extra.year = year;
+  if (runtime > 0) extra.runtime = String(Math.round(runtime));
 
-  return tryDomains(0, {}).catch(function () {
-    return [];
-  });
+  var seen = {};
+  return Promise.all([
+    fetchSources('/api/sources', {}, seen, 0),
+    fetchSources('/api/sources/willow', {}, seen, 1),
+    fetchSources('/api/sources/additional', extra, seen, 3),
+  ])
+    .then(function (groups) {
+      var out = [];
+      for (var i = 0; i < groups.length; i++) {
+        if (groups[i] && groups[i].length) out = out.concat(groups[i]);
+      }
+      return out;
+    })
+    .catch(function () {
+      return [];
+    });
 }

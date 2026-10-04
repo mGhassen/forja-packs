@@ -1,9 +1,11 @@
 var SPECS = {
-  "bases": [
-    "https://www.miruro.tv",
-    "https://www.miruro.to",
-    "https://www.miruro.bz"
-  ]
+  bases: [
+    'https://www.miruro.to',
+    'https://www.miruro.tv',
+    'https://www.miruro.bz',
+    'https://www.miruro.ru',
+    'https://www.miruro.cx',
+  ],
 };
 
 function extract(ctx) {
@@ -17,57 +19,83 @@ function extract(ctx) {
   var epNum = isEpisodic
     ? Number(ctx.mappedEpisode || ctx.episode || 1) || 1
     : 1;
-  var providers = cfg.providers || ['bonk', 'kiwi', 'bee', 'bun', 'ally', 'moo', 'hop', 'zoro'];
+  var http =
+    typeof ctx.chromeFetch === 'function' ? ctx.chromeFetch.bind(ctx) : ctx.fetch.bind(ctx);
+  var CATALOG_XOR = 'miruro/catalog';
 
-  function encodeReq(payload) {
-    if (ctx.crypto && ctx.crypto.encodePipe) return ctx.crypto.encodePipe(payload);
-    return '';
+  function hdrs(base) {
+    return {
+      'User-Agent': ua,
+      Referer: base + '/',
+      Origin: base,
+      Accept: 'application/json, application/octet-stream, */*',
+    };
   }
 
-  function decodeBody(text, xObf) {
+  function bytesFromRes(r) {
+    if (r && typeof r.arrayBuffer === 'function') {
+      return r.arrayBuffer().then(function (buf) {
+        return new Uint8Array(buf);
+      });
+    }
+    return r.text().then(function (t) {
+      var s = String(t || '');
+      var out = new Uint8Array(s.length);
+      for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+      return out;
+    });
+  }
+
+  function xorCatalog(bytes) {
+    var out = new Uint8Array(bytes.length);
+    for (var i = 0; i < bytes.length; i++) {
+      out[i] = bytes[i] ^ CATALOG_XOR.charCodeAt(i % CATALOG_XOR.length);
+    }
+    return out;
+  }
+
+  function bytesToB64(bytes) {
+    var s = '';
+    var step = 0x8000;
+    for (var i = 0; i < bytes.length; i += step) {
+      var end = i + step < bytes.length ? i + step : bytes.length;
+      var chunk = [];
+      for (var j = i; j < end; j++) chunk.push(bytes[j]);
+      s += String.fromCharCode.apply(null, chunk);
+    }
+    return btoa(s);
+  }
+
+  function decodeCatalog(bytes) {
+    if (!bytes || !bytes.length) return null;
+    if (bytes[0] === 0x7b) {
+      try {
+        var raw = '';
+        for (var i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+        return JSON.parse(raw);
+      } catch (e) {}
+    }
+    var xored = xorCatalog(bytes);
     if (ctx.crypto && ctx.crypto.decodePipe) {
-      var first = ctx.crypto.decodePipe(text, xObf);
-      if (first) return first;
-      // WKWebView / CORS often omit x-obfuscated — try known levels.
-      if (!xObf) {
-        var l2 = ctx.crypto.decodePipe(text, '2');
-        if (l2) return l2;
-        var l1 = ctx.crypto.decodePipe(text, '1');
-        if (l1) return l1;
-      }
-      return null;
+      var decoded = ctx.crypto.decodePipe(bytesToB64(xored), '');
+      if (decoded) return decoded;
     }
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
-  function pipeGet(base, payload) {
-    var e = encodeReq(payload);
-    if (!e) return Promise.resolve(null);
-    var url = base + '/api/secure/pipe?e=' + e;
-    return ctx
-      .fetch(url, {
-        headers: {
-          'User-Agent': ua,
-          Referer: base + '/',
-          Origin: base,
-          Accept: 'application/json, text/plain, */*',
-        },
-      })
+  function catalogGet(base, pathAndQuery) {
+    var url = base + '/api/' + String(pathAndQuery).replace(/^\//, '');
+    return http(url, { headers: hdrs(base) })
       .then(function (r) {
         if (!r.ok) return null;
-        return r.text().then(function (text) {
-          var xObf = (
-            r.headers.get('x-obfuscated') ||
-            r.headers.get('X-Obfuscated') ||
-            r.headers.get('x-obf') ||
-            r.headers.get('X-Obf') ||
-            ''
-          ).trim();
-          return decodeBody(text, xObf);
+        var ct = String((r.headers && r.headers.get && r.headers.get('content-type')) || '').toLowerCase();
+        if (ct.indexOf('json') >= 0 && ct.indexOf('octet-stream') < 0) {
+          return r.json().catch(function () {
+            return null;
+          });
+        }
+        return bytesFromRes(r).then(function (bytes) {
+          return decodeCatalog(bytes);
         });
       })
       .catch(function () {
@@ -75,12 +103,12 @@ function extract(ctx) {
       });
   }
 
-  function pipeAny(payload) {
+  function catalogAny(pathAndQuery) {
     var chain = Promise.resolve(null);
     bases.forEach(function (base) {
       chain = chain.then(function (found) {
         if (found) return found;
-        return pipeGet(base, payload).then(function (data) {
+        return catalogGet(base, pathAndQuery).then(function (data) {
           if (data) data._base = base;
           return data;
         });
@@ -90,126 +118,129 @@ function extract(ctx) {
   }
 
   function anilistId() {
-    if (ctx.anilistId) return Promise.resolve(Number(ctx.anilistId));
+    if (ctx.anilistId) return Number(ctx.anilistId) || 0;
     var fromHost = globalThis.__engineCtxAnilist && globalThis.__engineCtxAnilist(ctx);
-    if (fromHost) return Promise.resolve(Number(fromHost));
-    return Promise.resolve(0);
+    return fromHost ? Number(fromHost) || 0 : 0;
   }
 
-  function pickHls(streams, headers, base) {
-    var list = Array.isArray(streams) ? streams : [];
-    var hls = list.filter(function (s) {
-      var t = String((s && s.type) || '').toLowerCase();
-      if (t === 'iframe' || t === 'embed' || t === 'html' || t === 'player') return false;
-      var u = String((s && (s.url || s.file)) || '');
-      if (!/^https?:/i.test(u)) return false;
-      if (t === 'hls' || t === 'file' || t === 'mp4' || t === 'dash') return true;
-      return /\.m3u8|\.mp4|\/hls|master\.m3u8/i.test(u);
+  function malId() {
+    var fromHost = globalThis.__engineCtxMal && globalThis.__engineCtxMal(ctx);
+    if (fromHost && fromHost.mal) return Number(fromHost.mal) || 0;
+    if (ctx.malId) return Number(ctx.malId) || 0;
+    return 0;
+  }
+
+  function titleOf(item) {
+    var t = item && item.title;
+    if (!t) return '';
+    if (typeof t === 'string') return t;
+    return t.english || t.romaji || t.native || '';
+  }
+
+  function lookupAnime() {
+    var al = anilistId();
+    var mal = malId();
+    var q = String(ctx.title || '').trim();
+    var first = al
+      ? catalogAny('v1/anime?anilist_id_in=' + encodeURIComponent(String(al)) + '&limit=100')
+      : mal
+        ? catalogAny('v1/anime?mal_id_in=' + encodeURIComponent(String(mal)) + '&limit=100')
+        : q
+          ? catalogAny(
+              'v1/anime?q=' +
+                encodeURIComponent(q) +
+                '&limit=8&sort=' +
+                encodeURIComponent('-popularity'),
+            )
+          : Promise.resolve(null);
+    return first.then(function (data) {
+      var rows = data && Array.isArray(data.data) ? data.data : [];
+      if (!rows.length) return null;
+      var hit = rows[0];
+      if (q) {
+        var needle = q.toLowerCase();
+        var scored = rows
+          .map(function (row) {
+            var t = titleOf(row).toLowerCase();
+            var n = t === needle ? 100 : t.indexOf(needle) >= 0 || needle.indexOf(t) >= 0 ? 80 : 0;
+            return { row: row, n: n };
+          })
+          .sort(function (a, b) {
+            return b.n - a.n;
+          });
+        if (scored[0] && scored[0].n > 0) hit = scored[0].row;
+      }
+      if (!hit || !hit.id) return null;
+      hit._base = data._base;
+      return hit;
     });
-    var candidates = hls.length
-      ? hls
-      : list.filter(function (s) {
-          return (
-            s &&
-            /^https?:/i.test(String(s.url || s.file || '')) &&
-            String(s.type || '').toLowerCase() !== 'embed'
-          );
-        });
-    candidates.sort(function (a, b) {
-      if (a.default && !b.default) return -1;
-      if (!a.default && b.default) return 1;
-      var qa = parseInt(String(a.quality || '').replace(/\D/g, ''), 10) || 0;
-      var qb = parseInt(String(b.quality || '').replace(/\D/g, ''), 10) || 0;
-      return qb - qa;
+  }
+
+  function wantedTracks() {
+    var cats =
+      (globalThis.__engineAudioCategories && globalThis.__engineAudioCategories(ctx)) ||
+      ['sub', 'dub'];
+    var out = {};
+    cats.forEach(function (c) {
+      out[String(c).toLowerCase()] = true;
     });
-    var best = candidates[0];
-    if (!best) return null;
-    var referer =
-      (best.referer ||
-        best.Referer ||
-        (headers && (headers.Referer || headers.referer || headers.Origin || headers.origin)) ||
-        '') + '';
-    if (!referer) referer = base + '/';
-    return {
-      url: best.url || best.file,
-      name: 'Miruro ' + (best.server || best.label || best.name || 'HLS'),
-      headers: { 'User-Agent': ua, Referer: referer },
-    };
+    if (out.sub) out.ssub = true;
+    return out;
   }
 
-  function episodesFor(prov, category) {
-    var eps = prov && prov.episodes;
-    if (!eps) return [];
-    if (Array.isArray(eps)) return category === 'sub' ? eps : [];
-    return eps[category] || [];
-  }
-
-  return anilistId()
-    .then(function (al) {
-      if (!al) return [];
-      return pipeAny({
-        path: 'episodes',
-        method: 'GET',
-        query: { anilistId: String(al) },
-        body: null,
-        version: '0.2.0',
-      }).then(function (data) {
-        if (!data || !data.providers) return [];
-        var provMap = data.providers;
-        var names = providers.concat(
-          Object.keys(provMap).filter(function (k) {
-            return providers.indexOf(k) < 0;
-          }),
-        );
-        var tasks = [];
-        var cats =
-          (globalThis.__engineAudioCategories &&
-            globalThis.__engineAudioCategories(ctx)) ||
-          ['sub', 'dub'];
-        names.slice(0, 8).forEach(function (name) {
-          var prov = provMap[name];
-          if (!prov) return;
-          cats.forEach(function (cat) {
-            var eps = episodesFor(prov, cat);
-            var ep = eps.find(function (e) {
-              return Number(e.number || e.num) === Number(epNum);
+  function flattenPlay(play, base) {
+    var tracks = play && Array.isArray(play.tracks) ? play.tracks : [];
+    var want = wantedTracks();
+    var out = [];
+    var seen = {};
+    tracks.forEach(function (track) {
+      var cat = String((track && track.track) || '').toLowerCase();
+      if (!want[cat]) return;
+      var lang = cat === 'dub' ? 'Dub' : 'Sub';
+      var providers = (track && track.providers) || [];
+      providers.forEach(function (prov) {
+        var pname = String((prov && prov.provider) || 'src');
+        ((prov && prov.servers) || []).forEach(function (server) {
+          var sname = String((server && server.server) || 'HLS');
+          var sh = (server && server.headers) || {};
+          var referer = String(sh.Referer || sh.referer || sh.Origin || sh.origin || '') || base + '/';
+          var origin = String(sh.Origin || sh.origin || '');
+          ((server && server.streams) || []).forEach(function (stream) {
+            if (!stream) return;
+            var t = String(stream.format || stream.type || '').toLowerCase();
+            if (t === 'iframe' || t === 'embed' || t === 'html' || t === 'player') return;
+            var u = String(stream.url || stream.file || '');
+            if (!/^https?:/i.test(u)) return;
+            if (t && t !== 'hls' && t !== 'file' && t !== 'mp4' && t !== 'dash') {
+              if (!/\.m3u8|\.mp4|\/hls|master\.m3u8/i.test(u)) return;
+            }
+            if (seen[u]) return;
+            seen[u] = true;
+            var headers = { 'User-Agent': ua, Referer: referer };
+            if (origin) headers.Origin = origin;
+            out.push({
+              url: u,
+              name: 'Miruro ' + pname + ' ' + sname + ' ' + cat.toUpperCase(),
+              language: lang,
+              headers: headers,
             });
-            if (!ep || !ep.id) return;
-            // episodeId is the raw pipe id — do NOT base64 it again (whole payload is encoded).
-            tasks.push(
-              pipeGet(data._base || bases[0], {
-                path: 'sources',
-                method: 'GET',
-                query: {
-                  episodeId: String(ep.id),
-                  provider: name,
-                  category: cat,
-                  anilistId: String(al),
-                },
-                body: null,
-                version: '0.2.0',
-              }).then(function (src) {
-                if (!src) return [];
-                var streams = src.streams || src.sources;
-                var row = pickHls(streams, src.headers, data._base || bases[0]);
-                if (!row) return [];
-                row.name = 'Miruro ' + name + ' ' + cat.toUpperCase();
-                row.language = cat === 'dub' ? 'Dub' : 'Sub';
-                return [row];
-              }),
-            );
           });
         });
-        return Promise.all(tasks).then(function (groups) {
-          var seen = {};
-          var out = [];
-          ;[].concat.apply([], groups).forEach(function (r) {
-            if (!r || !r.url || seen[r.url]) return;
-            seen[r.url] = true;
-            out.push(r);
-          });
-          return out;
-        });
+      });
+    });
+    return out;
+  }
+
+  return lookupAnime()
+    .then(function (anime) {
+      if (!anime || !anime.id) return [];
+      var base = anime._base || bases[0];
+      return catalogGet(
+        base,
+        'v1/anime/' + encodeURIComponent(anime.id) + '/episodes/' + encodeURIComponent(String(epNum)) + '/play',
+      ).then(function (play) {
+        if (!play) return [];
+        return flattenPlay(play, base).slice(0, 16);
       });
     })
     .catch(function () {

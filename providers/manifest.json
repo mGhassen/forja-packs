@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.24",
+  "version": "1.6.44",
   "tags": [
     "providers",
     "anime",
@@ -255,13 +255,15 @@
       "id": "animekai",
       "name": "AnimeKai",
       "entry": "animekai.js",
+      "ids": [
+        "title",
+        "mal",
+        "anilist"
+      ],
       "types": [
         "anime"
       ],
-      "kind": "http",
-      "hops": [
-        "hop-megaup"
-      ]
+      "kind": "http"
     },
     {
       "id": "cinejoy",
@@ -1499,7 +1501,8 @@
         "jilliandescribecompany.com",
         "voe.bar",
         "reputationsheriffkennethsand.com",
-        "fittingcentermondaysunday.com"
+        "fittingcentermondaysunday.com",
+        "teresapoliticallearn.com"
       ]
     },
     {

@@ -1,9 +1,8 @@
 var SPECS = {
-  "base": "https://anidb.app",
+  "base": "https://anidb.se",
   "mapApi": "https://id-mapping-api-malid.hf.space/api/resolve",
   "tmdbKey": "1865f43a0549ca50d341dd9ab8b29f49",
-  "jikan": "https://api.jikan.moe/v4/anime",
-  "armBase": "https://arm.haglund.dev/api/v2"
+  "jikan": "https://api.jikan.moe/v4/anime"
 };
 
 function extract(ctx) {
@@ -11,41 +10,30 @@ function extract(ctx) {
   var base = cfg.base.replace(/\/$/, '');
   var mapApi = cfg.mapApi;
   var jikan = cfg.jikan;
-  var armBase = cfg.armBase.replace(/\/$/, '');
   var tmdbKey = cfg.tmdbKey;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
-  var navHdrs = {
-    'User-Agent': ua,
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-origin',
-  };
-  var xhrHdrs = Object.assign({}, navHdrs, {
-    Accept: 'application/json, text/html, */*;q=0.8',
-    'X-Requested-With': 'XMLHttpRequest',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-  });
+  var hdrs = { 'User-Agent': ua, Referer: base + '/', Accept: 'text/html,application/xhtml+xml' };
   var isTv = ctx.type !== 'movie';
   var epNum = isTv ? ctx.episode || 1 : 1;
 
   function fetchText(url, extra) {
-    return ctx.fetch(url, { headers: Object.assign({}, navHdrs, extra || {}) }).then(function (r) {
+    return ctx.fetch(url, { headers: Object.assign({}, hdrs, extra || {}) }).then(function (r) {
       return r.text();
     });
   }
 
   function fetchJson(url, extra) {
-    return ctx.fetch(url, { headers: Object.assign({}, xhrHdrs, extra || {}) }).then(function (r) {
+    return ctx.fetch(url, { headers: Object.assign({}, hdrs, extra || {}, { Accept: 'application/json' }) }).then(function (r) {
       return r.json();
     });
   }
 
-  function stripTags(html) {
-    return String(html || '').replace(/<[^>]+>/g, '').trim();
+  function normalize(str) {
+    return String(str || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
   }
 
   function decodeEntities(s) {
@@ -59,7 +47,18 @@ function extract(ctx) {
 
   function resolveMal() {
     var fromHost = globalThis.__engineCtxMal && globalThis.__engineCtxMal(ctx);
-    if (fromHost) return Promise.resolve(fromHost.malId);
+    if (fromHost) {
+      return fetchJson(jikan + '/' + fromHost.malId)
+        .then(function (j) {
+          return {
+            ep: fromHost.mappedEp || epNum,
+            title: (j && j.data && j.data.title) || fromHost.title || ctx.title || '',
+          };
+        })
+        .catch(function () {
+          return { ep: fromHost.mappedEp || epNum, title: fromHost.title || ctx.title || '' };
+        });
+    }
     if (!isTv) {
       return fetchJson(
         'https://tmdb.forjahq.xyz/3/movie/' +
@@ -70,9 +69,7 @@ function extract(ctx) {
         .then(function (d) {
           var title = d.title || d.original_title || '';
           if (!title) return null;
-          return fetchJson(jikan + '?q=' + encodeURIComponent(title) + '&type=movie&limit=1').then(function (j) {
-            return j && j.data && j.data[0] ? j.data[0].mal_id : null;
-          });
+          return { ep: 1, title: title };
         })
         .catch(function () {
           return null;
@@ -93,7 +90,7 @@ function extract(ctx) {
             return '';
           });
     return imdbP.then(function (imdbId) {
-      if (!imdbId) return null;
+      if (!imdbId) return ctx.title ? { ep: epNum, title: String(ctx.title) } : null;
       return fetchJson(
         mapApi +
           '?id=' +
@@ -104,211 +101,205 @@ function extract(ctx) {
           encodeURIComponent(String(epNum)),
       )
         .then(function (m) {
-          return m && m.mal_id ? { mal: m.mal_id, ep: m.mal_episode || epNum } : null;
+          if (!m || !m.mal_id) return ctx.title ? { ep: epNum, title: String(ctx.title) } : null;
+          return fetchJson(jikan + '/' + m.mal_id).then(function (j) {
+            return {
+              ep: m.mal_episode || epNum,
+              title: (j && j.data && j.data.title) || String(ctx.title || ''),
+            };
+          });
         })
         .catch(function () {
-          return null;
+          return ctx.title ? { ep: epNum, title: String(ctx.title) } : null;
         });
     });
   }
 
-  function resolveAnilist(malId) {
-    return fetchJson(armBase + '/ids?source=myanimelist&id=' + encodeURIComponent(String(malId))).then(function (d) {
-      return d && d.anilist ? d.anilist : null;
-    });
-  }
-
-  function titleFromMal(malId) {
-    return fetchJson(jikan + '/' + malId).then(function (j) {
-      var d = j && j.data;
-      return (d && (d.title || d.title_english)) || '';
-    });
-  }
-
-  function search(query) {
-    return fetchText(base + '/search/suggestions?q=' + encodeURIComponent(query), { Referer: base + '/home' })
-      .then(function (html) {
+  function searchAjax(query) {
+    return ctx
+      .fetch(base + '/wp-admin/admin-ajax.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+          'User-Agent': ua,
+          Origin: base,
+          Referer: base + '/',
+        },
+        body: 'action=ts_ac_do_search&ts_ac_query=' + encodeURIComponent(query),
+      })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
         var results = [];
-        var re = /<a\b[^>]*data-search-item\b[^>]*>[\s\S]*?<\/a>/gi;
-        var m;
-        while ((m = re.exec(html)) !== null) {
-          var tag = (m[0].match(/<a\b[^>]*>/i) || [])[0] || '';
-          var hrefM = tag.match(/href=["']([^"']+)["']/i);
-          var href = hrefM ? hrefM[1] : '';
-          var path = href.indexOf('http') === 0 ? href.replace(/^https?:\/\/[^/]+/, '') : href;
-          var slugM = path.match(/^\/anime\/([^/?#]+)/);
+        var items = (((data || {}).anime || [])[0] || {}).all || [];
+        for (var i = 0; i < items.length; i++) {
+          var item = items[i];
+          var slugM = (item.post_link || '').match(/\/anime\/([^/]+)\/?$/);
           if (!slugM) continue;
-          var titleM = m[0].match(/<p\b[^>]*class=["'][^"']*text-sm[^"']*["'][^>]*>([\s\S]*?)<\/p>/i);
-          var siteId = Number((slugM[1].match(/-(\d+)$/) || [])[1]);
-          results.push({ slug: slugM[1], title: titleM ? stripTags(titleM[1]) : slugM[1], siteId: siteId });
+          results.push({ slug: slugM[1], text: item.post_title || slugM[1].replace(/-/g, ' ') });
         }
-        if (results.length) return results;
-        return fetchText(base + '/browse?q=' + encodeURIComponent(query), { Referer: base + '/home' }).then(function (browse) {
-          var seen = {};
-          var out = [];
-          var cardRe =
-            /<a\b[^>]*href=["'](?:https:\/\/anidb\.app)?\/anime\/([^"']+)["'][^>]*class=["'][^"']*\banime-card\b[^"']*["'][^>]*>[\s\S]*?<\/a>/gi;
-          while ((m = cardRe.exec(browse)) !== null) {
-            if (seen[m[1]]) continue;
-            seen[m[1]] = true;
-            out.push({
-              slug: m[1],
-              title: stripTags((m[0].match(/title=["']([^"']+)["']/i) || [])[1] || m[1]),
-              siteId: Number((m[1].match(/-(\d+)$/) || [])[1]),
-            });
-          }
-          return out;
-        });
+        return results;
       })
       .catch(function () {
         return [];
       });
   }
 
-  function parseExternalIds(html) {
-    return {
-      anilistId: Number((html.match(/https:\/\/anilist\.co\/anime\/(\d+)/i) || [])[1]) || null,
-      malId: Number((html.match(/https:\/\/myanimelist\.net\/anime\/(\d+)/i) || [])[1]) || null,
-    };
-  }
-
-  function resolveSeries(anilistId, malId, title) {
-    var queries = [title].filter(Boolean);
-    return Promise.all(
-      queries.map(function (q) {
-        return search(q);
-      }),
-    ).then(function (groups) {
-      var candidates = {};
-      groups.forEach(function (list) {
-        list.forEach(function (r) {
-          if (!candidates[r.slug]) candidates[r.slug] = r;
-        });
-      });
-      var slugs = Object.keys(candidates);
-      if (!slugs.length) return null;
-      return Promise.all(
-        slugs.slice(0, 6).map(function (slug) {
-          var c = candidates[slug];
-          return fetchText(base + '/anime/' + slug, { Referer: base + '/home' }).then(function (html) {
-            var ids = parseExternalIds(html);
-            if (anilistId && ids.anilistId === Number(anilistId)) return { slug: slug, siteId: c.siteId, title: c.title };
-            if (malId && ids.malId === Number(malId)) return { slug: slug, siteId: c.siteId, title: c.title };
-            return null;
-          });
-        }),
-      ).then(function (matches) {
-        for (var i = 0; i < matches.length; i++) if (matches[i]) return matches[i];
-        return candidates[slugs[0]] || null;
-      });
+  function searchHtml(query) {
+    return fetchText(base + '/?s=' + encodeURIComponent(query)).then(function (html) {
+      var results = [];
+      var seen = {};
+      var re = /class="bsx">\s*<a href="([^"]+)"[^>]*title="([^"]+)"/gi;
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        var slugM = m[1].match(/\/anime\/([^/]+)\/?$/);
+        if (!slugM || seen[slugM[1]]) continue;
+        seen[slugM[1]] = true;
+        results.push({ slug: slugM[1], text: decodeEntities(m[2]) });
+      }
+      return results;
     });
   }
 
-  function inferOffset(episodes) {
-    var nums = episodes
-      .map(function (e) {
-        return Number(e.number);
-      })
-      .filter(function (n) {
-        return n > 0;
-      });
-    if (!nums.length) return 0;
-    var min = Math.min.apply(null, nums);
-    return min > 1 ? min - 1 : 0;
+  function search(query) {
+    return searchAjax(query).then(function (rows) {
+      return rows.length ? rows : searchHtml(query);
+    });
   }
 
-  function languageForAudio(languages, audio) {
-    var preferred = audio === 'sub' ? ['jpn', 'ja', 'japanese'] : ['eng', 'en', 'english'];
-    for (var i = 0; i < languages.length; i++) {
-      var code = String(languages[i].code || languages[i].name || '').toLowerCase();
-      if (preferred.indexOf(code) >= 0 && languages[i].embed_url) return languages[i];
+  function pickSlug(results, query) {
+    if (!results.length) return null;
+    var target = normalize(query);
+    for (var i = 0; i < results.length; i++) {
+      var n = normalize(results[i].text);
+      if (n === target || n.indexOf(target) >= 0 || target.indexOf(n) >= 0) return results[i].slug;
     }
-    return null;
+    return results[0].slug;
   }
 
-  function extractHls(html) {
-    var patterns = [
-      /file\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
-      /["'](https?:\/\/[^"']+\/master\.m3u8[^"']*)["']/i,
-      /["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
-    ];
-    for (var i = 0; i < patterns.length; i++) {
-      var m = html.match(patterns[i]);
-      if (m && m[1]) return decodeEntities(m[1]);
-    }
-    return null;
-  }
-
-  function streamsForEmbed(embedUrl, audio) {
-    return fetchText(embedUrl, { Referer: base + '/' }).then(function (html) {
-      var hls = extractHls(html);
-      if (hls) {
-        return [
-          {
-            url: hls,
-            name: 'AniDB.app',
-            headers: { 'User-Agent': ua, Referer: new URL(embedUrl).origin + '/' },
-            language: audio === 'dub' ? 'Dub' : 'Sub',
-          },
-        ];
+  function scrapeSeries(slug) {
+    return fetchText(base + '/anime/' + slug + '/').then(function (html) {
+      var episodes = [];
+      var seen = {};
+      var re =
+        /<li\b[^>]*data-index="\d+"[^>]*>[\s\S]*?<a\s+href="(https?:\/\/[^"]+)"[\s\S]*?<div\s+class="epl-num">([^<]+)<\/div>/gi;
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        var n = parseFloat(String(m[2]).trim());
+        var number = Number.isFinite(n) && n >= 1 ? Math.round(n) : null;
+        if (number === null || seen[number]) continue;
+        seen[number] = true;
+        episodes.push({ number: number, epUrl: decodeEntities(m[1]) });
       }
-      return ctx.hop(embedUrl).then(function (rows) {
-        return rows.map(function (r) {
-          return Object.assign({}, r, { name: 'AniDB.app embed', language: audio === 'dub' ? 'Dub' : 'Sub' });
+      return episodes;
+    });
+  }
+
+  function episodePageUrl(slug, number, audio) {
+    var suf = audio === 'dub' ? 'english-dubbed' : 'english-subbed';
+    return base + '/' + slug + '-episode-' + number + '-' + suf + '/';
+  }
+
+  function scrapeEmbeds(epUrl) {
+    return fetchText(epUrl).then(function (html) {
+      var streams = [];
+      var re = /<option\s+value="([A-Za-z0-9+/=]+)"[^>]*>([^<]+)<\/option>/gi;
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        var serverName = m[2].trim();
+        if (!serverName || /select video server/i.test(serverName) || !m[1]) continue;
+        try {
+          var decoded = decodeEntities(atob(m[1]));
+          var srcM =
+            decoded.match(/data-src=["'](https?:\/\/[^"']+)["']/i) ||
+            decoded.match(/src=["'](https?:\/\/[^"']+)["']/i);
+          if (!srcM) continue;
+          streams.push({ url: srcM[1], server: serverName });
+        } catch (e) {}
+      }
+      if (!streams.length) {
+        var iframeRe = /<(?:iframe|video)[^>]+(?:src|data-src)=["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+        while ((m = iframeRe.exec(html)) !== null) {
+          streams.push({ url: m[1], server: 'Direct' });
+        }
+      }
+      return streams;
+    });
+  }
+
+  function isDirectFile(url) {
+    return /\.(mp4|m3u8)(\?|$)/i.test(url);
+  }
+
+  function languageLabel(audio) {
+    return audio === 'dub' ? 'Dub' : 'Sub';
+  }
+
+  function resolveEmbeds(embeds, audio) {
+    return Promise.all(
+      embeds.map(function (stream) {
+        var url = stream.url;
+        if (isDirectFile(url)) {
+          return Promise.resolve([
+            {
+              url: url,
+              name: 'AniDbApp ' + stream.server,
+              headers: { 'User-Agent': ua, Referer: base + '/' },
+              language: languageLabel(audio),
+            },
+          ]);
+        }
+        return ctx.hop(url).then(function (rows) {
+          return rows.length
+            ? rows.map(function (r) {
+                return Object.assign({}, r, {
+                  name: 'AniDbApp ' + (stream.server || 'embed'),
+                  language: languageLabel(audio),
+                });
+              })
+            : [];
         });
-      });
+      }),
+    ).then(function (groups) {
+      return [].concat.apply([], groups);
+    });
+  }
+
+  function playEpisode(slug, episodes, number, audio) {
+    var listed = audio === 'sub'
+      ? episodes.find(function (e) {
+          return e.number === number;
+        })
+      : null;
+    var epUrl = listed ? listed.epUrl : episodePageUrl(slug, number, audio);
+    return scrapeEmbeds(epUrl).then(function (embeds) {
+      return embeds.length ? resolveEmbeds(embeds, audio) : [];
     });
   }
 
   return resolveMal()
     .then(function (mapped) {
       if (!mapped) return [];
-      var malId = mapped.mal;
-      var episode = mapped.ep;
-      return resolveAnilist(malId)
-        .then(function (alId) {
-          return titleFromMal(malId).then(function (title) {
-            return resolveSeries(alId, malId, title);
-          });
-        })
-        .then(function (series) {
-          if (!series || !series.siteId) return [];
-          return fetchJson(base + '/api/frontend/anime/' + series.siteId + '/episodes', {
-            Referer: base + '/anime/' + series.slug,
-          }).then(function (data) {
-            var episodes = (data && data.episodes) || [];
-            var offset = inferOffset(episodes);
-            var providerEp = Number(episode) + offset;
-            var ep = episodes.find(function (e) {
-              return Number(e.number) === providerEp;
-            });
-            if (!ep || !ep.id) return [];
-            return fetchJson(base + '/api/frontend/episode/' + ep.id + '/languages', {
-              Referer: base + '/anime/' + series.slug,
-            }).then(function (langData) {
-              var languages = (langData && langData.languages) || [];
-              var cats =
-                (globalThis.__engineAudioCategories &&
-                  globalThis.__engineAudioCategories(ctx)) ||
-                ['sub', 'dub'];
-              function tryAudio(audio) {
-                var lang = languageForAudio(languages, audio);
-                var embed =
-                  lang && lang.embed_url ? decodeEntities(lang.embed_url) : '';
-                if (!embed) return Promise.resolve([]);
-                return streamsForEmbed(embed, audio);
-              }
-              var first = cats[0] || 'sub';
-              return tryAudio(first).then(function (rows) {
-                if (rows.length || cats.length < 2) return rows;
-                return tryAudio(cats[1]);
-              });
-            });
+      var query = (mapped.title || String(ctx.title || '')).split(':')[0].trim();
+      if (!query) return [];
+      return search(query).then(function (results) {
+        var slug = pickSlug(results, query);
+        if (!slug) return [];
+        var cats =
+          (globalThis.__engineAudioCategories && globalThis.__engineAudioCategories(ctx)) || ['sub', 'dub'];
+        return scrapeSeries(slug).then(function (episodes) {
+          function tryAudio(audio) {
+            return playEpisode(slug, episodes, mapped.ep, audio);
+          }
+          var first = cats[0] || 'sub';
+          return tryAudio(first).then(function (rows) {
+            if (rows.length || cats.length < 2) return rows;
+            return tryAudio(cats[1]);
           });
         });
-    })
-    .then(function (rows) {
-      return rows && rows.length ? rows : [];
+      });
     })
     .catch(function () {
       return [];

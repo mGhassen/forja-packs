@@ -1,132 +1,148 @@
 var SPECS = {
-  domains: ['https://dulo.gd', 'https://dulo.cx'],
-  playOrigin: 'https://d.dulo.gd',
+  base: 'https://dulo.mov',
 };
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var domains = Array.isArray(cfg.domains) && cfg.domains.length ? cfg.domains : SPECS.domains;
-  var playOrigin = String(cfg.playOrigin || SPECS.playOrigin).replace(/\/$/, '');
+  var base = String(cfg.base || SPECS.base).replace(/\/$/, '');
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-  var ep = Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
-  var sessionCookie = '';
+  var playbackHeaders = {
+    'User-Agent': ua,
+    Referer: base + '/',
+    Origin: base,
+  };
+  var tmdbId = String(ctx.tmdbId || '').trim();
+  if (!tmdbId) return Promise.resolve([]);
 
-  function anilistId() {
-    var al = Number(ctx.anilistId) || 0;
-    if (!al && globalThis.__engineCtxAnilist) al = Number(globalThis.__engineCtxAnilist(ctx)) || 0;
-    return al;
-  }
+  var season = Number(ctx.season || 1) || 1;
+  var episode = Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
+  var title = String(ctx.title || ctx.titleEnglish || ctx.titleRomaji || '').trim();
 
-  function pickCookie(headers) {
-    if (!headers) return '';
-    var raw =
-      typeof headers.getSetCookie === 'function'
-        ? headers.getSetCookie().join(',')
-        : headers.get && (headers.get('set-cookie') || headers.get('Set-Cookie') || '');
-    var m = String(raw || '').match(/(__Host-amri_session=[^;]+)/);
-    return m ? m[1] : String(raw || '').split(';')[0].trim();
-  }
-
-  function getSession(domain) {
-    if (sessionCookie) return Promise.resolve(sessionCookie);
-    return ctx
-      .fetch(domain + '/api/session', {
-        headers: {
-          'User-Agent': ua,
-          Accept: 'application/json',
-          Referer: domain + '/',
-          Origin: domain,
-        },
+  function encodeQs(params) {
+    return Object.keys(params)
+      .filter(function (k) {
+        return params[k] !== '' && params[k] != null;
       })
-      .then(function (r) {
-        if (!r.ok) return '';
-        sessionCookie = pickCookie(r.headers);
-        return sessionCookie;
+      .map(function (k) {
+        return encodeURIComponent(k) + '=' + encodeURIComponent(String(params[k]));
       })
-      .catch(function () {
-        return '';
-      });
+      .join('&');
   }
 
-  function parseSse(text) {
-    var seen = {};
+  function qualityFromLabel(label) {
+    var text = String(label || '');
+    if (/\b4k\b/i.test(text) || /\b2160p\b/i.test(text)) return '2160p';
+    var m = text.match(/\b(\d{3,4})p\b/i);
+    return m ? m[1] + 'p' : '1080p';
+  }
+
+  function subtitlesFrom(item) {
+    var caps = item && Array.isArray(item.captions) ? item.captions : [];
     var rows = [];
-    var lines = String(text || '').split(/\r?\n/);
-    for (var i = 0; i < lines.length; i++) {
-      var trimmed = lines[i].trim();
-      if (trimmed.indexOf('data:') !== 0) continue;
-      var jsonPart = trimmed.substring(5).trim();
-      if (!jsonPart || jsonPart.charAt(0) !== '{') continue;
-      try {
-        var data = JSON.parse(jsonPart);
-        var sources = data && data.sources;
-        if (!Array.isArray(sources)) continue;
-        for (var j = 0; j < sources.length; j++) {
-          var item = sources[j];
-          if (!item || !item.url || !/^https?:\/\//i.test(item.url)) continue;
-          if (seen[item.url]) continue;
-          seen[item.url] = true;
-          rows.push({
-            url: item.url,
-            name: 'Dulo Anime (' + (item.title || item.quality || 'Source') + ')',
-            quality: item.quality && item.quality !== 'Auto' ? item.quality : '1080p',
-            headers: {
-              'User-Agent': ua,
-              Referer: playOrigin + '/',
-              Origin: playOrigin,
-            },
-          });
-        }
-      } catch (e) {}
+    for (var i = 0; i < caps.length; i++) {
+      var cap = caps[i];
+      var url = cap && String(cap.url || '');
+      if (!url || url.indexOf('http') !== 0) continue;
+      rows.push({
+        url: url,
+        lang: String(cap.display || cap.language || 'Unknown'),
+      });
     }
     return rows;
   }
 
-  function fetchDomain(domain, al) {
-    return getSession(domain).then(function (cookie) {
-      var headers = {
-        'User-Agent': ua,
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        Referer: domain + '/',
-        Origin: domain,
+  function parsePayload(data, seen) {
+    var rows = [];
+    var list = data && Array.isArray(data.sources) ? data.sources : [];
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (!item || typeof item !== 'object') continue;
+      var url = String(item.url || '');
+      if (!url || url.indexOf('http') !== 0 || seen[url]) continue;
+      seen[url] = true;
+      var label = String(item.label || 'Source');
+      var row = {
+        url: url,
+        name: 'Dulo Anime · ' + label,
+        quality: qualityFromLabel(label),
+        headers: playbackHeaders,
       };
-      if (cookie) headers.Cookie = cookie;
-      return ctx
-        .fetch(domain + '/api/source', {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify({
-            type: 'anime',
-            anilistId: al,
-            episode: ep,
-          }),
-        })
-        .then(function (r) {
-          if (r.status === 401 || r.status === 403) {
-            sessionCookie = '';
-            return [];
-          }
-          if (!r.ok) return [];
-          return r.text().then(parseSse);
+      var subs = subtitlesFrom(item);
+      if (subs.length) row.subtitles = subs;
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function getJson(path) {
+    return ctx
+      .fetch(base + path, {
+        headers: {
+          'User-Agent': ua,
+          Accept: 'application/json',
+          Referer: base + '/',
+          Origin: base,
+        },
+      })
+      .then(function (r) {
+        if (!r.ok) return null;
+        return r.json().catch(function () {
+          return null;
         });
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
     });
   }
 
-  var al = anilistId();
-  if (!al) return Promise.resolve([]);
-
-  var chain = Promise.resolve([]);
-  domains.forEach(function (domain) {
-    chain = chain.then(function (acc) {
-      if (acc.length) return acc;
-      return fetchDomain(String(domain).replace(/\/$/, ''), al).catch(function () {
-        return [];
-      });
+  function fetchSources(path, extra, seen, attemptsLeft) {
+    var params = {
+      tmdbId: tmdbId,
+      type: 'tv',
+      seasonId: String(season),
+      episodeId: String(episode),
+    };
+    Object.assign(params, extra || {});
+    return getJson(path + '?' + encodeQs(params)).then(function (data) {
+      var rows = parsePayload(data, seen);
+      var pending = !!(data && data.pending);
+      if (pending && attemptsLeft > 0) {
+        return delay(rows.length ? 4000 : 2500).then(function () {
+          return fetchSources(path, extra, seen, attemptsLeft - 1).then(function (more) {
+            return rows.concat(more);
+          });
+        });
+      }
+      return rows;
     });
-  });
-  return chain.catch(function () {
-    return [];
-  });
+  }
+
+  var extra = { progressive: 'true', anime: 'true' };
+  if (title) extra.title = title;
+  var seasonEpisodes = Number(ctx.seasonEpisodes || 0) || 0;
+  if (seasonEpisodes > 0) extra.seasonEpisodes = String(seasonEpisodes);
+
+  var seen = {};
+  return Promise.all([
+    fetchSources('/api/sources', {}, seen, 0),
+    fetchSources('/api/sources/willow', {}, seen, 1),
+    fetchSources('/api/sources/additional', extra, seen, 3),
+  ])
+    .then(function (groups) {
+      var out = [];
+      for (var i = 0; i < groups.length; i++) {
+        if (groups[i] && groups[i].length) out = out.concat(groups[i]);
+      }
+      return out;
+    })
+    .catch(function () {
+      return [];
+    });
 }

@@ -25,12 +25,17 @@ function extract(ctx) {
   var sticky = null;
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
-  // Hub Sources injects KissKh drama/episode ids. Home/TMDB has no kisskhId —
-  // Search API also never returns tmdbID, so Home must title-match (not list[0]).
-  var episodeId = cfg.episodeId || ctx.config.episodeId;
+  // Asian Drama hub injects kisskhId (+ real Episode API ids). Anime/Home
+  // MetaVideo ids are episode numbers ("1") — never treat those as Episode API ids.
+  // Search API also never returns tmdbID, so Home/Anime must title-match.
   var dramaId = cfg.dramaId || ctx.config.dramaId;
+  var episodeId = null;
+  if (dramaId) {
+    episodeId = cfg.episodeId || ctx.config.episodeId;
+  }
   var tmdbId = String(ctx.tmdbId || '');
   var title = String(ctx.title || '');
+  var wantEp = Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
   ctx.log(
     'kisskh start dramaId=' +
       (dramaId || '') +
@@ -43,11 +48,11 @@ function extract(ctx) {
       ' type=' +
       (ctx.type || '') +
       ' ep=' +
-      (ctx.episode || 1) +
+      wantEp +
       ' mirrors=' +
       ordered.length +
       ' hasKkey=' +
-      typeof kisskhKkey === 'function',
+      (typeof kisskhKkey === 'function'),
   );
 
   function headersFor(origin) {
@@ -359,7 +364,7 @@ function extract(ctx) {
     var eps = drama.episodes || drama.Episodes || [];
     if (!eps.length) return [];
     var isMovie = String(ctx.type || '').toLowerCase() === 'movie';
-    var want = Number(ctx.episode || 1);
+    var want = wantEp;
     var ep = null;
     if (isMovie || eps.length === 1) {
       // KissKh movies often number the single playable as 0 (not 1).

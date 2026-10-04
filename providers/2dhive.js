@@ -1,146 +1,208 @@
 var SPECS = {
-  "base": "https://2dhive.com",
-  "jikan": "https://api.jikan.moe/v4/anime"
+  base: 'https://2dhive.com',
+  wavy: 'https://wavy.babastream.top',
+  megaplay: 'https://megaplay.buzz',
 };
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var base = cfg.base.replace(/\/$/, '');
-  var jikan = cfg.jikan;
+  var hive = String(cfg.base || '').replace(/\/$/, '');
+  var wavy = String(cfg.wavy || '').replace(/\/$/, '');
+  var megaplay = String(cfg.megaplay || '').replace(/\/$/, '');
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-  var headers = { 'User-Agent': ua };
-  var title = String(ctx.title || '');
-  var epNum = ctx.type === 'movie' ? 1 : ctx.episode || 1;
-  var audio = 'sub';
+  var headers = { 'User-Agent': ua, Accept: '*/*' };
+  var plainFetch = ctx.fetch.bind(ctx);
+  var chromeFetch =
+    typeof ctx.chromeFetch === 'function' ? ctx.chromeFetch.bind(ctx) : null;
+  var http = chromeFetch || plainFetch;
 
-  function getJson(url, extra) {
-    return ctx.fetch(url, { headers: Object.assign({}, headers, extra || {}) }).then(function (r) {
-      return r.json();
+  function getText(url, extra, client) {
+    var fn = client || http;
+    return fn(url, { headers: Object.assign({}, headers, extra || {}) }).then(function (r) {
+      if (!r.ok) return '';
+      return r.text();
     });
   }
 
-  function getText(url, extra) {
-    return ctx.fetch(url, { headers: Object.assign({}, headers, extra || {}) }).then(function (r) {
-      return r.text();
+  function getJson(url, extra) {
+    return plainFetch(url, { headers: Object.assign({}, headers, extra || {}) }).then(function (r) {
+      if (!r.ok) return null;
+      return r.json();
     });
   }
 
   function malId() {
     var fromHost = globalThis.__engineCtxMal && globalThis.__engineCtxMal(ctx);
-    if (fromHost) return Promise.resolve(fromHost.malId);
-    if (!title) return Promise.resolve(null);
-    var type = ctx.type === 'movie' ? 'movie' : 'tv';
-    return getJson(jikan + '?q=' + encodeURIComponent(title) + '&type=' + type + '&limit=1')
-      .then(function (d) {
-        return d && d.data && d.data[0] ? d.data[0].mal_id : null;
+    if (fromHost && fromHost.mal) {
+      return {
+        mal: Number(fromHost.mal),
+        ep: Number(fromHost.ep || fromHost.mappedEp || ctx.episode || 1) || 1,
+      };
+    }
+    var mal = Number(ctx.malId) || 0;
+    if (!mal) return null;
+    return {
+      mal: mal,
+      ep: Number(ctx.mappedEpisode || ctx.episode || 1) || 1,
+    };
+  }
+
+  function cats() {
+    return (
+      (globalThis.__engineAudioCategories && globalThis.__engineAudioCategories(ctx)) || [
+        'sub',
+        'dub',
+      ]
+    );
+  }
+
+  function firstPlaylistUri(master, origin) {
+    var lines = String(master || '').split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].trim();
+      if (!ln || ln.charAt(0) === '#') continue;
+      if (/^https?:\/\//i.test(ln)) return ln;
+      if (ln.charAt(0) === '/') return origin + ln;
+      return origin + '/' + ln;
+    }
+    return '';
+  }
+
+  function wavyRows(mal, ep, kind) {
+    var page = wavy + '/' + mal + '/' + ep + '/' + kind;
+    var masterUrl = wavy + '/stream.m3u8';
+    var playHeaders = {
+      'User-Agent': ua,
+      Referer: page,
+      Origin: wavy,
+    };
+    function fromClient(client) {
+      return getText(page, { Referer: hive + '/' }, client).then(function (html) {
+        if (!html || /<title>not found/i.test(html)) return [];
+        return getText(masterUrl, { Referer: page, Origin: wavy }, client).then(function (master) {
+          if (!master || master.indexOf('#EXTM3U') < 0) return [];
+          var url = firstPlaylistUri(master, wavy) || masterUrl;
+          return [
+            {
+              url: url,
+              name: '2DHive Wavy (' + kind.toUpperCase() + ')',
+              language: kind === 'dub' ? 'Dub' : 'Sub',
+              headers: playHeaders,
+            },
+          ];
+        });
+      });
+    }
+    return fromClient(http)
+      .then(function (rows) {
+        if (rows && rows.length) return rows;
+        if (!chromeFetch) return [];
+        return fromClient(plainFetch);
       })
       .catch(function () {
-        return null;
+        return [];
       });
   }
 
-  function astroDecode(v) {
-    if (!Array.isArray(v)) return v;
-    var type = v[0];
-    var data = v[1];
-    if (type === 0) {
-      if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
-      var o = {};
-      Object.keys(data).forEach(function (k) {
-        o[k] = astroDecode(data[k]);
-      });
-      return o;
-    }
-    if (type === 1) return Array.isArray(data) ? data.map(astroDecode) : data;
-    return data;
-  }
-
-  function extractProps(html) {
-    var idx = html.indexOf('prefetchedHls');
-    if (idx < 0) return null;
-    var propsIdx = html.lastIndexOf('props="', idx);
-    if (propsIdx < 0) return null;
-    var valueIdx = propsIdx + 7;
-    var endIdx = html.indexOf('"', valueIdx);
-    if (endIdx < 0) return null;
-    var raw = html
-      .slice(valueIdx, endIdx)
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&#39;/g, "'")
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
+  function playerId(html) {
     try {
-      var parsed = JSON.parse(raw);
-      var out = {};
-      Object.keys(parsed).forEach(function (k) {
-        out[k] = astroDecode(parsed[k]);
-      });
-      return out;
+      var $ = ctx.html ? ctx.html(html) : null;
+      if ($) {
+        var el = $('#megaplay-player');
+        if (el && el.length) {
+          return el.attr('data-id') || '';
+        }
+      }
+    } catch (e) {}
+    return (
+      (html.match(/id=["']megaplay-player["'][^>]*data-id=["']([^"']+)/) ||
+        html.match(/data-id=["']([^"']+)["'][^>]*id=["']megaplay-player/) ||
+        [])[1] || ''
+    );
+  }
+
+  var MEGAPLAY_AES_KEY = 'i?LMTAx0Q6,:}50U';
+  var MEGAPLAY_AES_IV = "W0;27ToaUpl_P%'c";
+
+  function fileFromGetSources(json) {
+    var file = json && json.sources && json.sources.file;
+    if (typeof file === 'string' && file) return file;
+    var enc = json && json.enc;
+    if (!enc || typeof enc !== 'string') return '';
+    try {
+      var C = ctx.crypto || globalThis.CryptoJS;
+      if (!C || !C.AES) return '';
+      var keyHex = C.enc.Utf8.parse(MEGAPLAY_AES_KEY).toString(C.enc.Hex);
+      while (keyHex.length < 64) keyHex += '00';
+      var key = C.enc.Hex.parse(keyHex.substring(0, 64));
+      var iv = C.enc.Utf8.parse(MEGAPLAY_AES_IV);
+      var pt = C.AES.decrypt(
+        { ciphertext: C.enc.Base64.parse(enc) },
+        key,
+        { iv: iv, mode: C.mode.CBC, padding: C.pad.Pkcs7 },
+      );
+      var text = C.enc.Utf8.stringify(pt);
+      if (!text) return '';
+      var parsed = JSON.parse(text);
+      return (parsed && parsed.file) || '';
     } catch (e) {
-      return null;
+      return '';
     }
   }
 
-  return malId()
-    .then(function (mal) {
-      if (!mal) return [];
-      var referer = base + '/episode?anime=' + mal + '&ep_num=' + epNum;
-      var mega = 'https://megaplay.buzz/stream/mal/' + mal + '/' + epNum + '/' + audio;
-      return Promise.all([
-        getText(referer, { Referer: base + '/' })
-          .then(extractProps)
-          .catch(function () {
-            return null;
-          }),
-        getJson(base + '/api/hianime?mal_id=' + mal + '&ep_num=' + epNum, { Referer: referer }).catch(
-          function () {
-            return null;
-          },
-        ),
-        ctx.hop(mega),
-      ]).then(function (parts) {
-        var props = parts[0];
-        var hi = parts[1];
-        var hopped = parts[2] || [];
-        var rows = hopped.slice();
-        if (hi && hi.m3u8) {
-          rows.push({
-            url: hi.m3u8,
-            name: '2DHive hiAnime',
-            headers: { 'User-Agent': ua, Referer: referer },
-          });
-        }
-        var servers = props && Array.isArray(props.servers) ? props.servers : [];
-        var had = servers.filter(function (s) {
-          return s && s.server_name === 'HAdfree' && s.slug && !s.dub;
+  function megaplayRows(mal, ep, kind) {
+    var megaUrl = megaplay + '/stream/mal/' + mal + '/' + ep + '/' + kind;
+    return getText(megaUrl, { Referer: megaUrl }, plainFetch)
+      .then(function (html) {
+        var id = playerId(html);
+        if (!id) return [];
+        var api =
+          megaplay + '/stream/getSources?id=' + id + '&id=' + id + '&s=tcdn';
+        return getJson(api, {
+          'X-Requested-With': 'XMLHttpRequest',
+          Referer: megaUrl,
+          Origin: megaplay,
+        }).then(function (json) {
+          var file = fileFromGetSources(json);
+          if (!file) return [];
+          return [
+            {
+              url: file,
+              name: '2DHive Megaplay (' + kind.toUpperCase() + ')',
+              language: kind === 'dub' ? 'Dub' : 'Sub',
+              headers: { 'User-Agent': ua, Referer: megaplay + '/', Origin: megaplay },
+            },
+          ];
         });
-        return Promise.all(
-          had.slice(0, 4).map(function (entry) {
-            return getJson(base + '/api/hadfree?slug=' + encodeURIComponent(entry.slug), {
-              Referer: referer,
-            })
-              .then(function (j) {
-                return j && j.streamUrl
-                  ? [
-                      {
-                        url: j.streamUrl,
-                        name: '2DHive HAdfree',
-                        headers: { 'User-Agent': ua, Referer: referer },
-                      },
-                    ]
-                  : [];
-              })
-              .catch(function () {
-                return [];
-              });
-          }),
-        ).then(function (groups) {
-          var out = rows.concat.apply(rows, groups || []);
-          return out.length ? out : [];
+      })
+      .catch(function () {
+        return [];
+      });
+  }
+
+  var id = malId();
+  if (!id || !id.mal) return Promise.resolve([]);
+
+  var tasks = [];
+  cats().forEach(function (kind) {
+    tasks.push(wavyRows(id.mal, id.ep, kind));
+    tasks.push(megaplayRows(id.mal, id.ep, kind));
+  });
+
+  return Promise.all(tasks)
+    .then(function (groups) {
+      var seen = {};
+      var out = [];
+      groups.forEach(function (rows) {
+        (rows || []).forEach(function (r) {
+          if (!r || !r.url || seen[r.url]) return;
+          seen[r.url] = true;
+          out.push(r);
         });
       });
+      if (!out.length) ctx.log('2dhive: no wavy/megaplay streams mal=' + id.mal + ' ep=' + id.ep);
+      return out;
     })
     .catch(function () {
       return [];

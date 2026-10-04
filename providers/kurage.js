@@ -151,6 +151,7 @@ function extract(ctx) {
             url: streamUrl,
             quality: 'Auto',
             headers: Object.assign({}, hdrs, extraHeaders),
+            probe: 'headOrRange',
           });
         });
       });
