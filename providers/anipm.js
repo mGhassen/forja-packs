@@ -16,21 +16,19 @@ function extract(ctx) {
   }
 
   function scrape(al, kind) {
-    var cat = kind === 'dub' ? 'dub' : 'sub';
-    var params = {
-      ep: String(ep),
-      anilistId: String(al),
-    };
-    var title = String(ctx.title || ctx.titleEnglish || ctx.titleRomaji || '').trim();
-    if (title) params.title = title;
-    var qs = Object.keys(params)
-      .map(function (k) {
-        return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-      })
-      .join('&');
+    var lang = kind === 'dub' ? 'dub' : 'sub';
+    var url =
+      base +
+      '/api/anime/playback-bootstrap/anilist/' +
+      al +
+      '?ep=' +
+      encodeURIComponent(String(ep)) +
+      '&lang=' +
+      lang +
+      '&backup=1';
 
     return ctx
-      .fetch(base + '/api/anime/src/servers?' + qs, {
+      .fetch(url, {
         headers: {
           'User-Agent': ua,
           Referer: base + '/',
@@ -43,26 +41,39 @@ function extract(ctx) {
       })
       .then(function (data) {
         if (!data || typeof data !== 'object') return [];
-        var list = data[cat];
-        if (!Array.isArray(list)) return [];
         var rows = [];
-        for (var i = 0; i < list.length; i++) {
-          var srv = list[i];
-          if (!srv || !srv.url) continue;
-          var streamUrl = String(srv.url).charAt(0) === '/' ? base + srv.url : srv.url;
-          if (!streamUrl) continue;
-          rows.push({
-            url: streamUrl,
-            name: 'AniPM (' + (srv.provider || 'AniPM') + ') (' + cat.toUpperCase() + ')',
-            quality: '1080p',
-            language: cat === 'dub' ? 'Dub' : 'Sub',
-            headers: {
-              'User-Agent': ua,
-              Referer: base + '/',
-              Origin: base,
-            },
-          });
+        var langLabel = lang.toUpperCase();
+
+        var be = data.backupEmbed;
+        if (be && be.available) {
+          if (be.direct && be.direct.stream) {
+            rows.push({
+              url: be.direct.stream,
+              name: 'AniPM (Direct) (' + langLabel + ')',
+              quality: '1080p',
+              language: lang === 'dub' ? 'Dub' : 'Sub',
+              headers: {
+                'User-Agent': ua,
+                Referer: base + '/',
+                Origin: base,
+              },
+            });
+          }
+          if (be.url) {
+            rows.push({
+              url: be.url,
+              name: 'AniPM (Embed) (' + langLabel + ')',
+              quality: '1080p',
+              language: lang === 'dub' ? 'Dub' : 'Sub',
+              headers: {
+                'User-Agent': ua,
+                Referer: base + '/',
+                Origin: base,
+              },
+            });
+          }
         }
+
         return rows;
       })
       .catch(function () {

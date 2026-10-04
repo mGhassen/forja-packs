@@ -131,8 +131,6 @@ function extract(ctx) {
 
   var seen = {};
   return Promise.all([
-    fetchSources('/api/sources', {}, seen, 0),
-    fetchSources('/api/sources/willow', {}, seen, 1),
     fetchSources('/api/sources/additional', extra, seen, 3),
   ])
     .then(function (groups) {

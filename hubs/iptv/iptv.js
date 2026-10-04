@@ -50,7 +50,9 @@ function iptvLiveMeta(portal, stream, catName, kindOverride) {
     url = id;
   }
   // Stalker: no CDN URL until host create_link — paint with pending handoff.
-  if (!url && platform === 'stalker') {
+  // Always override: iptvNormStreams may set url from a cmd containing "://"
+  // (e.g. "ffrt http://…"), but that cmd is not a playable URL.
+  if (platform === 'stalker') {
     if (!id) return null;
     url = 'pending:stalker:' + id;
   }
