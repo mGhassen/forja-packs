@@ -1,8 +1,8 @@
 var SPECS = {
-  "origin": "https://animekai.to",
+  "origin": "https://animekai.be",
   "enc": "https://enc-dec.app/api",
   "db": "https://enc-dec.app/db/kai",
-  "ajax": "https://animekai.to/ajax"
+  "ajax": "https://animekai.be/ajax"
 };
 
 function extract(ctx) {
@@ -286,17 +286,17 @@ function extract(ctx) {
           ? Promise.resolve(token)
           : contentId
             ? encrypt(contentId)
-                .then(function (encId) {
-                  return getJsonAjax('/episodes/list?ani_id=' + contentId + '&_=' + encId, db);
-                })
-                .then(function (resp) {
-                  return parseHtml(resp.result);
-                })
-                .then(function (episodes) {
-                  var keys = seasonEpisodeKeys();
-                  var row = ((episodes || {})[keys.season] || {})[keys.episode];
-                  return row && row.token;
-                })
+              .then(function (encId) {
+                return getJsonAjax('/episodes/list?ani_id=' + contentId + '&_=' + encId, db);
+              })
+              .then(function (resp) {
+                return parseHtml(resp.result);
+              })
+              .then(function (episodes) {
+                var keys = seasonEpisodeKeys();
+                var row = ((episodes || {})[keys.season] || {})[keys.episode];
+                return row && row.token;
+              })
             : Promise.resolve(null);
 
         return start.then(function (epToken) {
