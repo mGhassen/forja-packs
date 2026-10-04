@@ -199,9 +199,9 @@ function extract(ctx) {
       var lang = cat === 'dub' ? 'Dub' : 'Sub';
       var providers = (track && track.providers) || [];
       providers.forEach(function (prov) {
-        var pname = String((prov && prov.provider) || 'src');
+        var pname = String((prov && (prov.provider || prov.name)) || 'src');
         ((prov && prov.servers) || []).forEach(function (server) {
-          var sname = String((server && server.server) || 'HLS');
+          var sname = String((server && (server.server || server.name)) || 'HLS');
           var sh = (server && server.headers) || {};
           var referer = String(sh.Referer || sh.referer || sh.Origin || sh.origin || '') || base + '/';
           var origin = String(sh.Origin || sh.origin || '');
