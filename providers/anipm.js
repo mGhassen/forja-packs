@@ -49,20 +49,7 @@ function extract(ctx) {
           if (be.direct && be.direct.stream) {
             rows.push({
               url: be.direct.stream,
-              name: 'AniPM (Direct) (' + langLabel + ')',
-              quality: '1080p',
-              language: lang === 'dub' ? 'Dub' : 'Sub',
-              headers: {
-                'User-Agent': ua,
-                Referer: base + '/',
-                Origin: base,
-              },
-            });
-          }
-          if (be.url) {
-            rows.push({
-              url: be.url,
-              name: 'AniPM (Embed) (' + langLabel + ')',
+              name: 'AniPM (' + langLabel + ')',
               quality: '1080p',
               language: lang === 'dub' ? 'Dub' : 'Sub',
               headers: {
