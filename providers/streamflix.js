@@ -75,31 +75,53 @@ function extract(ctx) {
     });
   }
 
-  function pickBest(catalog, title) {
-    if (!catalog.length) return null;
+  function normTitle(t) {
+    return String(t || '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  // Catalog mixes movies and shows, and TMDB ids overlap across the two.
+  // Match only entries of the requested kind: by TMDB id, else by exact title (+ year when known).
+  function pickBest(catalog, meta) {
+    var sameKind = catalog.filter(function (item) {
+      return !!(item && item.isTV) === isTv;
+    });
     if (tmdbId) {
-      var byTmdb = catalog.filter(function (item) {
+      var byTmdb = sameKind.filter(function (item) {
         return String(item.tmdb || '') === tmdbId;
       })[0];
       if (byTmdb) return byTmdb;
     }
-    var q = String(title || '').toLowerCase();
-    var words = q.split(/\s+/).filter(function (w) {
-      return w.length > 2;
+    var q = normTitle(meta.title);
+    if (!q) return null;
+    var year = String(meta.year || '');
+    return (
+      sameKind.filter(function (item) {
+        if (normTitle(item.moviename) !== q) return false;
+        return !year || !item.movieyear || String(item.movieyear) === year;
+      })[0] || null
+    );
+  }
+
+  // CDN answers 307 → 404 for missing files; keep only rows that resolve.
+  function liveRows(rows) {
+    return Promise.all(
+      rows.map(function (row) {
+        return ctx
+          .fetch(row.url, { method: 'HEAD', headers: row.headers })
+          .then(function (r) {
+            return r && r.ok ? row : null;
+          })
+          .catch(function () {
+            return null;
+          });
+      }),
+    ).then(function (out) {
+      return out.filter(Boolean);
     });
-    var hits = catalog.filter(function (item) {
-      var n = String((item && item.moviename) || '').toLowerCase();
-      if (!n) return false;
-      if (!words.length) return n.indexOf(q) >= 0;
-      return words.every(function (w) {
-        return n.indexOf(w) >= 0;
-      });
-    });
-    var best = hits[0];
-    hits.forEach(function (item) {
-      if (String(item.moviename || '').toLowerCase() === q) best = item;
-    });
-    return best || null;
   }
 
   return Promise.all([getJson(api + '/data.json'), getJson(api + configPath), tmdbTitle()])
@@ -107,18 +129,18 @@ function extract(ctx) {
       var catalog = (triple[0] && triple[0].data) || [];
       var config = triple[1] || {};
       var meta = triple[2] || {};
-      var best = pickBest(catalog, meta.title);
+      var best = pickBest(catalog, meta);
       if (!best) return [];
       if (!isTv) {
         if (!best.movielink) return [];
         var movieBases = uniqueBases(config.premium, config.movies, config.download);
-        return rowsFrom(movieBases, best.movielink, '1080p');
+        return liveRows(rowsFrom(movieBases, best.movielink, '1080p'));
       }
       var tvBases = uniqueBases(config.premium, config.tv, config.download);
       if (!tvBases.length || !best.moviekey) return [];
       var s = ctx.season || 1;
       var e = ctx.episode || 1;
-      return rowsFrom(tvBases, 'tv/' + best.moviekey + '/s' + s + '/episode' + e + '.mkv', '1080p');
+      return liveRows(rowsFrom(tvBases, 'tv/' + best.moviekey + '/s' + s + '/episode' + e + '.mkv', '1080p'));
     })
     .catch(function () {
       return [];

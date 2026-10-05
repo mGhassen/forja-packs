@@ -17,10 +17,24 @@ function extract(ctx) {
     return ctx.fetch(url, { headers: Object.assign({}, hdrs, extra || {}) }).then(function (r) { return r.text(); });
   }
 
+  // The site redirects old hosts to the current one and drops the query string,
+  // so resolve the live origin before calling search.php.
   function latestDomain() {
     return ctx.fetch(domainsUrl, { headers: { 'User-Agent': ua } }).then(function (r) { return r.json(); })
       .then(function (j) { return (j && j.moviesdrive) || fallback; })
-      .catch(function () { return fallback; });
+      .catch(function () { return fallback; })
+      .then(function (base) {
+        return ctx.fetch(base.replace(/\/$/, '') + '/', { headers: hdrs }).then(function (r) {
+          try { return new URL(r.url).origin; } catch (e) { return base; }
+        }).catch(function () { return base; });
+      });
+  }
+
+  // 10Gbps redirects through a worker to a wrapper page whose `link` param is the Google video link.
+  function resolve10Gbps(href, referer) {
+    return ctx.fetch(href, { headers: Object.assign({}, hdrs, { Referer: referer }) }).then(function (r) {
+      try { return new URL(r.url).searchParams.get('link') || ''; } catch (e) { return ''; }
+    }).catch(function () { return ''; });
   }
 
   function hubCloudExtract(url, referer) {
@@ -50,6 +64,7 @@ function extract(ctx) {
         var qm = header.match(/(\d{3,4})[pP]/);
         var quality = qm ? parseInt(qm[1], 10) : 1080;
         var links = [];
+        var pxlM = String(pageData || '').match(/var\s+pxl\s*=\s*["']([^"']+)["']/);
         $p('a.btn, a').each(function () {
           var a = $p(this);
           var href = a.attr('href') || '';
@@ -61,6 +76,8 @@ function extract(ctx) {
             /r2\.dev|workers\.dev|pixel\.hubcloud\.|pixeldrain\.(?:dev|net)\//i.test(href);
           if (!keep) return;
           if (/pixeldrain\.(?:dev|net)\//i.test(href) || /pixelserver/i.test(text)) {
+            // The anchor href is a decoy; an inline script swaps in the real file id.
+            if (pxlM) href = pxlM[1];
             var pd = href.match(/pixeldrain\.(?:dev|net)\/(?:u|api\/file)\/([A-Za-z0-9]+)/i);
             label = 'HubCloud - PixelServer';
             href = pd
@@ -81,7 +98,62 @@ function extract(ctx) {
             size: size || undefined,
           });
         });
-        return links;
+        return Promise.all(links.map(function (l) {
+          if (l.name !== 'HubCloud - 10Gbps') return l;
+          return resolve10Gbps(l.url, current).then(function (direct) {
+            if (!direct) return null;
+            l.url = direct;
+            return l;
+          });
+        })).then(function (rows) { return rows.filter(Boolean); });
+      });
+    }).catch(function () { return []; });
+  }
+
+  // GDFlix /file/ is an HTML landing page. Instant DL redirects to a wrapper
+  // whose `url` param is the Google video link; the other buttons sit behind Turnstile.
+  // Cloudflare on gdflix rejects the plain client's TLS fingerprint with 403.
+  var gdFetch = typeof ctx.chromeFetch === 'function' ? ctx.chromeFetch.bind(ctx) : ctx.fetch;
+  function gdFlixExtract(url, referer) {
+    return gdFetch(url, { headers: Object.assign({}, hdrs, { Referer: referer }) }).then(function (r) {
+      var pageUrl = r.url || url;
+      return r.text().then(function (html) {
+        var $ = ctx.html(html);
+        var fileName = '';
+        var size = '';
+        $('li.list-group-item').each(function () {
+          var t = $(this).text().trim();
+          var nm = t.match(/^Name\s*:\s*(.+)$/i);
+          if (nm) fileName = nm[1].trim();
+          var sm = t.match(/^Size\s*:\s*([^|]+)/i);
+          if (sm) size = sm[1].trim();
+        });
+        var qm = fileName.match(/(\d{3,4})[pP]/);
+        var quality = qm ? parseInt(qm[1], 10) : 1080;
+        var jobs = [];
+        $('a[href]').each(function () {
+          var href = $(this).attr('href') || '';
+          var text = $(this).text().toLowerCase();
+          if (/instant\.|instant dl/i.test(href + ' ' + text)) {
+            jobs.push(gdFetch(href, { headers: Object.assign({}, hdrs, { Referer: pageUrl }) }).then(function (ir) {
+              var direct = '';
+              try { direct = new URL(ir.url).searchParams.get('url') || ''; } catch (e) {}
+              return direct ? { name: 'GDFlix - Instant', quality: quality, url: direct } : null;
+            }).catch(function () { return null; }));
+          } else if (/r2\.dev|workers\.dev|pixeldrain\.(?:dev|net)\//i.test(href)) {
+            var pd = href.match(/pixeldrain\.(?:dev|net)\/(?:u|api\/file)\/([A-Za-z0-9]+)/i);
+            jobs.push(Promise.resolve(pd
+              ? { name: 'GDFlix - PixelDrain', quality: quality, url: 'https://pixeldrain.net/api/file/' + pd[1] + '?download=' }
+              : { name: 'GDFlix - Direct', quality: quality, url: href }));
+          }
+        });
+        return Promise.all(jobs).then(function (rows) {
+          return rows.filter(Boolean).map(function (s) {
+            s.title = fileName || undefined;
+            s.size = size || undefined;
+            return s;
+          });
+        });
       });
     }).catch(function () { return []; });
   }
@@ -91,7 +163,7 @@ function extract(ctx) {
     var hostname;
     try { hostname = new URL(url).hostname; } catch (e) { return Promise.resolve([]); }
     if (/hubcloud/i.test(hostname)) return hubCloudExtract(url, referer);
-    if (/gdflix|gdlink/i.test(hostname)) return Promise.resolve([{ name: 'Google Drive', quality: 1080, url: url }]);
+    if (/gdflix|gdlink/i.test(hostname)) return gdFlixExtract(url, referer);
     return Promise.resolve([]);
   }
 

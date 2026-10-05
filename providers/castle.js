@@ -266,15 +266,13 @@ function extract(ctx) {
     return fetchDecrypted(url, body);
   }
 
-  function qualityLabel(v, fallback) {
-    var q = String(v || '').replace(/^(SD|HD|FHD)\s+/i, '');
-    return q || fallback;
+  function resolutionQuality(resolution) {
+    return resolution === 3 ? '1080p' : resolution === 2 ? '720p' : '480p';
   }
 
-  function mapVideoResponse(videoData, info, seasonNum, episodeNum, resolution, languageInfo) {
-    var data = unwrapData(videoData);
+  function mapVideoResponse(data, resolution, languageInfo) {
     var videoUrl = data.videoUrl;
-    if (!videoUrl) return [];
+    if (!videoUrl) return null;
     var subtitles = [];
     (data.subtitles || []).forEach(function (sub) {
       if (!sub || !sub.url) return;
@@ -283,31 +281,43 @@ function extract(ctx) {
         lang: sub.abbreviate || 'Unknown',
       });
     });
-    var baseTitle = info.title || 'Unknown';
-    if (isTv) baseTitle = baseTitle + ' S' + seasonNum + 'E' + episodeNum;
-    var quality = resolution === 3 ? '1080p' : resolution === 2 ? '720p' : '480p';
-    var rows = [];
-    if (Array.isArray(data.videos) && data.videos.length) {
-      data.videos.forEach(function (video) {
-        rows.push({
-          url: video.url || videoUrl,
-          name: 'Castle ' + languageInfo,
-          quality: qualityLabel(video.resolutionDescription || video.resolution, quality),
-          headers: playHeaders(),
-          subtitles: subtitles,
+    // The server may serve a lower rendition than asked; the HLS path names the real one.
+    var pathRes = /\/(\d{3,4})\/index[^/?]*\.m3u8/.exec(videoUrl);
+    return {
+      url: videoUrl,
+      name: 'Castle ' + languageInfo,
+      quality: pathRes ? pathRes[1] + 'p' : resolutionQuality(resolution),
+      headers: playHeaders(),
+      subtitles: subtitles,
+    };
+  }
+
+  // `videos` lists the renditions but carries no URLs; each one needs its own getVideo call.
+  function fetchStreams(movieId, episodeId, languageId, languageInfo) {
+    var firstResolution = 2;
+    return getVideo(movieId, episodeId, languageId, firstResolution).then(function (videoData) {
+      var data = unwrapData(videoData);
+      var first = mapVideoResponse(data, firstResolution, languageInfo);
+      if (!first) return [];
+      var others = (data.videos || [])
+        .map(function (video) { return Number(video && video.resolution); })
+        .filter(function (res, i, all) {
+          return res && res !== firstResolution && all.indexOf(res) === i;
+        })
+        .map(function (res) {
+          return getVideo(movieId, episodeId, languageId, res)
+            .then(function (more) { return mapVideoResponse(unwrapData(more), res, languageInfo); })
+            .catch(function () { return null; });
+        });
+      return Promise.all(others).then(function (extra) {
+        var seen = {};
+        return [first].concat(extra).filter(function (row) {
+          if (!row || seen[row.quality]) return false;
+          seen[row.quality] = true;
+          return true;
         });
       });
-      return rows;
-    }
-    return [
-      {
-        url: videoUrl,
-        name: 'Castle ' + languageInfo,
-        quality: quality,
-        headers: playHeaders(),
-        subtitles: subtitles,
-      },
-    ];
+    });
   }
 
   return tmdbInfo()
@@ -430,16 +440,12 @@ function extract(ctx) {
         return [];
       }
       var episodeId = episodeHit.id || episodeHit.episodeId;
-      var resolution = 2;
       var tracks = (episodeHit && episodeHit.tracks) || [];
       var tasks = tracks
         .filter(function (track) { return track && track.existIndividualVideo && track.languageId; })
         .map(function (track) {
           var langName = track.languageName || track.abbreviate || 'Unknown';
-          return getVideo(state.movieId, episodeId, track.languageId, resolution)
-            .then(function (videoData) {
-              return mapVideoResponse(videoData, state.info, seasonNum, episodeNum, resolution, '[' + langName + ']');
-            })
+          return fetchStreams(state.movieId, episodeId, track.languageId, '[' + langName + ']')
             .catch(function () {
               return [];
             });
@@ -447,10 +453,7 @@ function extract(ctx) {
       return Promise.all(tasks).then(function (groups) {
         var out = [].concat.apply([], groups);
         if (out.length) return out;
-        return getVideo(state.movieId, episodeId, '', resolution)
-          .then(function (videoData) {
-            return mapVideoResponse(videoData, state.info, seasonNum, episodeNum, resolution, '[Shared]');
-          })
+        return fetchStreams(state.movieId, episodeId, '', '[Shared]')
           .catch(function () {
             return [];
           });

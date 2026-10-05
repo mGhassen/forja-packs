@@ -230,7 +230,21 @@ function extract(ctx) {
     var hostname;
     try { hostname = new URL(url).hostname; } catch (e) { return Promise.resolve(null); }
     var token = (url.split('?url=')[1] || '').trim();
-    if (!token) return Promise.resolve(null);
+    if (!token) {
+      if (!/video-gen|video-seed|video-leech/i.test(url)) return Promise.resolve(null);
+      // Path-token links (instant.video-gen.xyz/<hash>) redirect to a video-seed.dev/?url= page.
+      // Range keeps a direct file from downloading in full.
+      return ctx.fetch(url, { headers: Object.assign({}, hdrs, { Range: 'bytes=0-0' }) }).then(function (r) {
+        var fu = r.url || url;
+        if (fu !== url && fu.indexOf('?url=') >= 0) return extractVideoSeed(fu);
+        var ct = (r.headers && r.headers.get('content-type')) || '';
+        return /^(video\/|application\/octet-stream)/i.test(ct) ? fu : null;
+      }).catch(function () { return null; });
+    }
+    // The wrapper page carries the final file URL as-is.
+    if (/^https?(:|%3A)/i.test(token)) {
+      return Promise.resolve(/^https?%3A/i.test(token) ? decodeURIComponent(token) : token);
+    }
     return ctx.fetch('https://' + hostname + '/api', {
       method: 'POST',
       headers: Object.assign({}, hdrs, { 'Content-Type': 'application/x-www-form-urlencoded', 'x-token': hostname, Referer: url }),
