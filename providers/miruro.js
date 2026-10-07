@@ -188,6 +188,19 @@ function extract(ctx) {
     return out;
   }
 
+  function cap(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+
+  // Host reads "[Server]" as the row's server chip — same names as the site.
+  function serverLabel(pname, sname) {
+    var p = cap(pname);
+    var s = String(sname || '').trim();
+    if (!s || /^(hls|mp4|dash|file|default|main|src|stream)$/i.test(s)) return p;
+    if (s.toLowerCase() === p.toLowerCase()) return p;
+    return p + ' ' + cap(s);
+  }
+
   function flattenPlay(play, base) {
     var tracks = play && Array.isArray(play.tracks) ? play.tracks : [];
     var want = wantedTracks();
@@ -220,7 +233,7 @@ function extract(ctx) {
             if (origin) headers.Origin = origin;
             out.push({
               url: u,
-              name: 'Miruro ' + pname + ' ' + sname + ' ' + cat.toUpperCase(),
+              name: 'Miruro [' + serverLabel(pname, sname) + '] (' + cat.toUpperCase() + ')',
               language: lang,
               headers: headers,
             });
