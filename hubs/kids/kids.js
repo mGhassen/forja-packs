@@ -9,6 +9,9 @@ var KIDS_DEFAULTS = {
 
 var KIDS_FEED_RAILS = ['spotlight', 'latest', 'movies', 'episodes'];
 
+/** Upstream page cap per rail (host default stops at 4). */
+var KIDS_RAIL_MAX_PAGES = 100;
+
 var KIDS_LETTERS = [
   { id: '0', label: 'ا' },
   { id: '1', label: 'ب' },
@@ -193,6 +196,8 @@ function kidsParseMovieUrl(url) {
 function kidsMeta(kind, opaqueId, title, poster, opts) {
   opts = opts || {};
   title = kidsStripZw(title);
+  // "فيلم X" → "X" (the MOVIE card already says it is a film).
+  if (kind === 'movie') title = title.replace(/^فيلم\s+/, '') || title;
   if (!title || !opaqueId) return null;
   var id = String(opaqueId);
   var url = String(opts.url || '');
@@ -237,12 +242,12 @@ function kidsFilters() {
       {
         id: 'films',
         label: 'Films',
-        filter: { op: 'eq', field: 'kind', value: 'movie' },
+        filter: { op: 'eq', field: 'type', value: 'movie' },
       },
       {
         id: 'series',
         label: 'Series',
-        filter: { op: 'eq', field: 'kind', value: 'series' },
+        filter: { op: 'eq', field: 'type', value: 'series' },
       },
     ],
     fields: [
@@ -454,40 +459,89 @@ function kidsParseHomepageEpisodes(ctx, cfg, base, body, limit) {
   return hubClampList(out, limit);
 }
 
-function kidsLoadSeriesList(ctx, cfg, base, opts) {
-  opts = opts || {};
-  var letter = String(opts.letter || '').trim();
-  var path = letter !== '' ? letter + '-tri.html' : 'cartoon.php';
-  return kidsFetchText(ctx, base + '/' + path, base + '/').then(function (got) {
-    var raw = kidsParseCatalogCards(ctx, cfg, base, got.body, 'series');
-    return kidsGroupSeries(raw, { limit: opts.limit || 24 });
-  });
+/** Letter key: fold hamza / taa marbuta / alef maqsura forms. */
+function kidsLetterKey(title) {
+  return kidsStripZw(title)
+    .replace(/^ال/, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي');
 }
 
-function kidsLoadMovies(ctx, cfg, base, limit) {
-  return kidsFetchText(ctx, base + '/movies.php', base + '/').then(function (got) {
-    return hubClampList(
-      kidsParseCatalogCards(ctx, cfg, base, got.body, 'movie'),
-      limit || 24,
-    );
-  });
+/** Site letter page id (`N-tri.html`) for a title, or '' (Latin titles). */
+function kidsLetterIdFor(title) {
+  var ch = kidsLetterKey(title).charAt(0);
+  for (var i = 0; i < KIDS_LETTERS.length; i++) {
+    if (KIDS_LETTERS[i].label === ch) return KIDS_LETTERS[i].id;
+  }
+  return '';
+}
+
+function kidsLetterLabel(id) {
+  for (var i = 0; i < KIDS_LETTERS.length; i++) {
+    if (KIDS_LETTERS[i].id === String(id)) return KIDS_LETTERS[i].label;
+  }
+  return '';
+}
+
+/** `cartoon.php` / `movies.php` pager: `?next=N` (1-based). */
+function kidsHasNext(body, page) {
+  return new RegExp('next=' + (page + 1) + '(?![0-9])').test(String(body || ''));
+}
+
+/** Newest series — one `cartoon.php?next=N` page, seasons grouped. */
+function kidsSeriesPage(ctx, cfg, base, page) {
+  return kidsFetchText(ctx, base + '/cartoon.php?next=' + page, base + '/').then(
+    function (got) {
+      return {
+        items: kidsGroupSeries(
+          kidsParseCatalogCards(ctx, cfg, base, got.body, 'series'),
+          { limit: 100000 },
+        ),
+        hasMore: kidsHasNext(got.body, page),
+      };
+    },
+  );
+}
+
+/** Every series under one letter (`N-tri.html` lists them all, unpaged). */
+function kidsLetterSeries(ctx, cfg, base, letterId) {
+  return kidsFetchText(ctx, base + '/' + letterId + '-tri.html', base + '/').then(
+    function (got) {
+      return kidsGroupSeries(
+        kidsParseCatalogCards(ctx, cfg, base, got.body, 'series'),
+        { limit: 100000 },
+      );
+    },
+  );
+}
+
+function kidsMoviesPage(ctx, cfg, base, page) {
+  return kidsFetchText(ctx, base + '/movies.php?next=' + page, base + '/').then(
+    function (got) {
+      return {
+        items: kidsParseCatalogCards(ctx, cfg, base, got.body, 'movie'),
+        hasMore: kidsHasNext(got.body, page),
+      };
+    },
+  );
 }
 
 function kidsLoadHome(ctx, cfg, base) {
   return kidsFetchText(ctx, base + '/index.php', base + '/').then(function (got) {
     return {
       body: got.body,
-      series: kidsGroupSeries(
-        kidsParseCatalogCards(ctx, cfg, base, got.body, 'series'),
-        { limit: 40 },
-      ),
-      movies: hubClampList(
-        kidsParseCatalogCards(ctx, cfg, base, got.body, 'movie'),
-        24,
-      ),
-      episodes: kidsParseHomepageEpisodes(ctx, cfg, base, got.body, 24),
+      episodes: kidsParseHomepageEpisodes(ctx, cfg, base, got.body, 100),
     };
   });
+}
+
+function kidsSlice(list, page, limit) {
+  var start = (page - 1) * limit;
+  return {
+    items: list.slice(start, start + limit),
+    hasMore: start + limit < list.length,
+  };
 }
 
 
@@ -566,6 +620,41 @@ function kidsPagePoster(cfg, body) {
   return m ? m[1] : '';
 }
 
+/** Series card (all seasons) by key — its letter page, else every letter. */
+function kidsFindSeries(ctx, cfg, base, key) {
+  function pick(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].open && list[i].open.id === 'series:' + key) return list[i];
+    }
+    return null;
+  }
+  var letterId = kidsLetterIdFor(key);
+  var first = letterId
+    ? kidsLetterSeries(ctx, cfg, base, letterId).catch(function () {
+        return [];
+      })
+    : Promise.resolve([]);
+  return first.then(function (list) {
+    var hit = pick(list);
+    if (hit) return hit;
+    return Promise.all(
+      KIDS_LETTERS.filter(function (L) {
+        return L.id !== letterId;
+      }).map(function (L) {
+        return kidsLetterSeries(ctx, cfg, base, L.id).catch(function () {
+          return [];
+        });
+      }),
+    ).then(function (lists) {
+      for (var j = 0; j < lists.length; j++) {
+        var h = pick(lists[j]);
+        if (h) return h;
+      }
+      return null;
+    });
+  });
+}
+
 function kidsDetails(ctx, cfg, params) {
   var base = kidsBase(cfg);
   var raw = String(params.id || '').trim();
@@ -605,24 +694,27 @@ function kidsDetails(ctx, cfg, params) {
     var climbed = url.replace(/-\d+\.html(?:#.*)?$/i, '-anime-streaming.html');
     seasonUrls = [climbed];
   }
-  if (!seasonUrls.length && raw.indexOf('series:') === 0) {
-    // Search/browse without seasonUrls — try homepage+cartoon merge by key.
+  if (raw.indexOf('series:') === 0 && !params._seasonsComplete) {
+    // Cards from `cartoon.php` pages can split a show's seasons across pages,
+    // and Continue Watching sends the id only — the letter page lists every
+    // season of the show.
     var key = raw.substring(7);
-    return kidsLoadSeriesList(ctx, cfg, base, { limit: 400 }).then(function (list) {
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].open && list[i].open.id === 'series:' + key) {
-          return kidsDetails(
-            ctx,
-            cfg,
-            Object.assign({}, params, {
-              id: list[i].open.id,
-              url: list[i].open.url,
-              seasonUrls: list[i].open.seasonUrls || [],
-            }),
-          );
-        }
+    return kidsFindSeries(ctx, cfg, base, key).then(function (found) {
+      var urls = seasonUrls.slice();
+      var extra = (found && found.open && found.open.seasonUrls) || [];
+      for (var i = 0; i < extra.length; i++) {
+        if (urls.indexOf(extra[i]) < 0) urls.push(extra[i]);
       }
-      return hubFail('details', 'NOT_FOUND', 'series ' + key);
+      if (!urls.length) return hubFail('details', 'NOT_FOUND', 'series ' + key);
+      return kidsDetails(
+        ctx,
+        cfg,
+        Object.assign({}, params, {
+          url: url || (found && found.open && found.open.url) || urls[0],
+          seasonUrls: urls,
+          _seasonsComplete: true,
+        }),
+      );
     });
   }
   if (!seasonUrls.length) {
@@ -645,6 +737,7 @@ function kidsDetails(ctx, cfg, params) {
     var poster = '';
     var title = '';
     var seasonCount = parts.length;
+    var seenSlot = {};
     for (var p = 0; p < parts.length; p++) {
       var part = parts[p];
       if (!title) title = kidsPageTitle(part.body, '');
@@ -654,6 +747,10 @@ function kidsDetails(ctx, cfg, params) {
       for (var v = 0; v < (part.videos || []).length; v++) {
         var ep = part.videos[v];
         ep.season = seasonCount > 1 ? season : 1;
+        // The site re-uploads some seasons as a second page — keep the first.
+        var slot = ep.season + ':' + ep.episode;
+        if (seenSlot[slot]) continue;
+        seenSlot[slot] = true;
         videos.push(ep);
       }
     }
@@ -683,131 +780,113 @@ function kidsDetails(ctx, cfg, params) {
   });
 }
 
-function kidsRail(ctx, cfg, params) {
+/** Chrome filter → { letter id, type: movie|series|'' }. */
+function kidsChromeOf(params) {
+  var filter = params && params.filter;
+  // `kind` — menu field before `type` (layout showWhenType reads `type`).
+  var type = String(
+    hubFilterValue(filter, 'type') || hubFilterValue(filter, 'kind') || '',
+  ).toLowerCase();
+  if (type === 'tv') type = 'series';
+  return { letter: hubFilterValue(filter, 'letter'), type: type };
+}
+
+/**
+ * Rail id → one page. A chosen letter narrows series rails to that letter;
+ * Films / Series keep only that kind (layout showWhenType hides the rest).
+ */
+function kidsRailList(ctx, cfg, rail, params) {
   var base = kidsBase(cfg);
-  var rail = String(params.rail || params.id || '').trim();
+  var page = Number(params.page) > 0 ? Number(params.page) : 1;
   var limit = Number(params.limit) > 0 ? Number(params.limit) : 24;
-  var kind = hubFilterValue(params.filter, 'kind');
-  var letter = hubFilterValue(params.filter, 'letter');
-
-  if (kind === 'movie') {
-    if (rail === 'episodes') {
-      return Promise.resolve(hubItems('rail', [], { maxAge: 600, swr: 3600 }));
-    }
-    return kidsLoadMovies(ctx, cfg, base, limit)
-      .then(function (items) {
-        return hubItems('rail', items, { maxAge: 600, swr: 3600 });
-      })
-      .catch(function (e) {
-        return hubFail('rail', 'UPSTREAM', e && e.message, true);
-      });
-  }
-
-  if (rail === 'movies') {
-    if (kind === 'series') {
-      return Promise.resolve(hubItems('rail', [], { maxAge: 600, swr: 3600 }));
-    }
-    return kidsLoadMovies(ctx, cfg, base, limit)
-      .then(function (items) {
-        return hubItems('rail', items, { maxAge: 600, swr: 3600 });
-      })
-      .catch(function (e) {
-        return hubFail('rail', 'UPSTREAM', e && e.message, true);
-      });
-  }
-
-  if (rail === 'episodes') {
-    if (letter) {
-      return Promise.resolve(hubItems('rail', [], { maxAge: 600, swr: 3600 }));
-    }
-    return kidsLoadHome(ctx, cfg, base)
-      .then(function (home) {
-        return hubItems(
-          'rail',
-          hubClampList(home.episodes || [], limit),
-          { maxAge: 600, swr: 3600 },
-        );
-      })
-      .catch(function (e) {
-        return hubFail('rail', 'UPSTREAM', e && e.message, true);
-      });
-  }
+  var chrome = kidsChromeOf(params);
+  var none = Promise.resolve({ items: [], hasMore: false });
 
   if (rail === 'spotlight' || rail === 'latest') {
-    return kidsLoadSeriesList(ctx, cfg, base, {
-      letter: letter,
-      limit: limit,
-    })
-      .then(function (items) {
-        return hubItems('rail', items, { maxAge: 600, swr: 3600 });
-      })
-      .catch(function (e) {
-        return hubFail('rail', 'UPSTREAM', e && e.message, true);
+    if (chrome.type === 'movie') {
+      return chrome.letter ? none : kidsMoviesPage(ctx, cfg, base, page);
+    }
+    if (chrome.letter) {
+      return kidsLetterSeries(ctx, cfg, base, chrome.letter).then(function (list) {
+        return kidsSlice(list, page, limit);
       });
+    }
+    return kidsSeriesPage(ctx, cfg, base, page);
   }
-
-  return Promise.resolve(
-    hubFail('rail', 'INVALID_PARAMS', 'unknown rail ' + rail),
-  );
-}
-
-function kidsFeed(ctx, cfg, params) {
-  var base = kidsBase(cfg);
-  var limit = Number(params.limit) > 0 ? Number(params.limit) : 24;
-  var kind = hubFilterValue(params.filter, 'kind');
-  var letter = hubFilterValue(params.filter, 'letter');
-
-  if (kind === 'movie') {
-    return kidsLoadMovies(ctx, cfg, base, limit).then(function (movies) {
-      return hubOk(
-        'feed',
-        {
-          rails: {
-            spotlight: movies,
-            latest: [],
-            movies: movies,
-            episodes: [],
-          },
-        },
-        { maxAge: 600, swr: 3600 },
-      );
+  if (rail === 'movies') {
+    if (chrome.letter || chrome.type === 'series') return none;
+    return kidsMoviesPage(ctx, cfg, base, page);
+  }
+  if (rail === 'episodes') {
+    if (chrome.type === 'movie' || page > 1) return none;
+    return kidsLoadHome(ctx, cfg, base).then(function (home) {
+      var eps = home.episodes || [];
+      if (chrome.letter) {
+        var label = kidsLetterLabel(chrome.letter);
+        eps = eps.filter(function (m) {
+          return kidsLetterKey(m.name).charAt(0) === label;
+        });
+      }
+      return { items: eps, hasMore: false };
     });
   }
-
-  return Promise.all([
-    kidsLoadSeriesList(ctx, cfg, base, { letter: letter, limit: limit }),
-    letter
-      ? Promise.resolve([])
-      : kidsLoadMovies(ctx, cfg, base, limit).catch(function () {
-        return [];
-      }),
-    letter
-      ? Promise.resolve([])
-      : kidsLoadHome(ctx, cfg, base)
-        .then(function (h) {
-          return h.episodes || [];
-        })
-        .catch(function () {
-          return [];
-        }),
-  ]).then(function (parts) {
-    var series = parts[0] || [];
-    var movies = kind === 'series' ? [] : parts[1] || [];
-    var episodes = kind === 'series' ? [] : parts[2] || [];
-    return hubOk(
-      'feed',
-      {
-        rails: {
-          spotlight: series.slice(0, limit),
-          latest: series.slice(0, limit),
-          movies: movies.slice(0, limit),
-          episodes: episodes.slice(0, limit),
-        },
+  if (rail === 'all') {
+    // A–Z: one rail page per site letter page.
+    if (chrome.letter || chrome.type === 'movie') return none;
+    if (page > KIDS_LETTERS.length) return none;
+    return kidsLetterSeries(ctx, cfg, base, KIDS_LETTERS[page - 1].id).then(
+      function (list) {
+        return { items: list, hasMore: page < KIDS_LETTERS.length };
       },
-      { maxAge: 600, swr: 3600 },
     );
+  }
+  return null;
+}
+
+function kidsRail(ctx, cfg, params) {
+  var rail = String(params.rail || params.id || '').trim();
+  var load = kidsRailList(ctx, cfg, rail, params);
+  if (!load) {
+    return Promise.resolve(
+      hubFail('rail', 'INVALID_PARAMS', 'unknown rail ' + rail),
+    );
+  }
+  var limit = Number(params.limit) > 0 ? Number(params.limit) : 24;
+  return load
+    .then(function (page) {
+      return hubItems(
+        'rail',
+        page.items,
+        { maxAge: 600, swr: 3600 },
+        { pageSize: limit, hasMore: !!page.hasMore },
+      );
+    })
+    .catch(function (e) {
+      return hubFail('rail', 'UPSTREAM', e && e.message, true);
+    });
+}
+
+/** First page of each feed rail — the same lists `rail` pages through. */
+function kidsFeed(ctx, cfg, params) {
+  var first = Object.assign({}, params, { page: 1 });
+  return Promise.all(
+    KIDS_FEED_RAILS.map(function (rail) {
+      return kidsRailList(ctx, cfg, rail, first).catch(function () {
+        return { items: [] };
+      });
+    }),
+  ).then(function (pages) {
+    var rails = {};
+    var any = false;
+    for (var i = 0; i < KIDS_FEED_RAILS.length; i++) {
+      rails[KIDS_FEED_RAILS[i]] = pages[i].items;
+      if (pages[i].items.length) any = true;
+    }
+    if (!any) return hubFail('feed', 'UPSTREAM', 'no Dimakids rails loaded', true);
+    return hubOk('feed', { rails: rails }, { maxAge: 600, swr: 3600 });
   });
 }
+
 
 function extract(ctx) {
   var action = hubAction(ctx);

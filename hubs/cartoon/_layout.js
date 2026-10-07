@@ -8,7 +8,7 @@ function cartoonLayout() {
         feedRails: CARTOON_FEED_RAILS.slice(),
         pageSize: 24,
         // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
-        // Visual: latest → continue? → popular → episodes.
+        // Visual: latest → continue? → popular → episodes → all (A–Z).
         // Empty Continue: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
         // enter / restore omitted: hero View details owns first land
@@ -38,6 +38,7 @@ function cartoonLayout() {
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'portrait',
+            maxPages: CARTOON_RAIL_MAX_PAGES,
             // First catalog row ↑ → View details (not top menu).
             focusUp: 'hero-details',
             focusDown: 'continue_watching',
@@ -49,6 +50,7 @@ function cartoonLayout() {
               title: 'الأكثر حلقات',
               rail: 'popular',
               aspect: 'portrait',
+              maxPages: CARTOON_RAIL_MAX_PAGES,
               focusUp: 'continue_watching',
               focusDown: 'episodes',
             },
@@ -61,8 +63,19 @@ function cartoonLayout() {
             title: 'أحدث الحلقات',
             rail: 'episodes',
             aspect: 'portrait',
+            maxPages: CARTOON_RAIL_MAX_PAGES,
             focusUp: 'popular',
+            focusDown: 'all',
           }, 'rail', { rail: 'episodes' }),
+          hubWithLoad({
+            type: 'rail',
+            id: 'all',
+            title: 'كل المسلسلات (أ - ي)',
+            rail: 'all',
+            aspect: 'portrait',
+            maxPages: CARTOON_RAIL_MAX_PAGES,
+            focusUp: 'episodes',
+          }, 'rail', { rail: 'all' }),
         ],
       },
     },
