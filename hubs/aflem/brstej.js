@@ -9,133 +9,53 @@ var BRSTEJ_DEFAULTS = {
   origin: 'https://hd1.brstej.com',
 };
 
-var BRSTEJ_FEED_RAILS = ['spotlight', 'latest', 'series'];
+var BRSTEJ_FEED_RAILS = ['spotlight', 'latest', 'top'];
+
+/** Upstream page cap per rail — Brstej lists run to hundreds of pages. */
+var BRSTEJ_RAIL_MAX_PAGES = 200;
 
 function brstejCatFilter(value) {
   return { op: 'eq', field: 'cat', value: String(value) };
 }
 
-/** Curated region / type categories (not per-show dump pages). */
+function brstejCategory(id, label, cat, kind) {
+  return {
+    id: id,
+    label: label,
+    cat: cat,
+    kind: kind,
+    filter: brstejCatFilter(cat),
+  };
+}
+
+/**
+ * Every Brstej section, in hub order. Each one is a filter option and a rail.
+ * Series sections page through `cat03.php?type=series`; movie sections page
+ * through the category movie grid.
+ */
 var BRSTEJ_CATEGORY_OPTIONS = [
-  {
-    id: 'arabic',
-    label: 'مسلسلات عربية',
-    path: '/category.php?cat=arab8-2025',
-    kind: 'series',
-    filter: brstejCatFilter('arab8-2025'),
-  },
-  {
-    id: 'egyptian',
-    label: 'مسلسلات مصرية',
-    path: '/category.php?cat=eg8-2025',
-    kind: 'series',
-    filter: brstejCatFilter('eg8-2025'),
-  },
-  {
-    id: 'shami',
-    label: 'مسلسلات شامية',
-    path: '/category.php?cat=syy5-2025',
-    kind: 'series',
-    filter: brstejCatFilter('syy5-2025'),
-  },
-  {
-    id: 'gulf',
-    label: 'مسلسلات خليجية',
-    path: '/category.php?cat=5a7-2024',
-    kind: 'series',
-    filter: brstejCatFilter('5a7-2024'),
-  },
-  {
-    id: 'turkish',
-    label: 'مسلسلات تركية',
-    path: '/category.php?cat=ty9-2025',
-    kind: 'series',
-    filter: brstejCatFilter('ty9-2025'),
-  },
-  {
-    id: 'prestige',
-    label: 'مسلسلات برستيج',
-    path: '/cat03.php?cat=prss7-2025',
-    kind: 'series',
-    filter: brstejCatFilter('prss7-2025'),
-  },
-  {
-    id: 'indian',
-    label: 'مسلسلات هندية',
-    path: '/category.php?cat=2ind2-2025',
-    kind: 'series',
-    filter: brstejCatFilter('2ind2-2025'),
-  },
-  {
-    id: 'asian',
-    label: 'مسلسلات آسيوية',
-    path: '/category.php?cat=asia',
-    kind: 'series',
-    filter: brstejCatFilter('asia'),
-  },
-  {
-    id: 'foreign',
-    label: 'مسلسلات أجنبية',
-    path: '/category.php?cat=english1-2025',
-    kind: 'series',
-    filter: brstejCatFilter('english1-2025'),
-  },
-  {
-    id: 'anime',
-    label: 'مسلسلات أنمي',
-    path: '/category.php?cat=anmei',
-    kind: 'series',
-    filter: brstejCatFilter('anmei'),
-  },
-  {
-    id: 'ramadan',
-    label: 'رمضان 2026',
-    path: '/category.php?cat=ramdan2026',
-    kind: 'series',
-    filter: brstejCatFilter('ramdan2026'),
-  },
-  {
-    id: 'movies_ar',
-    label: 'أفلام عربية',
-    path: '/category.php?cat=aflam02-2024',
-    kind: 'movie',
-    filter: brstejCatFilter('aflam02-2024'),
-  },
-  {
-    id: 'movies_foreign',
-    label: 'أفلام أجنبية',
-    path: '/category.php?cat=aflamajnby3-2024',
-    kind: 'movie',
-    filter: brstejCatFilter('aflamajnby3-2024'),
-  },
-  {
-    id: 'movies_tr',
-    label: 'أفلام تركية',
-    path: '/category.php?cat=turkish3-movies2024',
-    kind: 'movie',
-    filter: brstejCatFilter('turkish3-movies2024'),
-  },
-  {
-    id: 'movies_in',
-    label: 'أفلام هندية',
-    path: '/category.php?cat=hindi1-moviess',
-    kind: 'movie',
-    filter: brstejCatFilter('hindi1-moviess'),
-  },
-  {
-    id: 'movies_anime',
-    label: 'أفلام أنمي',
-    path: '/category.php?cat=anime1',
-    kind: 'movie',
-    filter: brstejCatFilter('anime1'),
-  },
-  {
-    id: 'tv',
-    label: 'برامج تلفزيونية',
-    path: '/category.php?cat=tv4-2024',
-    kind: 'series',
-    filter: brstejCatFilter('tv4-2024'),
-  },
+  brstejCategory('ramadan', 'رمضان 2026', 'ramdan2026', 'series'),
+  brstejCategory('turkish', 'مسلسلات تركية', 'ty9-2025', 'series'),
+  brstejCategory('movies_ar', 'أفلام عربية', 'aflam02-2024', 'movie'),
+  brstejCategory('egyptian', 'مسلسلات مصرية', 'eg8-2025', 'series'),
+  brstejCategory('shami', 'مسلسلات شامية', 'syy5-2025', 'series'),
+  brstejCategory('movies_foreign', 'أفلام أجنبية', 'aflamajnby3-2024', 'movie'),
+  brstejCategory('gulf', 'مسلسلات خليجية', '5a7-2024', 'series'),
+  brstejCategory('arabic', 'مسلسلات عربية', 'arab8-2025', 'series'),
+  brstejCategory('prestige', 'مسلسلات برستيج', 'prss7-2025', 'series'),
+  brstejCategory('movies_tr', 'أفلام تركية', 'turkish3-movies2024', 'movie'),
+  brstejCategory('foreign', 'مسلسلات أجنبية', 'english1-2025', 'series'),
+  brstejCategory('asian', 'مسلسلات آسيوية', 'asia', 'series'),
+  brstejCategory('indian', 'مسلسلات هندية', '2ind2-2025', 'series'),
+  brstejCategory('movies_in', 'أفلام هندية', 'hindi1-moviess', 'movie'),
+  brstejCategory('anime', 'مسلسلات أنمي', 'anmei', 'series'),
+  brstejCategory('movies_anime', 'أفلام أنمي', 'anime1', 'movie'),
+  brstejCategory('tv', 'برامج تلفزيونية', 'tv4-2024', 'series'),
+  brstejCategory('ramadan_2025', 'رمضان 2025', 'ramadan2-2025', 'series'),
+  brstejCategory('ramadan_2024', 'رمضان 2024', 'ramdan1-2024', 'series'),
+  brstejCategory('ramadan_2023', 'رمضان 2023', 'ramda1-2023', 'series'),
+  brstejCategory('ramadan_2022', 'رمضان 2022', 'rm42-2022', 'series'),
+  brstejCategory('series_2021', 'مسلسلات 2021', 'rmdan31-2021', 'series'),
 ];
 
 function brstejFilters() {
@@ -144,23 +64,30 @@ function brstejFilters() {
       {
         id: 'films',
         label: 'Films',
-        filter: { op: 'eq', field: 'kind', value: 'movie' },
-        hideTypeFilterRails: true,
+        filter: { op: 'eq', field: 'type', value: 'movie' },
       },
       {
         id: 'series',
         label: 'Series',
-        filter: { op: 'eq', field: 'kind', value: 'series' },
-        hideTypeFilterRails: true,
+        filter: { op: 'eq', field: 'type', value: 'series' },
       },
     ],
     fields: [
       {
         field: 'cat',
         label: 'Category',
-        options: BRSTEJ_CATEGORY_OPTIONS.map(function (o) {
-          return { id: o.id, label: o.label, filter: o.filter };
-        }),
+        // Series sections first, then films (rails interleave them).
+        options: BRSTEJ_CATEGORY_OPTIONS.filter(function (o) {
+          return o.kind === 'series';
+        })
+          .concat(
+            BRSTEJ_CATEGORY_OPTIONS.filter(function (o) {
+              return o.kind === 'movie';
+            }),
+          )
+          .map(function (o) {
+            return { id: o.id, label: o.label, filter: o.filter };
+          }),
       },
     ],
   };
@@ -168,18 +95,37 @@ function brstejFilters() {
 
 function brstejOptionForCat(cat) {
   for (var i = 0; i < BRSTEJ_CATEGORY_OPTIONS.length; i++) {
-    if (BRSTEJ_CATEGORY_OPTIONS[i].filter.value === String(cat)) {
+    if (BRSTEJ_CATEGORY_OPTIONS[i].cat === String(cat)) {
       return BRSTEJ_CATEGORY_OPTIONS[i];
     }
   }
   return null;
 }
 
-function brstejChromeFiltered(params) {
-  return !!(
-    hubFilterValue(params.filter, 'cat') ||
-    hubFilterValue(params.filter, 'kind')
-  );
+function brstejOptionForRail(rail) {
+  for (var i = 0; i < BRSTEJ_CATEGORY_OPTIONS.length; i++) {
+    if (BRSTEJ_CATEGORY_OPTIONS[i].id === String(rail)) {
+      return BRSTEJ_CATEGORY_OPTIONS[i];
+    }
+  }
+  return null;
+}
+
+/** Chrome filter → { cat option or ad-hoc cat, type: movie|series|'' }. */
+function brstejChromeOf(params) {
+  var filter = params && params.filter;
+  var cat = hubFilterValue(filter, 'cat');
+  // `kind` — menu field before `type` (layout showWhenType reads `type`).
+  var type = String(
+    hubFilterValue(filter, 'type') || hubFilterValue(filter, 'kind') || '',
+  ).toLowerCase();
+  if (type === 'tv') type = 'series';
+  var opt = null;
+  if (cat) {
+    opt = brstejOptionForCat(cat) ||
+      brstejCategory(String(cat), String(cat), String(cat), 'series');
+  }
+  return { opt: opt, type: type };
 }
 
 function brstejBase(cfg) {
@@ -360,26 +306,44 @@ function brstejSerieHrefId(href) {
   return m ? m[1] : '';
 }
 
+/** Pager links appear as `?page=N`, `&page=N`, or HTML-escaped `&amp;page=N`. */
 function brstejHtmlHasNextPage(html, page) {
   var next = (Number(page) || 1) + 1;
-  return new RegExp('[?&]page=' + next + '([^0-9]|$)').test(String(html || ''));
+  return new RegExp('(?:[?&]|&amp;)page=' + next + '([^0-9]|$)').test(
+    String(html || ''),
+  );
 }
+
+function brstejText(el) {
+  return el && el.length
+    ? String(el.text() || '').replace(/\s+/g, ' ').trim()
+    : '';
+}
+
+// Series grids only — every page also carries a fixed footer of series links
+// and site-wide pinned blocks, so never match bare `series1.php` anchors.
+var BRSTEJ_SERIE_CARDS = [
+  'article.psd-card',
+  'ul.pcg-all-series-grid li',
+];
 
 function brstejParseSerieCards(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = [];
   var seen = {};
   if (!$) return out;
-  function push(card, a) {
-    if (!a || !a.length) return;
+  $(BRSTEJ_SERIE_CARDS.join(', ')).each(function () {
+    var card = $(this);
+    var a = card.find('h3 a[href*="series1.php"]').first();
+    if (!a.length) a = card.find('a[href*="series1.php"]').first();
+    if (!a.length) return;
     var href = a.attr('href') || '';
     var id = brstejSerieHrefId(href);
     if (!id || seen[id]) return;
-    var title = (a.attr('title') || '').trim();
-    if (!title) {
-      var h3 = card.find('h3').first();
-      title = (h3.text() || a.text() || '').trim();
-    }
+    var title =
+      String(a.attr('title') || '').trim() ||
+      brstejText(card.find('h3').first()) ||
+      brstejText(a);
     title = brstejStripPrefix(title);
     if (!title) return;
     seen[id] = true;
@@ -390,42 +354,40 @@ function brstejParseSerieCards(ctx, html, base) {
       { url: brstejAbs(base, href) },
     );
     if (meta) out.push(meta);
-  }
-  $('article.psd-card').each(function () {
-    var card = $(this);
-    var a = card
-      .find('h3 a[href*="series1.php"], h3 a[href*="view-serie.php"]')
-      .first();
-    if (!a.length) {
-      a = card.find('a[href*="series1.php"], a[href*="view-serie.php"]').first();
-    }
-    push(card, a);
   });
-  $('a.pcg-series-card, a[href*="series1.php?id="], a[href*="view-serie.php"]').each(
-    function () {
-      var a = $(this);
-      var card = a.closest('article, li');
-      if (!card.length) card = a;
-      push(card, a);
-    },
-  );
   return out;
 }
+
+// Paginated episode / movie grids per page template. Skips pinned
+// "featured", "discover" and "popular" side blocks that repeat on every page.
+var BRSTEJ_EPISODE_CARDS = [
+  'ul.pcg-episodes-grid li',
+  '.pln-grid article.pln-card',
+  'ul.prs-grid article.prs-card',
+  '.pmc-results-grid article.pmc-card',
+  'li[class*="col-xs-6"]',
+];
 
 function brstejParseEpisodeCards(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = [];
+  var seen = {};
   if (!$) return out;
-  $('li[class*="col-xs-6"]').each(function () {
+  $(BRSTEJ_EPISODE_CARDS.join(', ')).each(function () {
     var card = $(this);
-    var a = card.find('a[href*="watch.php"][title]').first();
+    var a = card.find('h3 a[href*="watch.php"]').first();
+    if (!a.length) a = card.find('a[href*="watch.php"][title]').first();
     if (!a.length) a = card.find('a[href*="watch.php"]').first();
     if (!a.length) return;
     var href = a.attr('href') || '';
     var m = /watch\.php\?vid=([^&"\s]+)/.exec(href);
-    if (!m) return;
-    var title = (a.attr('title') || a.text() || '').trim();
+    if (!m || seen[m[1]]) return;
+    var title =
+      brstejText(a) ||
+      String(a.attr('title') || '').trim() ||
+      String(card.find('a[aria-label]').first().attr('aria-label') || '').trim();
     if (!title) return;
+    seen[m[1]] = true;
     var meta = brstejMeta(
       'watch:' + m[1],
       title,
@@ -458,36 +420,6 @@ function brstejWithPage(path, page) {
   return path + '?page=' + page;
 }
 
-/** Upstream HTML lists ~30 cards/page; honor host page + return hasMore. */
-function brstejPageResult(raw, limit) {
-  limit = Number(limit) > 0 ? Number(limit) : 24;
-  var list = Array.isArray(raw) ? raw : [];
-  return {
-    items: hubClampList(list, limit),
-    pageSize: limit,
-    // Full-ish upstream page → more pages exist (use raw count, not grouped).
-    hasMore: list.length >= limit,
-  };
-}
-
-function brstejBrowseSeries(ctx, cfg, opts) {
-  opts = typeof opts === 'object' && opts ? opts : { limit: opts };
-  var page = Number(opts.page) > 0 ? Number(opts.page) : 1;
-  var limit = Number(opts.limit) > 0 ? Number(opts.limit) : 24;
-  var base = brstejBase(cfg);
-  // Site typo: paginated list is moslslat.php (moslsalat.php ignores ?page=).
-  var url = base + '/moslslat.php?page=' + page;
-  return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
-    var origin = brstejOrigin(got.url) || base;
-    var pageOut = brstejPageResult(
-      brstejParseSerieCards(ctx, got.html, origin),
-      limit,
-    );
-    if (brstejHtmlHasNextPage(got.html, page)) pageOut.hasMore = true;
-    return pageOut;
-  });
-}
-
 function brstejIsMovieTitle(title) {
   title = String(title || '');
   if (title.indexOf('الحلقة') >= 0) return false;
@@ -502,7 +434,7 @@ function brstejStripMoviePrefix(title) {
     .trim();
 }
 
-/** Category pages list watch.php cards — group episodes → series, keep movies. */
+/** Episode cards → one card per show on this page; movies stay one card each. */
 function brstejGroupCategoryCards(episodes, asMovies) {
   var byKey = {};
   var order = [];
@@ -542,109 +474,191 @@ function brstejGroupCategoryCards(episodes, asMovies) {
   return out;
 }
 
-function brstejBrowsePath(ctx, cfg, path, opts) {
-  opts = opts || {};
-  var page = Number(opts.page) > 0 ? Number(opts.page) : 1;
-  var limit = Number(opts.limit) > 0 ? Number(opts.limit) : 24;
+/** One upstream page → { items, hasMore } (hasMore from the site pager). */
+function brstejFetchList(ctx, cfg, path, page, parse) {
   var base = brstejBase(cfg);
   var url = base + brstejWithPage(path, page);
   return brstejFetchHtml(ctx, url, base + '/').then(function (got) {
     var origin = brstejOrigin(got.url) || base;
-    var series = brstejParseSerieCards(ctx, got.html, origin);
-    if (series.length) {
-      var seriesPage = brstejPageResult(series, limit);
-      if (brstejHtmlHasNextPage(got.html, page)) seriesPage.hasMore = true;
-      return seriesPage;
-    }
-    var episodes = brstejParseEpisodeCards(ctx, got.html, origin);
-    var grouped = brstejGroupCategoryCards(episodes, !!opts.asMovies);
-    // hasMore from raw episode cards — grouping collapses many eps → few shows.
-    var pageOut = brstejPageResult(grouped, limit);
-    pageOut.hasMore = episodes.length >= limit;
-    return pageOut;
+    return {
+      items: parse(got.html, origin) || [],
+      hasMore: brstejHtmlHasNextPage(got.html, page),
+    };
   });
 }
 
-function brstejExploreList(ctx, cfg, params) {
-  var cat = hubFilterValue(params.filter, 'cat');
-  var kind = hubFilterValue(params.filter, 'kind');
-  var limit = brstejLimitOf(params, 24);
-  var page = brstejPageOf(params);
-  if (cat) {
-    var opt = brstejOptionForCat(cat);
-    var path = opt
-      ? opt.path
-      : '/category.php?cat=' + encodeURIComponent(cat);
-    var asMovies =
-      kind === 'movie' || (opt && opt.kind === 'movie' && kind !== 'series');
-    return brstejBrowsePath(ctx, cfg, path, {
-      page: page,
-      limit: limit,
-      asMovies: asMovies,
-    });
-  }
-  if (kind === 'movie') {
-    return brstejBrowsePath(ctx, cfg, '/category.php?cat=aflam02-2024', {
-      page: page,
-      limit: limit,
-      asMovies: true,
-    });
-  }
-  if (kind === 'series') {
-    return brstejBrowseSeries(ctx, cfg, { page: page, limit: limit });
-  }
-  return Promise.resolve(brstejPageResult([], limit));
+/** Every show on the site, newest first (`moslslat.php` — site typo). */
+function brstejAllSeries(ctx, cfg, page) {
+  return brstejFetchList(ctx, cfg, '/moslslat.php', page, function (html, origin) {
+    return brstejParseSerieCards(ctx, html, origin);
+  });
 }
 
-function brstejFilteredFeed(ctx, cfg, params) {
-  var limit = brstejLimitOf(params, 24);
-  return brstejExploreList(
+/**
+ * Episode-grid pages grouped into shows; `type` keeps only movies or series.
+ * `span` upstream pages back one rail page — a page of daily episodes
+ * collapses to a handful of shows.
+ */
+function brstejEpisodeList(ctx, cfg, path, page, opts) {
+  opts = opts || {};
+  var span = Number(opts.span) > 1 ? Number(opts.span) : 1;
+  var pages = [];
+  for (var p = (page - 1) * span + 1; p <= page * span; p++) {
+    pages.push(
+      brstejFetchList(ctx, cfg, path, p, function (html, origin) {
+        return brstejParseEpisodeCards(ctx, html, origin);
+      }),
+    );
+  }
+  return Promise.all(pages).then(function (got) {
+    var episodes = [];
+    for (var i = 0; i < got.length; i++) episodes = episodes.concat(got[i].items);
+    var grouped = brstejGroupCategoryCards(episodes, !!opts.asMovies);
+    if (opts.type === 'movie' || opts.type === 'series') {
+      var wantMovie = opts.type === 'movie';
+      grouped = grouped.filter(function (m) {
+        return (m.badge === 'MOVIE') === wantMovie;
+      });
+    }
+    return { items: grouped, hasMore: got[got.length - 1].hasMore };
+  });
+}
+
+function brstejCategoryPath(opt) {
+  return '/cat03.php?cat=' + encodeURIComponent(opt.cat);
+}
+
+/** Concat without repeats — same id, or same show title from another page type. */
+function brstejConcatUnique(a, b) {
+  var seen = {};
+  var out = [];
+  var all = (a || []).concat(b || []);
+  for (var i = 0; i < all.length; i++) {
+    var m = all[i];
+    if (!m || !m.id) continue;
+    var title = 'title:' + brstejNormTitle(m.name);
+    if (seen[m.id] || seen[title]) continue;
+    seen[m.id] = true;
+    seen[title] = true;
+    out.push(m);
+  }
+  return out;
+}
+
+/**
+ * One page of a section. Series sections page the section's show index.
+ * A one-page index (older and smaller sections) misses shows, so those
+ * continue into the section's episode grid.
+ */
+function brstejCategoryList(ctx, cfg, opt, page) {
+  var path = brstejCategoryPath(opt);
+  if (opt.kind === 'movie') {
+    return brstejEpisodeList(ctx, cfg, path, page, { asMovies: true });
+  }
+  return brstejFetchList(
     ctx,
     cfg,
-    Object.assign({}, params, { page: 1, limit: Math.max(limit * 2, 48) }),
-  ).then(function (page) {
-    var list = (page && page.items) || [];
-    return hubOk(
-      'feed',
-      {
-        rails: {
-          spotlight: list.slice(0, limit),
-          latest: list.slice(0, limit),
-          series: list.slice(0, Math.min(10, limit)),
-        },
-      },
-      { maxAge: 600, swr: 3600 },
-    );
+    path + '&type=series',
+    page,
+    function (html, origin) {
+      return brstejParseSerieCards(ctx, html, origin);
+    },
+  ).then(function (got) {
+    var thin = page === 1 ? !got.hasMore : got.items.length === 0;
+    if (!thin) return got;
+    return brstejEpisodeList(ctx, cfg, path, page).then(function (eps) {
+      return {
+        items: page === 1 ? brstejConcatUnique(got.items, eps.items) : eps.items,
+        hasMore: eps.hasMore,
+      };
+    });
   });
 }
 
+/** Newest Arabic and foreign films, interleaved. */
+function brstejLatestMovies(ctx, cfg, page) {
+  var ids = ['movies_ar', 'movies_foreign'];
+  return Promise.all(
+    ids.map(function (id) {
+      return brstejCategoryList(ctx, cfg, brstejOptionForRail(id), page);
+    }),
+  ).then(function (pages) {
+    var a = pages[0].items;
+    var b = pages[1].items;
+    var mixed = [];
+    for (var i = 0; i < Math.max(a.length, b.length); i++) {
+      if (i < a.length) mixed.push(a[i]);
+      if (i < b.length) mixed.push(b[i]);
+    }
+    return {
+      items: brstejConcatUnique(mixed, []),
+      hasMore: pages[0].hasMore || pages[1].hasMore,
+    };
+  });
+}
+
+/**
+ * Rail id → one page. A chosen Category narrows the hub to that section:
+ * other section rails come back empty (host hides them).
+ */
+function brstejRailList(ctx, cfg, rail, params) {
+  var page = brstejPageOf(params);
+  var chrome = brstejChromeOf(params);
+  var none = Promise.resolve({ items: [], hasMore: false });
+  // `series` — ranked rail id in layouts cached before `top`.
+  if (rail === 'series') rail = 'top';
+
+  if (rail === 'spotlight' || rail === 'latest') {
+    if (chrome.opt) {
+      return rail === 'latest' && chrome.opt.kind === 'series'
+        ? brstejEpisodeList(ctx, cfg, brstejCategoryPath(chrome.opt), page, {
+          span: 2,
+        })
+        : brstejCategoryList(ctx, cfg, chrome.opt, page);
+    }
+    if (chrome.type === 'movie') return brstejLatestMovies(ctx, cfg, page);
+    if (rail === 'spotlight') return brstejAllSeries(ctx, cfg, page);
+    return brstejEpisodeList(ctx, cfg, '/new-videos.php', page, {
+      type: chrome.type,
+      span: 2,
+    });
+  }
+  if (rail === 'top') {
+    // Most-viewed is episode traffic — films barely register there.
+    if (chrome.opt || chrome.type === 'movie') return none;
+    return brstejEpisodeList(ctx, cfg, '/topvideos.php', page, {
+      type: chrome.type,
+      span: 3,
+    });
+  }
+  if (rail === 'all_series') {
+    if (chrome.opt || chrome.type === 'movie') return none;
+    return brstejAllSeries(ctx, cfg, page);
+  }
+  var opt = brstejOptionForRail(rail);
+  if (!opt) return null;
+  if (chrome.opt && chrome.opt.cat !== opt.cat) return none;
+  if (chrome.type && chrome.type !== opt.kind) return none;
+  return brstejCategoryList(ctx, cfg, opt, page);
+}
 
 function brstejRailItems(ctx, cfg, params) {
   var rail = String(params.rail || '');
-  if (
-    rail !== 'spotlight' &&
-    rail !== 'latest' &&
-    rail !== 'series'
-  ) {
+  var load = brstejRailList(ctx, cfg, rail, params);
+  if (!load) {
     return Promise.resolve(
       hubFail('rail', 'INVALID_PARAMS', 'unknown rail ' + rail),
     );
   }
-  var load = brstejChromeFiltered(params)
-    ? brstejExploreList(ctx, cfg, params)
-    : brstejBrowseSeries(ctx, cfg, {
-      page: brstejPageOf(params),
-      limit: brstejLimitOf(params, 24),
-    });
   return load
     .then(function (page) {
       return hubItems(
         'rail',
-        (page && page.items) || [],
+        page.items,
         { maxAge: 600, swr: 3600 },
         {
-          pageSize: (page && page.pageSize) || brstejLimitOf(params, 24),
-          hasMore: !!(page && page.hasMore),
+          pageSize: brstejLimitOf(params, 24),
+          hasMore: !!page.hasMore,
         },
       );
     })
@@ -654,29 +668,19 @@ function brstejRailItems(ctx, cfg, params) {
 }
 
 function brstejFeed(ctx, cfg, params) {
-  if (brstejChromeFiltered(params)) {
-    return brstejFilteredFeed(ctx, cfg, params).catch(function (e) {
-      return hubFail('feed', 'UPSTREAM', e && e.message, true);
-    });
-  }
   var limit = brstejLimitOf(params, 24);
-  return brstejBrowseSeries(ctx, cfg, {
-    page: 1,
-    limit: Math.max(limit, 24),
-  })
-    .then(function (page) {
-      var list = (page && page.items) || [];
-      return hubOk(
-        'feed',
-        {
-          rails: {
-            spotlight: list.slice(0, limit),
-            latest: list.slice(0, limit),
-            series: list.slice(0, Math.min(10, limit)),
-          },
-        },
-        { maxAge: 600, swr: 3600 },
-      );
+  var first = Object.assign({}, params, { page: 1 });
+  return Promise.all(
+    BRSTEJ_FEED_RAILS.map(function (rail) {
+      return brstejRailList(ctx, cfg, rail, first);
+    }),
+  )
+    .then(function (pages) {
+      var rails = {};
+      for (var i = 0; i < BRSTEJ_FEED_RAILS.length; i++) {
+        rails[BRSTEJ_FEED_RAILS[i]] = hubClampList(pages[i].items, limit);
+      }
+      return hubOk('feed', { rails: rails }, { maxAge: 600, swr: 3600 });
     })
     .catch(function (e) {
       return hubFail('feed', 'UPSTREAM', e && e.message, true);
@@ -781,6 +785,27 @@ function brstejAppendPdsSeasons($, base, out) {
   });
 }
 
+/** Watch pages: `.pwr-season-panel` per season, tab label "الموسم N". */
+function brstejAppendPwrSeasons($, base, out) {
+  $('.pwr-season-panel').each(function (si) {
+    var panel = $(this);
+    var label = brstejText(panel.find('.pwr-season-fallback').first());
+    var tabId = panel.attr('aria-labelledby') || '';
+    if (tabId) label = brstejText($('#' + tabId).first()) || label;
+    var m = /الموسم\s+(\d+)/.exec(label);
+    var seasonNum = m ? Number(m[1]) : si + 1;
+    var eps = brstejParseEpisodeAnchors(
+      $,
+      panel.find('a[href*="watch.php"]'),
+      base,
+    );
+    for (var i = 0; i < eps.length; i++) {
+      eps[i].season = seasonNum;
+      out.videos.push(eps[i]);
+    }
+  });
+}
+
 function brstejParseSerieHtml(ctx, html, base) {
   var $ = brstejHtml(ctx, html);
   var out = { title: '', poster: '', description: '', videos: [] };
@@ -857,6 +882,12 @@ function brstejParseWatchHtml(ctx, html, base) {
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
   if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
+  if (!out.videos.length) brstejAppendPwrSeasons($, base, out);
+  // A film's watch page has no episode list.
+  if (!out.videos.length && brstejIsMovieTitle(title)) {
+    out.movie = true;
+    out.title = brstejStripMoviePrefix(title);
+  }
   brstejFillVideoThumbs(out.videos, out.poster);
   return out;
 }
@@ -921,6 +952,7 @@ function brstejDetails(ctx, cfg, params) {
       meta.description = parsed.description || '';
       meta.background = poster;
       meta.videos = parsed.videos || [];
+      if (parsed.movie) meta.badge = 'MOVIE';
       return hubOk('details', { meta: meta }, { maxAge: 900, swr: 3600 });
     })
     .catch(function (e) {

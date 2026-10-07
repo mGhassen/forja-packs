@@ -22,7 +22,7 @@ Packs are JavaScript plugins the Forja app installs by manifest URL, caches on d
 | **Anime** | [`hubs/anime/manifest.json`](hubs/anime/manifest.json) | Anime catalog hub (AniList) |
 | **Asian Drama** | [`hubs/asian_drama/manifest.json`](hubs/asian_drama/manifest.json) | Asian Drama catalog hub (KissKH) |
 | **Arabic** | [`hubs/arabic/manifest.json`](hubs/arabic/manifest.json) | Arabic hub (Larozaa) |
-| **Aflem** | [`hubs/aflem/manifest.json`](hubs/aflem/manifest.json) | Aflem series hub |
+| **Aflem** | [`hubs/aflem/manifest.json`](hubs/aflem/manifest.json) | Arabic series, films and TV shows from Brstej |
 | **Cartoon** | [`hubs/cartoon/manifest.json`](hubs/cartoon/manifest.json) | كرتون / DimaToon hub |
 | **Kids** | [`hubs/kids/manifest.json`](hubs/kids/manifest.json) | Kids / Dimakids hub |
 | **Shahid** | [`hubs/shahid/manifest.json`](hubs/shahid/manifest.json) | Shahid movies and series |

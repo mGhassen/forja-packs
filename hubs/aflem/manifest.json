@@ -2,9 +2,9 @@
   "schema": 1,
   "id": "forjahq-aflem",
   "name": "ForjaHQ Aflem",
-  "description": "Aflem Arabic series hub (Brstej upstream).",
+  "description": "Arabic series, films and TV shows from Brstej.",
   "author": "ForjaHQ",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "tags": [
     "aflem",
     "arabic"
