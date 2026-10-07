@@ -8,11 +8,33 @@ function extract(ctx) {
   var ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
   var ep = Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
+  // embed.settlar.io sits behind Cloudflare and 403s the plain client's TLS fingerprint.
+  var cfFetch = typeof ctx.chromeFetch === 'function' ? ctx.chromeFetch.bind(ctx) : ctx.fetch;
 
   function anilistId() {
     var al = Number(ctx.anilistId) || 0;
     if (!al && globalThis.__engineCtxAnilist) al = Number(globalThis.__engineCtxAnilist(ctx)) || 0;
     return al;
+  }
+
+  // Settlar proxy paths wrap the upstream URL: /backup/v1/{h|v}/<base64url>.<sig>.<ext>.
+  // The proxy only answers browser fingerprints; the upstream CDN plays with the embed host as referer.
+  function unwrap(url) {
+    var m = /\/backup\/v1\/[hv]\/([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+\.(?:m3u8|vtt)$/.exec(String(url || ''));
+    if (!m) return '';
+    try {
+      var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      var out = atob(b64);
+      return /^https?:\/\//.test(out) ? out : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function originOf(url) {
+    var m = /^(https?:\/\/[^/]+)/.exec(String(url || ''));
+    return m ? m[1] : '';
   }
 
   function scrape(al, kind) {
@@ -36,32 +58,53 @@ function extract(ctx) {
         },
       })
       .then(function (r) {
-        if (!r.ok) return [];
+        if (!r.ok) return null;
         return r.json();
       })
       .then(function (data) {
-        if (!data || typeof data !== 'object') return [];
-        var rows = [];
-        var langLabel = lang.toUpperCase();
+        var be = data && data.backupEmbed;
+        if (!be || !be.available || !be.direct || !be.direct.stream) return [];
+        if (be.language && be.language !== lang) return [];
+        var embedOrigin = originOf(be.url);
+        if (!embedOrigin) return [];
 
-        var be = data.backupEmbed;
-        if (be && be.available) {
-          if (be.direct && be.direct.stream) {
-            rows.push({
-              url: be.direct.stream,
-              name: 'AniPM (' + langLabel + ')',
-              quality: '1080p',
-              language: lang === 'dub' ? 'Dub' : 'Sub',
-              headers: {
-                'User-Agent': ua,
-                Referer: base + '/',
-                Origin: base,
-              },
+        // direct.stream is a JSON descriptor ({ master, tracks }), not media.
+        return cfFetch(be.direct.stream, {
+          headers: {
+            'User-Agent': ua,
+            Referer: base + '/',
+            Origin: base,
+            Accept: 'application/json',
+          },
+        })
+          .then(function (r) {
+            if (!r.ok) return null;
+            return r.json();
+          })
+          .then(function (desc) {
+            var master = unwrap(desc && desc.master);
+            if (!master) return [];
+            var subtitles = [];
+            (desc.tracks || []).forEach(function (t) {
+              var su = t && unwrap(t.url);
+              if (!su) return;
+              subtitles.push({ url: su, lang: t.lang || t.label || 'Unknown', label: t.label || '' });
             });
-          }
-        }
-
-        return rows;
+            return [
+              {
+                url: master,
+                name: 'AniPM (' + lang.toUpperCase() + ')',
+                language: lang === 'dub' ? 'Dub' : 'Sub',
+                headers: {
+                  'User-Agent': ua,
+                  Referer: embedOrigin + '/',
+                  Origin: embedOrigin,
+                },
+                subtitles: subtitles,
+                pngStrip: 'auto',
+              },
+            ];
+          });
       })
       .catch(function () {
         return [];

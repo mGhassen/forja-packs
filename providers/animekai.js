@@ -126,6 +126,7 @@ function extract(ctx) {
             name: 'AnimeKai [' + name + '] (' + kind.toUpperCase() + ')',
             language: kind === 'dub' ? 'Dub' : 'Sub',
             headers: { 'User-Agent': ua, Referer: host + '/', Origin: host },
+            pngStrip: 'auto',
           },
         ];
       })

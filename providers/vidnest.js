@@ -160,25 +160,62 @@ function extract(ctx) {
     var al = anilistId();
     if (!al) return Promise.resolve([]);
     var ep = Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
+    // Paths + referers match the vidnest.fun anime player (2026-10):
+    // Anitaku → hianime/…/hd-2 (CDN 403s without the megaplay referer),
+    // Aniwave → aniwave_hls (per-source referer), Megaplay → animehub.
     var animeServers = (cfg.servers || []).filter(function (s) {
-      return s && (s.anime || s.id === 'hianime' || s.id === 'animepahe' || s.id === 'kickass' || s.id === '9anime');
+      return s && s.path;
     });
     if (!animeServers.length) {
       animeServers = [
-        { id: 'hianime', name: 'HiAnime' },
-        { id: 'animepahe', name: 'AnimePahe' },
+        { id: 'anitaku', name: 'Anitaku', path: 'hianime/anime/{al}/{ep}/{cat}/hd-2', referer: 'https://megaplay.buzz/', pngStrip: 'auto' },
+        { id: 'aniwave', name: 'Aniwave', path: 'aniwave_hls/{al}/{ep}/{cat}', referer: 'https://play.echovideo.ru/' },
+        { id: 'megaplay', name: 'Megaplay', path: 'animehub/{al}/{ep}/{cat}', pngStrip: 'auto' },
       ];
     }
     var cats =
       (globalThis.__engineAudioCategories &&
         globalThis.__engineAudioCategories(ctx)) ||
       ['sub', 'dub'];
+
+    function streamHeaders(referer) {
+      var h = { 'User-Agent': ua };
+      if (!referer) return h;
+      h.Referer = referer;
+      var m = String(referer).match(/^(https?:\/\/[^/]+)/i);
+      if (m) h.Origin = m[1];
+      return h;
+    }
+
+    function animeRows(json, server, cat) {
+      var rows = [];
+      var srcs = [].concat(json.sources || [], json.multiSrc || []);
+      srcs.forEach(function (src) {
+        var u = src && (src.file || src.url);
+        if (!u) return;
+        var row = {
+          url: u,
+          name: (server.name || server.id) + ' (' + cat.toUpperCase() + ')',
+          quality: String(src.quality || ''),
+          language: cat === 'dub' ? 'Dub' : 'Sub',
+          headers: streamHeaders(src.referer || server.referer),
+        };
+        if (server.pngStrip) row.pngStrip = server.pngStrip;
+        rows.push(row);
+      });
+      return rows;
+    }
+
     var tasks = [];
     animeServers.forEach(function (server) {
-      var key = String(server.id || server.anime || '').toLowerCase();
-      if (!key) return;
       cats.forEach(function (cat) {
-        var uri = api + '/' + key + '/anime/' + al + '/' + ep + '/' + cat;
+        var uri =
+          api +
+          '/' +
+          String(server.path)
+            .replace('{al}', al)
+            .replace('{ep}', ep)
+            .replace('{cat}', cat);
         tasks.push(
           ctx
             .fetch(uri, { headers: headers })
@@ -189,13 +226,7 @@ function extract(ctx) {
             .then(function (body) {
               var json = decodeBody(body);
               if (!json) return [];
-              var rows = emit(json, {
-                name: (server.name || key) + ' (' + cat.toUpperCase() + ')',
-              });
-              rows.forEach(function (row) {
-                row.language = cat === 'dub' ? 'Dub' : 'Sub';
-              });
-              return resolveRows(rows);
+              return resolveRows(animeRows(json, server, cat));
             })
             .catch(function () {
               return [];

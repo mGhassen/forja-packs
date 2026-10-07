@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.49",
+  "version": "1.6.50",
   "tags": [
     "providers",
     "anime",
@@ -558,24 +558,23 @@
         "alphabet": "RB0fpH8ZEyVLkv7c2i6MAJ5u3IKFDxlS1NTsnGaqmXYdUrtzjwObCgQP94hoeW+/=",
         "servers": [
           {
-            "id": "hianime",
-            "name": "HiAnime",
-            "anime": "hianime"
+            "id": "anitaku",
+            "name": "Anitaku",
+            "path": "hianime/anime/{al}/{ep}/{cat}/hd-2",
+            "referer": "https://megaplay.buzz/",
+            "pngStrip": "auto"
           },
           {
-            "id": "animepahe",
-            "name": "AnimePahe",
-            "anime": "animepahe"
+            "id": "aniwave",
+            "name": "Aniwave",
+            "path": "aniwave_hls/{al}/{ep}/{cat}",
+            "referer": "https://play.echovideo.ru/"
           },
           {
-            "id": "kickass",
-            "name": "KickAssAnime",
-            "anime": "kickassanime"
-          },
-          {
-            "id": "9anime",
-            "name": "9Anime",
-            "anime": "9anime"
+            "id": "megaplay",
+            "name": "Megaplay",
+            "path": "animehub/{al}/{ep}/{cat}",
+            "pngStrip": "auto"
           }
         ]
       }

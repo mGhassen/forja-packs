@@ -253,7 +253,7 @@ function extract(ctx) {
         'v1/anime/' + encodeURIComponent(anime.id) + '/episodes/' + encodeURIComponent(String(epNum)) + '/play',
       ).then(function (play) {
         if (!play) return [];
-        return flattenPlay(play, base).slice(0, 16);
+        return flattenPlay(play, base);
       });
     })
     .catch(function () {
