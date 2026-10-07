@@ -232,6 +232,7 @@ function filterSimklByLocal(simklItems, allLocal, status, hiddenKeys) {
       s.listStatus = localStatus;
       if (local.uniqueId) s.uniqueId = local.uniqueId;
       if (local.pluginId) s.pluginId = local.pluginId;
+      if (local.hubLabel) s.hubLabel = local.hubLabel;
       var lo = local.metaOpen || local.open || local.catalogOpen;
       if (lo && typeof lo === 'object') {
         s.open = lo;

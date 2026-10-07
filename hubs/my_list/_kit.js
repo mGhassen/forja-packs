@@ -117,6 +117,11 @@ function hubPosterTypeLabel(meta) {
     return 'DRAMA';
   }
   if (kind === 'anime' || surface === 'anime') return 'ANIME';
+  // Pinned from a hub (Arabic, Kids, …) — show that hub, not FILM / TV.
+  var hubLabel = String(meta.hubLabel || '').trim();
+  if (hubLabel && surface && surface !== 'tmdb') {
+    return hubLabel.toUpperCase();
+  }
   if (hint === 'tv' || kind === 'tv' || kind === 'series' || kind === 'shows') {
     return 'TV';
   }
