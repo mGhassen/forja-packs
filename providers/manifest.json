@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.47",
+  "version": "1.6.48",
   "tags": [
     "providers",
     "anime",
@@ -1378,6 +1378,32 @@
       ]
     },
     {
+      "kind": "http",
+      "id": "voiranime",
+      "name": "VoirAnime",
+      "entry": "voiranime.js",
+      "prelude": "_fr_anime_embeds.js",
+      "ids": [
+        "title"
+      ],
+      "types": [
+        "anime"
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "animesama",
+      "name": "Anime-Sama",
+      "entry": "animesama.js",
+      "prelude": "_fr_anime_embeds.js",
+      "ids": [
+        "title"
+      ],
+      "types": [
+        "anime"
+      ]
+    },
+    {
       "id": "hop-flixcloud",
       "name": "FlixCloud",
       "entry": "flixcloud.js",
@@ -1502,7 +1528,8 @@
         "voe.bar",
         "reputationsheriffkennethsand.com",
         "fittingcentermondaysunday.com",
-        "teresapoliticallearn.com"
+        "teresapoliticallearn.com",
+        "jeremyparticipantanything.com"
       ]
     },
     {
@@ -1848,6 +1875,9 @@
     "watchhentai.js",
     "hentaini.js",
     "arabicanime.js",
+    "_fr_anime_embeds.js",
+    "voiranime.js",
+    "animesama.js",
     "hops/abyss.js",
     "hops/megaup.js",
     "hops/onetouchtv.js",
