@@ -1,46 +1,71 @@
 // Arabic hub page layout — widgets tree for action:'layout'.
+// One rail per Larozaa section (ARABIC_SECTIONS) plus every series, so the
+// hub covers the whole site. Films / Series menus hide rails via
+// showWhenType; a chosen Category empties the other section rails.
 
 function arabicLayout() {
-  // Visual order under the hero bleed (`latest`).
-  var chain = [
-    'latest',
-    'continue_watching',
-    'series',
-    'movies',
-    'turkish',
-    'foreign_series',
-    'foreign_movies',
-    'indian_series',
-    'indian',
-    'asian_series',
-    'asian_movies',
-    'anime_series',
-    'anime_movies',
-    'dubbed',
-    'turkish_movies',
-    'ramadan',
-    'tv_programs',
-    'plays',
-  ];
+  var rails = [];
+  for (var i = 0; i < ARABIC_SECTIONS.length; i++) {
+    var s = ARABIC_SECTIONS[i];
+    rails.push({
+      type: 'rail',
+      id: s.id,
+      title: s.label,
+      rail: s.id,
+      showWhenType: s.kind,
+    });
+  }
+  rails.push({
+    type: 'rail',
+    id: 'all_series',
+    title: 'كل المسلسلات',
+    rail: 'all_series',
+    showWhenType: 'series',
+  });
 
-  function edges(id) {
-    var i = chain.indexOf(id);
-    var out = {};
-    if (i > 0) out.focusUp = chain[i - 1];
-    if (i >= 0 && i + 1 < chain.length) out.focusDown = chain[i + 1];
-    return out;
+  // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
+  // Hidden or empty rails: host kit-edge miss walks past.
+  var chain = ['latest', 'continue_watching'];
+  for (var j = 0; j < rails.length; j++) chain.push(rails[j].id);
+  function link(node) {
+    var at = chain.indexOf(node.id);
+    if (at > 0 && !node.focusUp) node.focusUp = chain[at - 1];
+    if (at >= 0 && at + 1 < chain.length) node.focusDown = chain[at + 1];
+    return node;
   }
 
-  function rail(id, title, extra) {
-    return hubWithLoad(
-      Object.assign(
-        { type: 'rail', id: id, title: title, rail: id },
-        edges(id),
-        extra || {},
-      ),
+  var widgets = [
+    hubWithLoad(
+      {
+        type: 'hero',
+        id: 'spotlight',
+        title: 'رائج · Spotlight',
+        rail: 'trending',
+        bleed: 'latest',
+      },
       'rail',
-      { rail: id },
-    );
+      { rail: 'trending' },
+    ),
+    hubWithLoad(
+      link({
+        type: 'rail',
+        id: 'latest',
+        title: 'أخر الاضافات',
+        rail: 'latest',
+        hideWhenBleed: true,
+        maxPages: ARABIC_RAIL_MAX_PAGES,
+        // First catalog row ↑ → View details (not top menu).
+        focusUp: 'hero-details',
+      }),
+      'rail',
+      { rail: 'latest' },
+    ),
+    link({ type: 'continue', id: 'continue_watching' }),
+  ];
+  for (var k = 0; k < rails.length; k++) {
+    var node = link(rails[k]);
+    node.maxPages = ARABIC_RAIL_MAX_PAGES;
+    widgets.push(hubWithLoad(node, 'rail', { rail: node.rail }));
   }
 
   return {
@@ -49,49 +74,10 @@ function arabicLayout() {
         feed: true,
         feedRails: ARABIC_FEED_RAILS.slice(),
         pageSize: 24,
-        // TV D-pad — vertical chain is pack focusUp/focusDown via `chain`.
-        // Empty Continue: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
         // enter / restore omitted: hero View details owns first land
         // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
-        widgets: [
-          hubWithLoad(
-            {
-              type: 'hero',
-              id: 'spotlight',
-              title: 'رائج · Spotlight',
-              rail: 'trending',
-              bleed: 'latest',
-            },
-            'rail',
-            { rail: 'trending' },
-          ),
-          rail('latest', 'أخر الاضافات', {
-            hideWhenBleed: true,
-            // First catalog row ↑ → View details (not top menu).
-            focusUp: 'hero-details',
-          }),
-          Object.assign(
-            { type: 'continue', id: 'continue_watching' },
-            edges('continue_watching'),
-          ),
-          rail('series', 'مسلسلات عربية'),
-          rail('movies', 'أفلام عربية'),
-          rail('turkish', 'مسلسلات تركية'),
-          rail('foreign_series', 'مسلسلات أجنبية'),
-          rail('foreign_movies', 'أفلام أجنبية'),
-          rail('indian_series', 'مسلسلات هندية'),
-          rail('indian', 'أفلام هندية'),
-          rail('asian_series', 'مسلسلات آسيوية'),
-          rail('asian_movies', 'أفلام آسيوية'),
-          rail('anime_series', 'أنمي · مسلسلات'),
-          rail('anime_movies', 'أنمي · أفلام'),
-          rail('dubbed', 'أفلام مدبلجة'),
-          rail('turkish_movies', 'أفلام تركية'),
-          rail('ramadan', 'رمضان 2026'),
-          rail('tv_programs', 'برامج تلفزيونية'),
-          rail('plays', 'مسرحيات'),
-        ],
+        widgets: widgets,
       },
     },
   };

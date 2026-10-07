@@ -2,8 +2,8 @@
   "schema": 1,
   "id": "forjahq-arabic",
   "name": "ForjaHQ Arabic",
-  "description": "Larozaa Arabic movies and TV hub.",
-  "version": "1.4.19",
+  "description": "Arabic and dubbed series, films, plays and TV shows from Larozaa.",
+  "version": "1.4.20",
   "tags": [
     "arabic"
   ],

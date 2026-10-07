@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.52",
+  "version": "1.6.53",
   "tags": [
     "providers",
     "anime",
@@ -171,7 +171,13 @@
           "https://laaroza.space",
           "https://laaroza.pics"
         ]
-      }
+      },
+      "hops": [
+        "hop-voe",
+        "hop-vidmoly",
+        "hop-mixdrop",
+        "hop-doodstream"
+      ]
     },
     {
       "id": "dimatoon",
@@ -1529,7 +1535,8 @@
         "dood.pm",
         "dood.work",
         "dood.one",
-        "dood.so"
+        "dood.so",
+        "dsvplay.com"
       ]
     },
     {
@@ -1681,7 +1688,9 @@
         "mixdrop.ag",
         "mixdrop.sx",
         "mixdrop.to",
-        "mdy48tn97.com"
+        "mdy48tn97.com",
+        "mixdrop.top",
+        "mxdrop.top"
       ]
     },
     {

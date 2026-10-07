@@ -140,6 +140,81 @@ function collectLarozaServers($, rawHtml, playUrl, playReferer) {
   return items;
 }
 
+function hostOf(url) {
+  try {
+    return new URL(url).host.toLowerCase().replace(/^www\./, '');
+  } catch (e) {
+    return '';
+  }
+}
+
+// Vidara-family players: POST `/api/stream` → `streaming_url` (HLS).
+var VIDARA_HOSTS = ['vidara.to'];
+
+function resolveVidara(ctx, server) {
+  var code = /\/e\/([A-Za-z0-9]+)/.exec(server.embedUrl);
+  if (!code) return Promise.resolve([]);
+  var o = origin(server.embedUrl);
+  var h = headers(server.embedUrl);
+  h['Content-Type'] = 'application/json';
+  h.Origin = o;
+  return ctx
+    .fetch(o + '/api/stream', {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({ filecode: code[1], device: 'web', codecs: [] }),
+    })
+    .then(function (res) {
+      return res.json();
+    })
+    .then(function (j) {
+      var url = j && j.streaming_url;
+      if (!url) return [];
+      return [arabicDirectRow(url, server.name, server.embedUrl)];
+    })
+    .catch(function () {
+      return [];
+    });
+}
+
+/**
+ * One server → stream rows. Packed / JW pages unpack here; Vidara uses its
+ * API; VOE, Vidmoly, Mixdrop and DoodStream go to the shared hops.
+ */
+function resolveServer(ctx, server) {
+  return arabicResolveEmbed(ctx, server.embedUrl, server.referer, server.name)
+    .then(function (row) {
+      if (row) return [row];
+      if (VIDARA_HOSTS.indexOf(hostOf(server.embedUrl)) >= 0) {
+        return resolveVidara(ctx, server);
+      }
+      if (typeof ctx.hop !== 'function') return [];
+      return ctx.hop(server.embedUrl).then(function (rows) {
+        return (rows || []).map(function (r) {
+          return Object.assign({}, r, { name: server.name, title: server.name });
+        });
+      });
+    })
+    .catch(function () {
+      return [];
+    });
+}
+
+function resolveServers(ctx, servers) {
+  return Promise.all(
+    servers.map(function (s) {
+      return resolveServer(ctx, s);
+    }),
+  ).then(function (lists) {
+    var out = [];
+    for (var i = 0; i < lists.length; i++) out = out.concat(lists[i]);
+    if (!out.length) {
+      ctx.log('larozaa: no direct streams from ' + servers.length + ' server(s)');
+    }
+    return out;
+  });
+}
+
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var videoId = parseVideoId(cfg.videoId || '');
@@ -162,14 +237,10 @@ function extract(ctx) {
           return fetchHtml(ctx, embedUrl, playReferer).then(function (emb) {
             var $e = html(ctx, emb.html);
             var fromEmbed = collectLarozaServers($e, emb.html, embedUrl, playReferer);
-            return arabicResolveEmbeds(ctx, fromEmbed, function (msg) {
-              ctx.log('larozaa: ' + msg);
-            });
+            return resolveServers(ctx, fromEmbed);
           });
         }
-        return arabicResolveEmbeds(ctx, servers, function (msg) {
-          ctx.log('larozaa: ' + msg);
-        });
+        return resolveServers(ctx, servers);
       });
     })
     .catch(function (e) {
