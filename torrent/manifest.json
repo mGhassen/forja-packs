@@ -4,7 +4,7 @@
   "name": "ForjaHQ Torrent",
   "description": "Built-in torrent indexer search for movies and series.",
   "author": "ForjaHQ",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "prelude": "_torrent_common.js",
   "tags": [
     "torrent"
@@ -129,6 +129,41 @@
       "config": {
         "source": "TorrentGalaxy"
       }
+    },
+    {
+      "id": "torrent-downloads",
+      "name": "Torrent downloads",
+      "description": "Torrents in the local engine: stop, resume on the next play, delete.",
+      "entry": "downloads.js",
+      "kind": "catalog",
+      "protocol": 1,
+      "kit": 1,
+      "types": [],
+      "capabilities": [
+        "settings",
+        "settingsList",
+        "settingsAction"
+      ],
+      "settings": {
+        "addon": "torrent",
+        "addons": [
+          "torrent",
+          "downloads"
+        ],
+        "group": "Torrents",
+        "order": 5,
+        "fields": [
+          {
+            "id": "downloads",
+            "type": "action_list",
+            "label": "Torrents",
+            "subtitle": "Torrents in the engine with progress, peers and speed.",
+            "action": "settingsList",
+            "itemAction": "settingsAction",
+            "refreshSeconds": 2
+          }
+        ]
+      }
     }
   ],
   "bundle": [
@@ -142,6 +177,7 @@
     "solid_torrents.js",
     "therarbg.js",
     "torrentio.js",
-    "torrentgalaxy.js"
+    "torrentgalaxy.js",
+    "downloads.js"
   ]
 }

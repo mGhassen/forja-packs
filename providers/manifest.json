@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.51",
+  "version": "1.6.52",
   "tags": [
     "providers",
     "anime",
@@ -1378,6 +1378,28 @@
     },
     {
       "kind": "http",
+      "id": "animezid",
+      "name": "AnimeZid",
+      "entry": "animezid.js",
+      "prelude": "_arabic_stream_unpack.js",
+      "ids": [
+        "title"
+      ],
+      "types": [
+        "anime"
+      ],
+      "config": {
+        "base": "https://animezid.cam"
+      },
+      "hops": [
+        "hop-voe",
+        "hop-mp4upload",
+        "hop-doodstream",
+        "hop-mixdrop"
+      ]
+    },
+    {
+      "kind": "http",
       "id": "voiranime",
       "name": "VoirAnime",
       "entry": "voiranime.js",
@@ -1874,6 +1896,7 @@
     "watchhentai.js",
     "hentaini.js",
     "arabicanime.js",
+    "animezid.js",
     "_fr_anime_embeds.js",
     "voiranime.js",
     "animesama.js",

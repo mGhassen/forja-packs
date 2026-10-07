@@ -3,9 +3,12 @@
 var FR_ANIME_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36';
 
+// `language` must be sub/dub: it is the field the host's Anime SUB/DUB filter reads after
+// mapping. Labels name the audio; the subbed label avoids "VOSTFR"/"FRENCH", which the
+// Sources chips read as French audio.
 var FR_ANIME_LANGS = {
-  vf: { language: 'French', tag: '(DUB)', label: 'VF' },
-  vostfr: { language: 'VOSTFR', tag: '(SUB)', label: 'VOSTFR' },
+  vf: { language: 'dub', tag: '(DUB)', label: 'French dub' },
+  vostfr: { language: 'sub', tag: '(SUB)', label: 'Japanese · sous-titres FR' },
 };
 
 var FR_ANIME_HOST_NAMES = {
