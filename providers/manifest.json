@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.53",
+  "version": "1.6.54",
   "tags": [
     "providers",
     "anime",
@@ -1228,7 +1228,8 @@
       "name": "FshareTV",
       "entry": "fsharetv.js",
       "types": [
-        "movie"
+        "movie",
+        "tv"
       ]
     },
     {
@@ -1237,7 +1238,8 @@
       "name": "FSonic",
       "entry": "fsonic.js",
       "types": [
-        "movie"
+        "movie",
+        "tv"
       ]
     },
     {
@@ -1256,7 +1258,8 @@
       "name": "LMScript",
       "entry": "lmscript.js",
       "types": [
-        "movie"
+        "movie",
+        "tv"
       ]
     },
     {

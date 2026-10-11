@@ -62,9 +62,21 @@ function extract(ctx) {
     return out;
   }
 
-  function scrape(al, kind) {
+  // Upstream exposes one HLS file per server via ?server=HD-N (invalid names fall back to HD-1).
+  var SERVERS = ['HD-1', 'HD-2', 'HD-3', 'HD-4', 'HD-5', 'HD-6'];
+
+  function scrape(al, kind, server) {
     var cat = kind === 'dub' ? 'dub' : 'sub';
-    var embedUrl = base + '/embed/ani/' + al + '/' + ep + '/' + cat + '?k=1';
+    var embedUrl =
+      base +
+      '/embed/ani/' +
+      al +
+      '/' +
+      ep +
+      '/' +
+      cat +
+      '?k=1&server=' +
+      encodeURIComponent(server);
     return getText(embedUrl, {
       Accept:
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -76,23 +88,28 @@ function extract(ctx) {
         if (!m) return [];
         var sourcesUrl = abs(m[1]);
         return getJson(sourcesUrl, { Referer: embedUrl }).then(function (data) {
-          if (!data || !Array.isArray(data.sources) || !data.sources.length) return [];
-          var filePath = data.sources[0] && data.sources[0].file;
-          var streamUrl = abs(filePath || '');
-          if (!streamUrl) return [];
-          var row = {
-            url: streamUrl,
-            name: 'ReCloud (' + cat.toUpperCase() + ')',
-            language: cat === 'dub' ? 'Dub' : 'Sub',
-            headers: {
-              Referer: base + '/',
-              Origin: base,
-              'User-Agent': ua,
-            },
-          };
+          if (!data || data.server !== server) return [];
+          if (!Array.isArray(data.sources) || !data.sources.length) return [];
           var subs = tracksFrom(data);
-          if (subs.length) row.subtitles = subs;
-          return [row];
+          var rows = [];
+          for (var i = 0; i < data.sources.length; i++) {
+            var filePath = data.sources[i] && data.sources[i].file;
+            var streamUrl = abs(filePath || '');
+            if (!streamUrl) continue;
+            var row = {
+              url: streamUrl,
+              name: 'ReCloud ' + server + ' (' + cat.toUpperCase() + ')',
+              language: cat === 'dub' ? 'Dub' : 'Sub',
+              headers: {
+                Referer: base + '/',
+                Origin: base,
+                'User-Agent': ua,
+              },
+            };
+            if (subs.length) row.subtitles = subs;
+            rows.push(row);
+          }
+          return rows;
         });
       })
       .catch(function () {
@@ -107,11 +124,14 @@ function extract(ctx) {
     (globalThis.__engineAudioCategories && globalThis.__engineAudioCategories(ctx)) ||
     ['sub', 'dub'];
 
-  return Promise.all(
-    cats.map(function (kind) {
-      return scrape(al, kind);
-    }),
-  ).then(function (groups) {
+  var jobs = [];
+  cats.forEach(function (kind) {
+    SERVERS.forEach(function (server) {
+      jobs.push(scrape(al, kind, server));
+    });
+  });
+
+  return Promise.all(jobs).then(function (groups) {
     var seen = {};
     var out = [];
     groups.forEach(function (rows) {
