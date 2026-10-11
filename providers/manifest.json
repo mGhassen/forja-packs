@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.54",
+  "version": "1.6.55",
   "tags": [
     "providers",
     "anime",
@@ -1174,6 +1174,17 @@
     },
     {
       "kind": "http",
+      "id": "movix",
+      "name": "Movix",
+      "entry": "movix.js",
+      "prelude": "_fr_anime_embeds.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
       "id": "vidapi",
       "name": "VidApi",
       "entry": "vidapi.js",
@@ -1886,6 +1897,7 @@
     "nova.js",
     "megasource.js",
     "purstream.js",
+    "movix.js",
     "vidapi.js",
     "vidvault.js",
     "cinesrc.js",
