@@ -166,26 +166,55 @@ function extract(ctx) {
     });
   }
 
-  function resolveRedirect(url) {
-    if (/hubcloud|hubdrive/i.test(url)) return Promise.resolve(url);
-    return fetchText(url)
+  function decodeRedirectLink(html) {
+    var regex =
+      /s\s*\(\s*['"]o['"]\s*,\s*['"]([A-Za-z0-9+/=]+)['"]|ck\s*\(\s*['"]_wp_http_\d+['"]\s*,\s*['"]([^"']+)['"]/g;
+    var combined = '';
+    var m;
+    while ((m = regex.exec(html)) !== null) combined += m[1] || m[2] || '';
+    if (!combined) return null;
+    try {
+      var decoded = atobCompat(rot13(atobCompat(atobCompat(combined))));
+      var obj = JSON.parse(decoded);
+      return atobCompat(obj.o || '').trim() || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // greenmotors / gadgetsweb gate pages — decode s('o',…) payload; never follow
+  // the JS interstitial (homelander) which needs browser localStorage.
+  function getRedirectLink(url, referer) {
+    return fetchText(url, referer ? { Referer: referer } : undefined)
       .then(function (html) {
-        var m = String(html || '').match(/'o','(.*?)'/);
-        if (!m) return url;
-        try {
-          var step1 = atobCompat(m[1]);
-          var step2 = atobCompat(step1);
-          var step3 = rot13(step2);
-          var step4 = atobCompat(step3);
-          var decoded = JSON.parse(step4);
-          return decoded && decoded.o ? atobCompat(decoded.o) : url;
-        } catch (e) {
-          return url;
+        var decoded = decodeRedirectLink(html);
+        if (decoded) return decoded;
+        var loc = String(html || '').match(/window\.location\.href\s*=\s*['"]([^'"]+)['"]/);
+        if (
+          loc &&
+          loc[1] &&
+          loc[1] !== url &&
+          !/homelander|\/go\//i.test(loc[1])
+        ) {
+          return getRedirectLink(loc[1], url);
         }
+        return null;
       })
       .catch(function () {
-        return url;
+        return null;
       });
+  }
+
+  function resolveRedirect(url, referer) {
+    if (/hubcloud|hubdrive/i.test(url)) return Promise.resolve(url);
+    return getRedirectLink(url, referer || domain).then(function (redir) {
+      if (redir) return redir;
+      // Gate page with no s('o',…) payload — do not scrape greenmotors HTML as HubCloud.
+      if (/greenmotors|gadgetsweb|techyboy|bloggingvector|[?&]id=/i.test(url)) {
+        return '';
+      }
+      return url;
+    });
   }
 
   function resolveHref(href, baseUrl) {
@@ -283,7 +312,11 @@ function extract(ctx) {
         var href = a.attr('href') || '';
         if (!hubCloudLink && (/HubCloud/i.test(text) || /hubcloud/i.test(href))) hubCloudLink = href;
       });
-    if (hubCloudLink) return resolveRedirect(hubCloudLink).then(function (u) { return { url: u, meta: meta }; });
+    if (hubCloudLink) {
+      return resolveRedirect(hubCloudLink, domain).then(function (u) {
+        return u ? { url: u, meta: meta } : null;
+      });
+    }
 
     var hubDriveLink = '';
     $(el)
@@ -295,7 +328,7 @@ function extract(ctx) {
         if (!hubDriveLink && (/HubDrive/i.test(text) || /hubdrive/i.test(href))) hubDriveLink = href;
       });
     if (!hubDriveLink) return Promise.resolve(null);
-    return resolveRedirect(hubDriveLink).then(function (resolvedDrive) {
+    return resolveRedirect(hubDriveLink, domain).then(function (resolvedDrive) {
       if (!resolvedDrive) return null;
       return fetchText(resolvedDrive).then(function (innerHtml) {
         var $2 = ctx.html(innerHtml);
@@ -408,7 +441,10 @@ function extract(ctx) {
         results.push({ source: 'FSLv2', url: href, meta: meta });
       } else if (/FSL/i.test(text)) {
         results.push({ source: 'FSL', url: href, meta: meta });
-      } else if (/Download File/i.test(text) || /r2\.dev/i.test(href)) {
+      } else if (
+        /Download File/i.test(text) ||
+        /r2\.dev|r2\.cloudflarestorage\.com/i.test(href)
+      ) {
         results.push({ source: 'Direct R2', url: href, meta: meta });
       } else if (/ZipDisk/i.test(text) || /workers\.dev/i.test(href)) {
         results.push({ source: 'ZipDisk Server', url: href, meta: meta });
@@ -478,6 +514,11 @@ function extract(ctx) {
           if (!results.length && linksUrl) {
             results = collectHubCloudLinks($r, meta);
           }
+          ctx.log(
+            'hubcloud mirrors=' +
+              results.length +
+              (linksUrl ? ' via=' + linksUrl.split('?')[0] : ''),
+          );
           return directizeHubCloudLinks(results);
         });
       })
@@ -521,8 +562,13 @@ function extract(ctx) {
           return Promise.all(
             items.map(function (item) {
               return extractSourceResult($, item).then(function (result) {
-                if (!result || !result.url) return [];
+                if (!result || !result.url) {
+                  ctx.log('item skipped (no hub link)');
+                  return [];
+                }
+                ctx.log('hub=' + result.url);
                 return extractHubCloud(result.url, result.meta).then(function (links) {
+                  ctx.log('streams_from_hub=' + links.length);
                   return links.map(function (link) {
                     var release =
                       link.meta.title || result.meta.title || '';

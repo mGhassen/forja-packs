@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.58",
+  "version": "1.6.60",
   "tags": [
     "providers",
     "anime",
@@ -1249,7 +1249,7 @@
     {
       "kind": "http",
       "id": "cinesu",
-      "name": "CineSu",
+      "name": "Koddo",
       "entry": "cinesu.js",
       "types": [
         "movie",
