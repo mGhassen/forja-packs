@@ -1196,6 +1196,17 @@
     },
     {
       "kind": "http",
+      "id": "wavewatch",
+      "name": "Wavewatch",
+      "entry": "wavewatch.js",
+      "prelude": "_fr_anime_embeds.js",
+      "types": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "kind": "http",
       "id": "flemmix",
       "name": "Flemmix",
       "entry": "flemmix.js",
@@ -1921,6 +1932,7 @@
     "purstream.js",
     "movix.js",
     "nakios.js",
+    "wavewatch.js",
     "flemmix.js",
     "vidapi.js",
     "vidvault.js",
