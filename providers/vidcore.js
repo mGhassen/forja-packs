@@ -1,5 +1,6 @@
+// VidCore (vidcore.io): the player behind Coreflix. Every server it lists, keyed by TMDB id.
 var SPECS = {
-  "origin": "https://vidcore.net",
+  "origin": "https://vidcore.io",
   "enc": "https://enc-dec.app/api"
 };
 
@@ -17,6 +18,7 @@ function extract(ctx) {
   var headers = {
     'User-Agent': ua,
     Referer: origin + '/',
+    'X-Requested-With': 'XMLHttpRequest',
   };
 
   function validate(j) {
@@ -37,15 +39,38 @@ function extract(ctx) {
         ctx.error('vidcore: page token missing');
         return [];
       }
+      // Stage 1 trades the page token for a session token; stage 2 turns that into the servers and stream URLs.
       return ctx
-        .fetch(enc + '/enc-vidcore?text=' + encodeURIComponent(text), { headers: headers })
+        .fetch(enc + '/enc-vidcore?text=' + encodeURIComponent(text) + '&stage=1', { headers: headers })
         .then(function (r) {
           return r.json();
         })
         .then(function (j) {
+          var s1 = validate(j);
+          if (!s1 || !s1.stage1) {
+            ctx.error('vidcore: enc-vidcore stage 1 failed');
+            return null;
+          }
+          return ctx
+            .fetch(s1.stage1, {
+              method: 'POST',
+              headers: Object.assign({}, headers, { 'X-CSRF-Token': s1.token || '' }),
+            })
+            .then(function (r) {
+              return r.text();
+            })
+            .then(function (t1) {
+              return ctx.fetch(enc + '/enc-vidcore?text=' + encodeURIComponent(t1) + '&stage=2', { headers: headers });
+            })
+            .then(function (r) {
+              return r.json();
+            });
+        })
+        .then(function (j) {
+          if (!j) return [];
           var parts = validate(j);
-          if (!parts) {
-            ctx.error('vidcore: enc-vidcore failed');
+          if (!parts || !parts.servers || !parts.stream) {
+            ctx.error('vidcore: enc-vidcore stage 2 failed');
             return [];
           }
           var hdrs = Object.assign({}, headers, { 'X-CSRF-Token': parts.token || '' });
@@ -66,7 +91,7 @@ function extract(ctx) {
                 })
                 .then(function (dj) {
                   var servers = validate(dj) || [];
-                  var tasks = (Array.isArray(servers) ? servers : []).slice(0, 6).map(function (server) {
+                  var tasks = (Array.isArray(servers) ? servers : []).map(function (server) {
                     var data = server && server.data;
                     if (!data) return Promise.resolve([]);
                     return ctx
@@ -101,7 +126,7 @@ function extract(ctx) {
                         return urls.map(function (u) {
                           return {
                             url: u,
-                            name: (server.name || 'VidCore') + '',
+                            name: server.name ? 'VidCore · ' + server.name : 'VidCore',
                             headers: { 'User-Agent': ua, Referer: origin + '/' },
                           };
                         });
