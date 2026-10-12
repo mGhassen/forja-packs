@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.27",
+  "version": "2.0.28",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -221,6 +221,33 @@
       }
     },
     {
+      "id": "bzhsport",
+      "name": "BZH-Sport",
+      "description": "bzh.lat schedule and stream resolve",
+      "entry": "bzhsport.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "config": {
+        "matchIdPrefix": "bzh_",
+        "origins": [
+          "https://bzh.lat",
+          "https://volkamax.club"
+        ],
+        "tzOffsetMin": 60
+      }
+    },
+    {
       "id": "liveonsat",
       "name": "LiveOnSat",
       "description": "LiveOnSat TV schedule + broadcast channel hints",
@@ -286,6 +313,7 @@
     "timstreams.js",
     "watchfooty.js",
     "streamic.js",
+    "bzhsport.js",
     "liveonsat.js",
     "livesoccertv.js",
     "goat/unlock.mjs",
