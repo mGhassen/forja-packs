@@ -23,6 +23,21 @@ var FLEMMIX_FILM_PATH = /^\/(film-en-streaming|film-ancien|films-prochainement)\
 // Vidara players: POST `/api/stream` → `streaming_url` (HLS).
 var FLEMMIX_VIDARA_HOSTS = { 'vidara.to': 1 };
 
+// Season pages label links "Lecteur N"; name the player from its mirror domain instead.
+var FLEMMIX_HOST_NAMES = {
+  'vidara.to': 'Vidara',
+  'jeremyparticipantanything.com': 'Voe',
+  'luluvido.com': 'LuLuTV',
+  'uqload.vc': 'Uqload',
+  'vidmoly.org': 'Vidmoly',
+  'morencius.com': 'Filelions',
+  'hanerix.com': 'StreamWish',
+};
+
+function flemmixHostName(url) {
+  return FLEMMIX_HOST_NAMES[frAnimeHost(url)] || frAnimeHostName(url);
+}
+
 function flemmixNorm(s) {
   return frAnimeDecodeEntities(String(s || ''))
     .normalize('NFD')
@@ -323,7 +338,7 @@ function extract(ctx) {
       return Promise.all(
         embeds.map(function (e) {
           var meta = FLEMMIX_LANGS[e.lang];
-          var host = e.label && !/^lecteur\s*\d*$/i.test(e.label) ? e.label : frAnimeHostName(e.url);
+          var host = e.label && !/^lecteur\s*\d*$/i.test(e.label) ? e.label : flemmixHostName(e.url);
           return flemmixResolveEmbed(ctx, e.url, referer).then(function (rows) {
             return (rows || []).map(function (r) {
               var out = Object.assign({}, r, {
