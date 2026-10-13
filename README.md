@@ -51,7 +51,7 @@ Author contracts live in **[forja-sdk](https://github.com/mGhassen/forja-sdk)**.
 Each pack is a `manifest.json` plus JS entries. Optional **`bundle`** lists every file the host downloads on install:
 
 ```json
-"bundle": ["videasy.js", "hops/abyss.js", "_kit.js"]
+"bundle": ["vidlink.js", "hops/abyss.js", "_kit.js"]
 ```
 
 If `bundle` is omitted, the host derives paths from each plugin’s `entry` / `prelude`.

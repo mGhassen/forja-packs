@@ -4,7 +4,7 @@ Prefer the **smallest clean peer** that matches the kind. Copy structure + manif
 
 | Kind | Mode | Clone from | Copy |
 |------|------|------------|------|
-| **Provider** (`http`) | Add plugin | `providers/videasy.js` + its `plugins[]` entry in `providers/manifest.json` | JS file + manifest object; bump `version` |
+| **Provider** (`http`) | Add plugin | `providers/vidlink.js` + its `plugins[]` entry in `providers/manifest.json` | JS file + manifest object; bump `version` |
 | **Hop** | Add plugin | `providers/hops/abyss.js` + `hop-abyss` in `providers/manifest.json` | `hops/<id>.js` + `kind: hop` + `hosts[]` |
 | **Hub** (new tab) | New pack | `hubs/cartoon/` (manifest + `_kit.js` + entry + `icons/`) | Whole folder → `hubs/<slug>/`; rename everything |
 | **Hub + enrich** | New pack | `hubs/anime/` or `hubs/kids/` | Folder + enrich plugin pair |
