@@ -2314,6 +2314,16 @@ function extract(ctx) {
       ],
       fields: [{ field: 'genre', label: 'Genre', options: tmdbCategoryOptions() }],
       genreRows: TMDB_GENRE_ROWS,
+      play: [
+        {
+          id: 'languages',
+          field: 'languages',
+          style: 'multiselect',
+          source: 'pluginLanguages',
+          settingsField: 'streamLanguages',
+          default: [],
+        },
+      ],
     }, { maxAge: 86400 });
   }
   if (tmdbNeedsApiKey(cfg) && !String(cfg.apiKey || '').trim()) {

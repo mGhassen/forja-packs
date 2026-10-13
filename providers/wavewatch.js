@@ -41,20 +41,27 @@ function wavewatchDecode(b64) {
 }
 
 // Each `<button class="src">` carries the base64 target in `u=`, its format and a language tag.
+// Direct m3u8/mp4 must stay on `playerix.php?px=1&u=…` — the peeled CDN host is CF-walled.
 function wavewatchParse(html) {
   var out = [];
   var re = /<button class="src"([\s\S]*?)<\/button>/g;
   var m;
   while ((m = re.exec(html))) {
     var block = m[1];
-    var raw = (block.match(/data-url="([^"]+)"/) || [])[1] || '';
+    var raw = ((block.match(/data-url="([^"]+)"/) || [])[1] || '').replace(/&amp;/g, '&');
     var fmt = ((block.match(/data-fmt="([^"]*)"/) || [])[1] || '').toLowerCase();
     var alive = (block.match(/data-alive="([^"]*)"/) || [])[1];
     var lang = (block.match(/class="lang">([^<]*)</) || [])[1] || '';
-    var b64 = (raw.replace(/&amp;/g, '&').match(/[?&]u=([^&]+)/) || [])[1];
-    var url = wavewatchDecode(b64 ? decodeURIComponent(b64) : '').trim();
-    if (alive === '0' || !/^https?:\/\//i.test(url)) continue;
-    out.push({ url: url, fmt: fmt, lang: wavewatchLangKey(lang) });
+    var b64 = (raw.match(/[?&]u=([^&]+)/) || [])[1];
+    var target = wavewatchDecode(b64 ? decodeURIComponent(b64) : '').trim();
+    if (alive === '0' || !/^https?:\/\//i.test(target)) continue;
+    var proxied = (fmt === 'm3u8' || fmt === 'mp4') && /[?&]px=1(?:&|$)/.test(raw);
+    out.push({
+      url: proxied ? raw : target,
+      hostUrl: target,
+      fmt: fmt,
+      lang: wavewatchLangKey(lang),
+    });
   }
   return out;
 }
@@ -83,13 +90,14 @@ function extract(ctx) {
       var direct = [];
       var embeds = [];
       wavewatchParse(html).forEach(function (s) {
-        if (seen[s.url]) return;
-        seen[s.url] = true;
+        var dedupe = s.hostUrl || s.url;
+        if (seen[dedupe]) return;
+        seen[dedupe] = true;
         var meta = WAVEWATCH_LANGS[s.lang];
         if (s.fmt === 'm3u8' || s.fmt === 'mp4') {
           var row = {
             url: s.url,
-            name: 'Wavewatch · ' + frAnimeHostName(s.url),
+            name: 'Wavewatch · ' + frAnimeHostName(s.hostUrl || s.url),
             title: meta.title,
             headers: playHeaders,
           };
@@ -97,8 +105,8 @@ function extract(ctx) {
           direct.push(row);
           return;
         }
-        if (WAVEWATCH_SKIP_HOSTS.test(frAnimeHost(s.url))) return;
-        embeds.push({ url: s.url, meta: meta });
+        if (WAVEWATCH_SKIP_HOSTS.test(frAnimeHost(s.hostUrl || s.url))) return;
+        embeds.push({ url: s.url, hostUrl: s.hostUrl || s.url, meta: meta });
       });
 
       var picked = embeds.slice(0, Number(cfg.maxEmbeds) || SPECS.maxEmbeds);
@@ -107,7 +115,7 @@ function extract(ctx) {
           return frAnimeResolveEmbed(ctx, e.url, api + '/').then(function (rows) {
             return (rows || []).map(function (r) {
               var out = Object.assign({}, r, {
-                name: 'Wavewatch · ' + (r.name || frAnimeHostName(e.url)),
+                name: 'Wavewatch · ' + (r.name || frAnimeHostName(e.hostUrl)),
                 title: e.meta.title + (r.quality ? ' · ' + r.quality : ''),
               });
               if (e.meta.language) out.language = e.meta.language;

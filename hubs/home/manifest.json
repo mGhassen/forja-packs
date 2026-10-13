@@ -4,7 +4,7 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.72",
+  "version": "1.0.73",
   "tags": [
     "home",
     "movies",
@@ -63,6 +63,15 @@
                 "label": "Number chips"
               }
             ]
+          },
+          {
+            "id": "streamLanguages",
+            "type": "multi_select",
+            "label": "Stream languages",
+            "subtitle": "Empty = all providers. Filters which Forja plugins run on Play and Sources.",
+            "source": "pluginLanguages",
+            "default": [],
+            "reloadHub": false
           }
         ],
         "greenPlay": {

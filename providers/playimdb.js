@@ -10,11 +10,14 @@ function extract(ctx) {
   var ua =
     cfg.ua ||
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-  var headers = {
+  // API gate wants Origin/Referer; CloudStream leaf segments (`page-N.html`)
+  // 403 when those are set — stream rows stay UA-only (same as Vidsrc / 054).
+  var apiHeaders = {
     'User-Agent': ua,
     Origin: origin,
     Referer: String(origin).replace(/\/?$/, '/'),
   };
+  var playHeaders = { 'User-Agent': ua };
   var tmdbId = String(ctx.tmdbId || '').trim();
   if (!tmdbId) return Promise.resolve([]);
   var isMovie = ctx.type === 'movie';
@@ -51,7 +54,7 @@ function extract(ctx) {
   }
 
   return ctx
-    .fetch(url, { headers: headers })
+    .fetch(url, { headers: apiHeaders })
     .then(function (r) {
       return r.json();
     })
@@ -79,7 +82,7 @@ function extract(ctx) {
             name: 'Server ' + (i + 1),
             quality: quality,
             language: language,
-            headers: headers,
+            headers: playHeaders,
           };
           if (subs.length) row.subtitles = subs;
           return row;
