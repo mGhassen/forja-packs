@@ -76,6 +76,7 @@ function extract(ctx) {
               url: streamUrl,
               name: 'PeeStream · ' + sourceId + ' · ' + quality,
               quality: quality,
+              type: 'hls',
               headers: reqHeaders,
             });
           } catch (e) {}
@@ -128,6 +129,7 @@ function extract(ctx) {
               url: streamUrl,
               name: 'PeeStream · ' + stName + ' · ' + quality,
               quality: quality,
+              type: 'hls',
               headers: { 'User-Agent': ua },
             });
           });
