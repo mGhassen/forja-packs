@@ -315,7 +315,10 @@ function liveSportsLoadFeed(ctx, params) {
     for (var i = 0; i < rows.length; i++) {
       var shaped = liveSportsShapeRow(rows[i]);
       if (!shaped) continue;
-      var always = shaped.alwaysLive === true;
+      var always =
+        shaped.alwaysLive === true ||
+        (typeof liveFeedIsAlwaysOn === 'function' &&
+          liveFeedIsAlwaysOn(rows[i]));
       if (section === 'tv') {
         if (!always) continue;
         if (
