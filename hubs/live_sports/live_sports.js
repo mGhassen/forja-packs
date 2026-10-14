@@ -208,25 +208,24 @@ function liveSportsShapeTvChannel(row) {
   var image = liveSportsAbsUrl(
     row.poster || row.posterPath || row.homeBadge || row.awayBadge || '',
   );
-  var painted = hubPaintPoster(
-    Object.assign({}, row, {
-      name: title,
+  var out = Object.assign({}, row, {
+    name: title,
+    title: title,
+    poster: image || undefined,
+    alwaysLive: true,
+    airing: true,
+    live: true,
+  });
+  // Direct channelCard — never posterCard/eventCard (host must not paint film).
+  out.paint = {
+    type: 'channelCard',
+    props: {
       title: title,
-      poster: image || undefined,
-      type: 'live_match',
-    }),
-  );
-  painted.paint.type = 'channelCard';
-  if (!painted.paint.props) painted.paint.props = {};
-  painted.paint.props.title = title;
-  if (image) painted.paint.props.imageUrl = image;
-  delete painted.paint.props.aspect;
-  delete painted.paint.props.badge;
-  delete painted.paint.props.subtitle;
-  painted.alwaysLive = true;
-  painted.airing = true;
-  painted.live = true;
-  return painted;
+      cardKind: 'channel',
+    },
+  };
+  if (image) out.paint.props.imageUrl = image;
+  return out;
 }
 
 function liveSportsParseHorizonPref(raw) {

@@ -1225,11 +1225,20 @@ function liveFeedFilterRows(rows, query, mergeMatching) {
     .trim()
     .toLowerCase();
   var tvShelf = section === 'tv';
+  var catalogFilter = String((query && query.catalogFilter) || '').trim();
   for (var i = 0; i < (rows || []).length; i++) {
     var map = Object.assign({}, rows[i]);
     var id = String(map.id || '').trim();
     if (!id || seen[id]) continue;
     seen[id] = 1;
+    if (
+      catalogFilter &&
+      catalogFilter !== 'all' &&
+      catalogFilter.indexOf('stremio:') !== 0
+    ) {
+      var pluginId = String(map.pluginId || map.livePluginId || '').trim();
+      if (!liveFeedCatalogIdMatches(pluginId, catalogFilter)) continue;
+    }
     var alwaysOn = liveFeedIsAlwaysOn(map);
     if (tvShelf) {
       if (!alwaysOn) continue;
@@ -1324,6 +1333,20 @@ function liveSportsAggregateFeed(ctx, params) {
         query,
         liveFeedShouldMerge(query, cfg),
       );
+    }
+    // Catalog chip after All — re-filter warm aggregate, do not re-scrape.
+    var wantFilter = String(query.catalogFilter || '').trim();
+    if (wantFilter && wantFilter !== 'all' && wantFilter.indexOf('stremio:') !== 0) {
+      var allHit = liveFeedCacheGet(host, liveFeedCacheKey('all'));
+      if (allHit && Array.isArray(allHit.rows) && allHit.rows.length) {
+        liveFeedCacheSet(host, cacheKey, allHit.rows);
+        return liveFeedFinish(
+          host,
+          allHit.rows,
+          query,
+          liveFeedShouldMerge(query, cfg),
+        );
+      }
     }
   }
 
