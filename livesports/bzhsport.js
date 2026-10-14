@@ -90,6 +90,16 @@ function bzhSplitTeams(title) {
   return { home: home, away: away };
 }
 
+function bzhPathOf(href) {
+  var raw = String(href || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).pathname;
+  } catch (_) {
+    return raw.indexOf('/') === 0 ? raw.split('?')[0] : '';
+  }
+}
+
 /** Schedule table rows → plain event objects (path is origin-relative). */
 function bzhParseSchedule(html, cfg) {
   var out = [];
@@ -104,12 +114,7 @@ function bzhParseSchedule(html, cfg) {
     if (tds.length < 6) continue;
     var link = row.match(/<a\s+href="([^"]+)"[^>]*\bk="(\d+)"/);
     if (!link) continue;
-    var path = '';
-    try {
-      path = new URL(link[1].trim()).pathname;
-    } catch (_) {
-      path = link[1].trim();
-    }
+    var path = bzhPathOf(link[1]);
     if (!path) continue;
     var catM = row.match(/\/cat\/(\d+)\./);
     var kind = (catM && BZH_CATEGORY[catM[1]]) || 'other';
@@ -134,18 +139,73 @@ function bzhParseSchedule(html, cfg) {
   return out;
 }
 
-/** First mirror that serves a schedule wins. */
-async function bzhFetchSchedule(ctx, cfg) {
+/** Sidebar `#channels` → always-on TV rows (path is the stable id). */
+function bzhParseChannels(html) {
+  var out = [];
+  var seen = {};
+  var panel = String(html || '').match(
+    /id=["']channels["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i,
+  );
+  var block = panel ? panel[1] : '';
+  var re =
+    /<div class="channels">\s*<a\s+href="([^"]+)"[^>]*>\s*([\s\S]*?)\s*<\/a>/gi;
+  var m;
+  while ((m = re.exec(block))) {
+    var path = bzhPathOf(m[1]);
+    if (!path || path === '/' || seen[path]) continue;
+    var title = bzhHtmlText(m[2]);
+    if (!title) continue;
+    seen[path] = 1;
+    out.push({
+      key: path,
+      path: path,
+      title: title,
+      kind: 'other',
+      dateMs: 0,
+      airing: true,
+      alwaysOn: true,
+    });
+  }
+  return out;
+}
+
+/** First mirror that serves schedule and/or channels wins. */
+async function bzhFetchHome(ctx, cfg) {
   var origins = bzhOrigins(cfg);
   for (var i = 0; i < origins.length; i++) {
     try {
       var res = await ctx.fetch(origins[i] + '/', { headers: { 'User-Agent': ua() } });
       if (!res.ok) continue;
-      var events = bzhParseSchedule(await res.text(), cfg);
-      if (events.length) return { origin: origins[i], events: events };
+      var html = await res.text();
+      var events = bzhParseSchedule(html, cfg);
+      var channels = bzhParseChannels(html);
+      if (events.length || channels.length) {
+        return { origin: origins[i], events: events, channels: channels };
+      }
     } catch (_) {}
   }
-  return { origin: '', events: [] };
+  return { origin: '', events: [], channels: [] };
+}
+
+function bzhCatalogRow(ev, pluginId) {
+  var alwaysOn = !!ev.alwaysOn;
+  var row = {
+    id: 'bzh_' + (alwaysOn ? 'ch_' + String(ev.path || '').replace(/^\//, '') : ev.key),
+    title: ev.title,
+    category: alwaysOn ? 'other' : ev.kind,
+    date: alwaysOn ? 0 : ev.dateMs,
+    airing: alwaysOn ? true : !!ev.airing,
+    sources: [{ source: 'bzhsport', id: ev.key }],
+    catalog: 'forja_live',
+    pluginId: pluginId,
+  };
+  if (alwaysOn) {
+    row.alwaysLive = true;
+    row.badge = '24/7';
+  }
+  if (ev.homeTeam) row.homeTeam = ev.homeTeam;
+  if (ev.awayTeam) row.awayTeam = ev.awayTeam;
+  return liveCatalogStamp(row, pluginId);
 }
 
 async function catalogExtract(ctx) {
@@ -154,22 +214,14 @@ async function catalogExtract(ctx) {
 
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var pluginId = String(cfg.pluginId || cfg.providerId || 'bzhsport');
-  var schedule = await bzhFetchSchedule(ctx, cfg);
-  return schedule.events.map(function (ev) {
-    var row = {
-      id: 'bzh_' + ev.key,
-      title: ev.title,
-      category: ev.kind,
-      date: ev.dateMs,
-      airing: ev.airing,
-      sources: [{ source: 'bzhsport', id: ev.key }],
-      catalog: 'forja_live',
-      pluginId: pluginId,
-    };
-    if (ev.homeTeam) row.homeTeam = ev.homeTeam;
-    if (ev.awayTeam) row.awayTeam = ev.awayTeam;
-    return liveCatalogStamp(row, pluginId);
+  var home = await bzhFetchHome(ctx, cfg);
+  var rows = home.events.map(function (ev) {
+    return bzhCatalogRow(ev, pluginId);
   });
+  for (var i = 0; i < home.channels.length; i++) {
+    rows.push(bzhCatalogRow(home.channels[i], pluginId));
+  }
+  return rows;
 }
 
 // Resolve half (closed scope — no name collisions with catalog)
@@ -263,9 +315,68 @@ async function liveM3u8(ctx, url, headers) {
   }
 }
 
-/** Follow nested iframes until a page carries `window._econfig`. */
+/** JWPlayer pages (xstream.st): `const streamUrls=["…m3u8",…]`. */
+function parseStreamUrls(html) {
+  var m = String(html || '').match(/streamUrls\s*=\s*(\[[^\]]*\])/);
+  if (!m) return [];
+  try {
+    var raw = m[1].replace(/\\u([0-9a-fA-F]{4})/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    });
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map(function (u) {
+        return String(u || '').trim();
+      })
+      .filter(function (u) {
+        return /^https?:\/\//i.test(u) && /\.m3u8(\?|$)/i.test(u);
+      });
+  } catch (_) {
+    return [];
+  }
+}
+
+async function unlockStreamUrls(ctx, html, pageUrl) {
+  var urls = parseStreamUrls(html);
+  if (!urls.length) return null;
+  var headers = playHeaders(pageUrl);
+  for (var i = 0; i < urls.length; i++) {
+    if (await liveM3u8(ctx, urls[i], headers)) {
+      return { url: urls[i], headers: headers };
+    }
+  }
+  return null;
+}
+
+function isSkippableIframe(url) {
+  var u = String(url || '');
+  if (!u) return true;
+  // Empty holdfold stub (`/embed/` with no id) and 1×1 ad frames.
+  if (/\/embed\/?\s*$/i.test(u.split('?')[0])) return true;
+  if (/\/ad\d*\.html|instreams\.click\/ad/i.test(u)) return true;
+  return false;
+}
+
+/** Prefer a real player iframe; skip ads / empty stubs. */
+function nextPlayerIframe(html, baseUrl) {
+  var re = /<iframe\b[^>]*\bsrc="([^"]+)"/gi;
+  var m;
+  while ((m = re.exec(String(html || '')))) {
+    var u = absUrl(m[1], baseUrl);
+    if (!u || isSkippableIframe(u)) continue;
+    return u;
+  }
+  return '';
+}
+
+/**
+ * Follow nested iframes until a playable page:
+ * holdfold `_econfig`, or xstream JW `streamUrls`.
+ */
 async function unlockEmbed(ctx, embedUrl, referer) {
-  var url = embedUrl;
+  var url = String(embedUrl || '').trim();
+  if (!url || isSkippableIframe(url)) return null;
   var ref = referer;
   for (var hop = 0; hop <= MAX_IFRAME_HOPS && url; hop++) {
     var html;
@@ -286,10 +397,12 @@ async function unlockEmbed(ctx, embedUrl, referer) {
       if (!(await liveM3u8(ctx, m3u8, headers))) return null;
       return { url: m3u8, headers: headers };
     }
-    var next = String(html || '').match(/<iframe\b[^>]*\bsrc="([^"]+)"/i);
+    var fromJw = await unlockStreamUrls(ctx, html, url);
+    if (fromJw) return fromJw;
+    var next = nextPlayerIframe(html, url);
     if (!next) return null;
     ref = url;
-    url = absUrl(next[1], url);
+    url = next;
   }
   return null;
 }
@@ -305,13 +418,26 @@ function streamRow(ctx, unlocked, label) {
   };
 }
 
+function bzhMatchKey(ev, key) {
+  var k = String(key || '');
+  if (!k || !ev) return false;
+  if (String(ev.key) === k) return true;
+  var path = String(ev.path || '');
+  if (!path) return false;
+  if (path === k || path === '/' + k) return true;
+  // Catalog id uses `bzh_ch_<slug>` for always-on channels.
+  if (k.indexOf('ch_') === 0 && path === '/' + k.slice(3)) return true;
+  return false;
+}
+
 async function findEvent(ctx, cfg) {
-  var schedule = await bzhFetchSchedule(ctx, cfg);
-  if (!schedule.events.length) return null;
+  var home = await bzhFetchHome(ctx, cfg);
+  var all = home.events.concat(home.channels || []);
+  if (!all.length) return null;
   var key = String(ctx.matchId || '').replace(/^bzh_/, '');
-  var list = schedule.events.map(function (ev) {
+  var list = all.map(function (ev) {
     return {
-      id: 'bzh_' + ev.key,
+      id: 'bzh_' + (ev.alwaysOn ? 'ch_' + String(ev.path || '').replace(/^\//, '') : ev.key),
       matchId: ev.key,
       title: ev.title,
       homeTeam: ev.homeTeam || '',
@@ -323,7 +449,7 @@ async function findEvent(ctx, cfg) {
   var hit = null;
   if (key && ctx.fixtureSearch !== true) {
     for (var i = 0; i < list.length; i++) {
-      if (list[i].matchId === key) {
+      if (bzhMatchKey(list[i].ev, key)) {
         hit = list[i];
         break;
       }
@@ -332,7 +458,7 @@ async function findEvent(ctx, cfg) {
   // Another catalog's fixture (or stale id) → soft team/title match.
   if (!hit) hit = liveFindFixtureInList(list, ctx);
   if (!hit) return null;
-  return { origin: schedule.origin, ev: hit.ev };
+  return { origin: home.origin, ev: hit.ev };
 }
 
 async function listEventStreams(ctx, cfg) {

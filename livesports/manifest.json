@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.28",
+  "version": "2.0.30",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -223,7 +223,7 @@
     {
       "id": "bzhsport",
       "name": "BZH-Sport",
-      "description": "bzh.lat schedule and stream resolve",
+      "description": "bzh.lat schedule, 24/7 channels, and stream resolve",
       "entry": "bzhsport.js",
       "types": [
         "live_sport"

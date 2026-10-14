@@ -672,19 +672,32 @@ function liveFeedKickoffMatches(row, query) {
   return start >= now - range.past && start <= now + range.future;
 }
 
+function liveFeedNormSport(raw) {
+  var s = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[/_\s]+/g, '-')
+    .replace(/-+/g, '-');
+  if (s.charAt(s.length - 1) === '-') s = s.slice(0, -1);
+  if (s === '24-7-streams' || s === '24-7-stream') return '24-7';
+  if (s === 'soccer') return 'football';
+  return s;
+}
+
 function liveFeedSportMatches(row, sportFilter) {
   var filter = String(sportFilter || 'all').trim();
   if (!filter || filter === 'all') return true;
-  var kind = String(
+  var want = liveFeedNormSport(filter);
+  if (!want) return true;
+  var kind = liveFeedNormSport(
     row.kind || row.category || row.category_name || row.sport || '',
-  ).toLowerCase();
-  var want = filter.toLowerCase();
-  if (kind.indexOf(want) >= 0) return true;
-  if (String(row.type || '').toLowerCase() === want) return true;
+  );
+  if (kind && kind === want) return true;
+  if (liveFeedNormSport(row.type || '') === want) return true;
   var genres = row.genres;
   if (Array.isArray(genres)) {
     for (var i = 0; i < genres.length; i++) {
-      if (String(genres[i] || '').toLowerCase().indexOf(want) >= 0) return true;
+      if (liveFeedNormSport(genres[i]) === want) return true;
     }
   }
   return false;
