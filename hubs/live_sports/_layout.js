@@ -64,39 +64,57 @@ function liveSportsKindIcons() {
     esports: 'esports',
     'e-sport': 'esports',
     gaming: 'esports',
-    '24-7': 'tv',
-    '24/7': 'tv',
-    'live-tv': 'tv',
-    livetv: 'tv',
-    'tv-show': 'tv',
-    stream: 'tv',
     other: 'sports',
     misc: 'sports',
     general: 'sports',
   };
 }
 
+function liveSportsShelfAction() {
+  return {
+    id: 'section',
+    label: 'Section',
+    style: 'shelf',
+    expandOnHover: true,
+    reload: true,
+    default: 'sports',
+    items: [
+      {
+        id: 'sports',
+        label: 'Sports',
+        icon: 'sports',
+        colors: ['#FB923C', '#C2410C'],
+      },
+      {
+        id: 'tv',
+        label: 'TV',
+        icon: 'live_tv',
+        colors: ['#EF4444', '#7C2D12'],
+      },
+    ],
+  };
+}
+
 function liveSportsCatalogActions() {
   return [
+    liveSportsShelfAction(),
     {
       id: 'catalog',
       label: 'Catalog',
       icon: 'filter',
       dynamicCatalogs: true,
       default: 'all',
-      // Host remaps chips when these revision tokens bump (install/remove Live addons).
+      showWhen: { section: 'sports' },
       deps: ['stremio'],
-      items: [
-        { id: 'all', label: 'All' },
-      ],
+      items: [{ id: 'all', label: 'All' }],
     },
     {
       id: 'horizon',
       label: 'Schedule',
       icon: 'schedule',
-      // Host Status×Horizon sheet — never key off bare id alone.
       dynamicSchedule: true,
       default: 'airing|1h',
+      showWhen: { section: 'sports' },
       items: [
         { id: 'airing|1h', label: 'Airing' },
         { id: 'upcoming|1h', label: 'Next · 1h' },
@@ -121,6 +139,15 @@ function liveSportsCatalogActions() {
       action: 'eventSearch',
       trailing: true,
       placeholder: 'Team, match, sport…',
+      showWhen: { section: 'sports' },
+    },
+    {
+      id: 'search_tv',
+      label: 'Search',
+      action: 'eventSearch',
+      trailing: true,
+      placeholder: 'Channel…',
+      showWhen: { section: 'tv' },
     },
     {
       id: 'view',
@@ -128,6 +155,7 @@ function liveSportsCatalogActions() {
       style: 'group',
       trailing: true,
       default: 'list',
+      showWhen: { section: 'sports' },
       items: [
         { id: 'list', label: 'List', icon: 'list' },
         { id: 'cards', label: 'Cards', icon: 'cards' },
@@ -140,6 +168,7 @@ function liveSportsCatalogActions() {
       hoistSource: 'live_schedule',
       trailing: true,
       width: 260,
+      showWhen: { section: 'sports' },
     },
   ];
 }
@@ -157,7 +186,6 @@ function liveSportsLayout() {
         widgets: [
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
-              // ↓ from Catalog / Portals → sport circles (then ↓ again → matches).
               focusDown: 'kind',
               actions: liveSportsCatalogActions(),
             }),
@@ -169,6 +197,7 @@ function liveSportsLayout() {
               kindIcons: liveSportsKindIcons(),
               focusUp: 'chrome',
               focusDown: 'schedule',
+              showWhen: { section: 'sports' },
             }),
             hubWithLoad(
               kitList('schedule', {
@@ -178,8 +207,10 @@ function liveSportsLayout() {
                 expand: true,
                 kindMenu: 'kind',
                 catalogMenu: 'catalog',
+                sectionMenu: 'section',
                 horizonMenu: 'horizon',
                 panelTab: 'providers',
+                showWhen: { section: 'sports' },
                 panelTabs: [
                   { id: 'providers', label: 'Providers', icon: 'dns' },
                   {
@@ -197,6 +228,23 @@ function liveSportsLayout() {
                   'Fetching matches from your live sports catalogs…',
                 emptyTitle: 'No matches in this schedule',
                 emptyDescription: 'Try another catalog, horizon, or sport filter.',
+              }),
+              'feed',
+              { progressiveCatalogs: true },
+            ),
+            hubWithLoad(
+              kitList('tv_channels', {
+                style: 'grid',
+                cardKind: 'channel',
+                open: 'play',
+                expand: true,
+                sectionMenu: 'section',
+                showWhen: { section: 'tv' },
+                focusUp: 'chrome',
+                loadingTitle: 'Loading channels',
+                loadingDetail: 'Fetching 24/7 channels from your live catalogs…',
+                emptyTitle: 'No TV channels',
+                emptyDescription: 'No 24/7 channels in your live catalogs.',
               }),
               'feed',
               { progressiveCatalogs: true },

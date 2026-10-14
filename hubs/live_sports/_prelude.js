@@ -533,11 +533,21 @@ function liveFeedQueryFromParams(params) {
     if (!status.trim()) status = parsed.status;
     if (!horizon.trim()) horizon = parsed.horizon;
   }
+  var section = String(p.section || '')
+    .trim()
+    .toLowerCase();
+  if (section !== 'tv' && section !== 'sports') section = 'sports';
+  // TV shelf is always-on channels only — ignore schedule horizon chips.
+  if (section === 'tv') {
+    status = 'airing';
+    horizon = 'h24';
+  }
   return {
     catalogFilter: String(p.catalogFilter || 'all'),
     sportFilter: String(p.sportFilter || 'all'),
     scheduleStatus: liveFeedNormalizeStatus(status),
     scheduleHorizon: liveFeedNormalizeHorizon(horizon),
+    section: section,
   };
 }
 
@@ -1168,12 +1178,22 @@ function liveFeedSortLiveFirst(rows) {
 function liveFeedFilterRows(rows, query, mergeMatching) {
   var out = [];
   var seen = {};
+  var section = String((query && query.section) || 'sports')
+    .trim()
+    .toLowerCase();
+  var tvShelf = section === 'tv';
   for (var i = 0; i < (rows || []).length; i++) {
     var map = Object.assign({}, rows[i]);
     var id = String(map.id || '').trim();
     if (!id || seen[id]) continue;
     seen[id] = 1;
-    if (!liveFeedSportMatches(map, query.sportFilter)) continue;
+    var alwaysOn = liveFeedIsAlwaysOn(map);
+    if (tvShelf) {
+      if (!alwaysOn) continue;
+    } else if (alwaysOn) {
+      continue;
+    }
+    if (!tvShelf && !liveFeedSportMatches(map, query.sportFilter)) continue;
     if (!liveFeedKickoffMatches(map, query)) continue;
     out.push(map);
   }
@@ -1183,6 +1203,9 @@ function liveFeedFilterRows(rows, query, mergeMatching) {
 }
 
 function liveFeedShouldMerge(query, cfg) {
+  if (String((query && query.section) || '').toLowerCase() === 'tv') {
+    return false;
+  }
   var filter = String(query.catalogFilter || '').trim();
   if (filter && filter !== 'all') return false;
   if (cfg && cfg.mergeMatchingEvents === false) return false;

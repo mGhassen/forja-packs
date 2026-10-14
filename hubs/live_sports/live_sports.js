@@ -182,7 +182,7 @@ function liveSportsShapeRow(row) {
   var paintProps = {};
   if (broadcasts.length) paintProps.broadcastChannels = broadcasts.slice();
   if (catalogs.length) paintProps.catalogs = catalogs.slice();
-  return hubPaintEvent(out, {
+  var painted = hubPaintEvent(out, {
     homeBadgeUrl: homeBadge,
     awayBadgeUrl: awayBadge,
     categoryLabel: category,
@@ -192,6 +192,36 @@ function liveSportsShapeRow(row) {
     live: live,
     props: paintProps,
   });
+  if (alwaysLive) return liveSportsShapeTvChannel(painted);
+  return painted;
+}
+
+/** IPTV-sized channel tile for the TV shelf (24/7). */
+function liveSportsShapeTvChannel(row) {
+  if (!row || typeof row !== 'object') return row;
+  var title = String(row.title || row.name || '').trim() || 'Channel';
+  var image = liveSportsAbsUrl(
+    row.poster || row.posterPath || row.homeBadge || row.awayBadge || '',
+  );
+  var painted = hubPaintPoster(
+    Object.assign({}, row, {
+      name: title,
+      title: title,
+      poster: image || undefined,
+      type: 'live_match',
+    }),
+  );
+  painted.paint.type = 'channelCard';
+  if (!painted.paint.props) painted.paint.props = {};
+  painted.paint.props.title = title;
+  if (image) painted.paint.props.imageUrl = image;
+  delete painted.paint.props.aspect;
+  delete painted.paint.props.badge;
+  delete painted.paint.props.subtitle;
+  painted.alwaysLive = true;
+  painted.airing = true;
+  painted.live = true;
+  return painted;
 }
 
 function liveSportsParseHorizonPref(raw) {
@@ -243,12 +273,20 @@ function liveSportsLoadFeed(ctx, params) {
   ) {
     return Promise.reject(new Error('HOST_PLUGIN_RUN_REQUIRED'));
   }
+  var section = String(p.section || '')
+    .trim()
+    .toLowerCase();
+  if (section !== 'tv' && section !== 'sports') section = 'sports';
   var status = String(p.scheduleStatus || '').trim();
   var horizon = String(p.scheduleHorizon || '').trim();
   if (!status || !horizon) {
     var parsed = liveSportsParseHorizonPref(p.horizon || p.schedule || '');
     if (!status) status = parsed.status;
     if (!horizon) horizon = parsed.horizon;
+  }
+  if (section === 'tv') {
+    status = 'airing';
+    horizon = 'h24';
   }
   var q = String(p.q || p.query || '')
     .trim()
@@ -260,9 +298,10 @@ function liveSportsLoadFeed(ctx, params) {
     : [];
   return liveSportsAggregateFeed(ctx, {
     catalogFilter: p.catalogFilter || 'all',
-    sportFilter: p.sportFilter || 'all',
+    sportFilter: section === 'tv' ? 'all' : p.sportFilter || 'all',
     scheduleStatus: status || 'airing',
     scheduleHorizon: horizon || 'h1',
+    section: section,
     force: !!(p.force || p.forceRefresh),
     rows: hasRows ? p.rows : undefined,
   }).then(function (rows) {
@@ -271,6 +310,12 @@ function liveSportsLoadFeed(ctx, params) {
     for (var i = 0; i < rows.length; i++) {
       var shaped = liveSportsShapeRow(rows[i]);
       if (!shaped) continue;
+      var always = shaped.alwaysLive === true;
+      if (section === 'tv') {
+        if (!always) continue;
+      } else if (always) {
+        continue;
+      }
       if (qTokens.length) {
         var hay = String(shaped.searchText || shaped.name || '').toLowerCase();
         var ok = true;
