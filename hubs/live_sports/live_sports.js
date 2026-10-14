@@ -74,7 +74,12 @@ function liveSportsShapeRow(row) {
     out.alwaysLive === 1 ||
     out.always_live === 1 ||
     catLower.indexOf('24/7') >= 0 ||
-    catLower.indexOf('24-7') >= 0;
+    catLower.indexOf('24-7') >= 0 ||
+    catLower.indexOf('247') >= 0 ||
+    (out.popular === true &&
+      dateMs <= 0 &&
+      !home &&
+      !away);
   var endMs = liveSportsNum(out.endsAt || out.ends_at);
   if (endMs > 0 && endMs < 1e12) endMs = endMs * 1000;
   var scheduledFuture = dateMs > Date.now();
@@ -192,7 +197,7 @@ function liveSportsShapeRow(row) {
     live: live,
     props: paintProps,
   });
-  if (alwaysLive) return liveSportsShapeTvChannel(painted);
+  // Channel paint is TV-shelf only — Sports always keeps event/dense cards.
   return painted;
 }
 
@@ -313,6 +318,14 @@ function liveSportsLoadFeed(ctx, params) {
       var always = shaped.alwaysLive === true;
       if (section === 'tv') {
         if (!always) continue;
+        if (
+          typeof liveFeedHasHandoffSources === 'function' &&
+          !liveFeedHasHandoffSources(shaped) &&
+          !liveFeedHasHandoffSources(rows[i])
+        ) {
+          continue;
+        }
+        shaped = liveSportsShapeTvChannel(shaped);
       } else if (always) {
         continue;
       }

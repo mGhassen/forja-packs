@@ -578,9 +578,10 @@ function liveFeedCacheSet(host, key, rows) {
   );
 }
 
-function liveFeedCacheClear(host) {
+function liveFeedCacheClear(host, cacheKey) {
   if (!host || !host.cache || typeof host.cache.invalidate !== 'function') return;
-  host.cache.invalidate(LIVE_FEED_CACHE_NS, '');
+  var key = cacheKey == null ? '' : String(cacheKey);
+  host.cache.invalidate(LIVE_FEED_CACHE_NS, key);
 }
 
 function liveFeedViewerCount(value) {
@@ -633,14 +634,41 @@ function liveFeedEndsAtMs(row) {
 function liveFeedIsAlwaysOn(row) {
   if (!row) return false;
   if (liveFeedFlag(row.always_live) || liveFeedFlag(row.alwaysLive)) return true;
-  var badge = String(row.badge || row.kind || row.category || '').toLowerCase();
-  if (badge.indexOf('24/7') >= 0 || badge.indexOf('24-7') >= 0) return true;
+  var badge = String(row.badge || row.kind || row.category || row.sport || '')
+    .toLowerCase();
+  if (
+    badge.indexOf('24/7') >= 0 ||
+    badge.indexOf('24-7') >= 0 ||
+    badge.indexOf('247') >= 0
+  ) {
+    return true;
+  }
+  var sport = liveFeedNormSport(badge);
+  if (sport === '24-7' || sport === '247') return true;
   var genres = row.genres;
   if (Array.isArray(genres)) {
     for (var i = 0; i < genres.length; i++) {
       var g = String(genres[i] || '').toLowerCase();
-      if (g.indexOf('24/7') >= 0 || g.indexOf('24-7') >= 0) return true;
+      if (
+        g.indexOf('24/7') >= 0 ||
+        g.indexOf('24-7') >= 0 ||
+        liveFeedNormSport(g) === '24-7'
+      ) {
+        return true;
+      }
     }
+  }
+  // Channel / 24/7: no kickoff, not a team matchup (vs / at / @).
+  // Do not treat "Lakers @ Celtics" as a channel — that emptied Sports of
+  // everything except "vs" football titles.
+  if (
+    liveFeedStartsAtMs(row) <= 0 &&
+    !String(row.homeTeam || '').trim() &&
+    !String(row.awayTeam || '').trim()
+  ) {
+    var parsed = liveFeedParseTeamsFromTitle(row.title || row.name || '');
+    if (parsed.home && parsed.away) return false;
+    if (liveFeedFlag(row.popular)) return true;
   }
   return false;
 }
@@ -1175,6 +1203,21 @@ function liveFeedSortLiveFirst(rows) {
     });
 }
 
+function liveFeedHasHandoffSources(row) {
+  var raw = row && row.sources;
+  if (!Array.isArray(raw) || !raw.length) return false;
+  for (var i = 0; i < raw.length; i++) {
+    var s = raw[i];
+    if (!s || typeof s !== 'object') continue;
+    var source = String(s.source || '').trim();
+    var id = String(s.id || '').trim();
+    if (!source || !id) continue;
+    if (source.toLowerCase() === 'echo') continue;
+    return true;
+  }
+  return false;
+}
+
 function liveFeedFilterRows(rows, query, mergeMatching) {
   var out = [];
   var seen = {};
@@ -1190,6 +1233,8 @@ function liveFeedFilterRows(rows, query, mergeMatching) {
     var alwaysOn = liveFeedIsAlwaysOn(map);
     if (tvShelf) {
       if (!alwaysOn) continue;
+      // TV tap → resolve; no handoff keys means nothing to play — omit.
+      if (!liveFeedHasHandoffSources(map)) continue;
     } else if (alwaysOn) {
       continue;
     }
@@ -1263,9 +1308,12 @@ function liveSportsAggregateFeed(ctx, params) {
   if (typeof host.plugin.list !== 'function') {
     return Promise.reject(new Error('HOST_PLUGIN_LIST_REQUIRED'));
   }
-  if (force) liveFeedCacheClear(host);
-
   var cacheKey = liveFeedCacheKey(query.catalogFilter);
+  if (force) {
+    var f = String(query.catalogFilter || '').trim();
+    if (!f || f === 'all') liveFeedCacheClear(host);
+    else liveFeedCacheClear(host, cacheKey);
+  }
   if (!force) {
     var hit = liveFeedCacheGet(host, cacheKey);
     // Empty arrays are not a hit — cancelled scrapes must not poison the slot.
