@@ -316,12 +316,38 @@ function enCbcToken(ctx, rbSession) {
     mode: C.mode.CBC,
     padding: C.pad.Pkcs7,
   });
-  return encodeURIComponent(enc.ciphertext.toString(C.enc.Base64)) + 'a';
+  // CipherParams (.ciphertext) or bare WordArray from older host polyfills.
+  var wa = enc && enc.ciphertext ? enc.ciphertext : enc;
+  if (!wa || typeof wa.toString !== 'function') throw new Error('aes ciphertext missing');
+  return encodeURIComponent(wa.toString(C.enc.Base64)) + 'a';
 }
 
 function signMil(decUrl, token) {
   var u = new URL(String(decUrl));
   return u.origin + '/token-' + token + u.pathname + (u.search || '');
+}
+
+function sleep(ms) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function fetchRetry(ctx, url, opts, retries) {
+  // TCPWE /api/common/bs rate-limits (~429) under multi-sport / double catalog.
+  var max = retries == null ? 4 : retries;
+  var attempt = 0;
+  var res = null;
+  while (attempt <= max) {
+    res = await ctx.fetch(url, opts);
+    if (res && res.ok) return res;
+    var status = res ? Number(res.status) || 0 : 0;
+    attempt++;
+    if (attempt > max) break;
+    if (status && status !== 429 && status < 500) break;
+    await sleep(Math.min(2500, 350 * Math.pow(2, attempt - 1)));
+  }
+  return res;
 }
 
 async function handshake(ctx, cfg) {
@@ -338,28 +364,36 @@ async function handshake(ctx, cfg) {
 async function fetchBs(ctx, cfg, code, query) {
   var base = String(cfg.apiBase || SPECS.apiBase).replace(/\/$/, '');
   var q = 'code=' + code + (query ? '&' + query : '');
-  var res = await ctx.fetch(base + '/api/common/bs?' + q, { headers: apiHeaders(cfg) });
-  if (!res.ok) return '';
+  var res = await fetchRetry(ctx, base + '/api/common/bs?' + q, { headers: apiHeaders(cfg) });
+  if (!res || !res.ok) return '';
   var map = parseBsMap(await resBytes(res));
   return map[code] || '';
 }
 
-async function sfverFetch(ctx, cfg, path, params, code, extraQuery) {
-  var base = String(cfg.apiBase || SPECS.apiBase).replace(/\/$/, '');
+function paramsQuery(params, extraQuery) {
   var qParts = [];
   Object.keys(params || {}).forEach(function (k) {
     var v = params[k];
-    qParts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v === true ? 'true' : v === false ? 'false' : String(v)));
+    qParts.push(
+      encodeURIComponent(k) +
+        '=' +
+        encodeURIComponent(v === true ? 'true' : v === false ? 'false' : String(v)),
+    );
   });
   if (extraQuery) qParts.push(extraQuery);
-  var qs = qParts.join('&');
-  var sig = await fetchBs(ctx, cfg, code, qs);
+  return qParts.join('&');
+}
+
+async function sfverFetch(ctx, cfg, path, params, code, extraQuery, cachedSig) {
+  var base = String(cfg.apiBase || SPECS.apiBase).replace(/\/$/, '');
+  var qs = paramsQuery(params, extraQuery);
+  var sig = cachedSig || (await fetchBs(ctx, cfg, code, qs));
   if (!sig) return null;
   var js = orderedParamsJson(params);
   var ver = 'sfver' + md5Hex6(ctx, js) + sig;
   var url = base + '/' + ver + path + (qs ? '?' + qs : '');
-  var res = await ctx.fetch(url, { headers: apiHeaders(cfg) });
-  if (!res.ok) return null;
+  var res = await fetchRetry(ctx, url, { headers: apiHeaders(cfg) });
+  if (!res || !res.ok) return null;
   return await resBytes(res);
 }
 
@@ -375,6 +409,20 @@ async function catalogExtract(ctx) {
   var language = Number(cfg.language != null ? cfg.language : SPECS.language);
   var byId = {};
 
+  // One bs sig for the whole catalog. Per-sport bs (×8) + chip re-scrape → 429 → raw=0.
+  // Verified: code-100 sig from sportType=1 signs every sportType live URL.
+  var seedType = 0;
+  for (var zi = 0; zi < sportTypes.length; zi++) {
+    if (Number(sportTypes[zi])) {
+      seedType = Number(sportTypes[zi]);
+      break;
+    }
+  }
+  if (!seedType) return [];
+  var seedParams = { sportType: seedType, language: language, stream: true };
+  var liveSig = await fetchBs(ctx, cfg, 100, paramsQuery(seedParams, ''));
+  if (!liveSig) return [];
+
   for (var si = 0; si < sportTypes.length; si++) {
     var sportType = Number(sportTypes[si]);
     if (!sportType) continue;
@@ -387,6 +435,7 @@ async function catalogExtract(ctx) {
         params,
         100,
         '',
+        liveSig,
       );
       if (!body || !body.length) continue;
       var list = parseLiveMatches(body);
