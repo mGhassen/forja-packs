@@ -66,14 +66,15 @@ async function resBytes(res) {
 }
 
 function readVarint(buf, i) {
+  // Float accumulate — JS `<<` truncates at 32 bits and nukes dateMs (epoch ms).
   var x = 0;
-  var s = 0;
+  var mul = 1;
   while (i < buf.length) {
     var c = buf[i++];
-    x |= (c & 0x7f) << s;
-    if (!(c & 0x80)) return { v: x >>> 0, i: i };
-    s += 7;
-    if (s > 63) return null;
+    x += (c & 0x7f) * mul;
+    if (!(c & 0x80)) return { v: x, i: i };
+    mul *= 128;
+    if (mul > 0x20000000000000) return null; // past Number.MAX_SAFE_INTEGER
   }
   return null;
 }
