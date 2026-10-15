@@ -467,7 +467,8 @@ function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
   if (action === 'layout') {
-    return hubOk('layout', liveSportsLayout(), { maxAge: 3600, swr: 86400 });
+    // Short TTL — layout owns cardKind/open; long SWR left TV on film posters.
+    return hubOk('layout', liveSportsLayout(), { maxAge: 30, swr: 120 });
   }
   if (action === 'feed' || action === 'rail') {
     return liveSportsLoadFeed(ctx, params).then(function (items) {

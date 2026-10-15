@@ -208,6 +208,7 @@ function liveSportsLayout() {
                 catalogMenu: 'catalog',
                 sectionMenu: 'section',
                 horizonMenu: 'horizon',
+                viewMenu: 'view',
                 panelTab: 'providers',
                 showWhen: { section: 'sports' },
                 panelTabs: [
