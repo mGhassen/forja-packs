@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.30",
+  "version": "2.0.31",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -248,6 +248,38 @@
       }
     },
     {
+      "id": "fctv33",
+      "name": "FCTV33",
+      "description": "FCTV33 / MadPlay live schedule and stream resolve",
+      "entry": "fctv33.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "config": {
+        "matchIdPrefix": "fctv_",
+        "apiBase": "https://apis-data-defra10.tcpwe138stya.ru",
+        "webOrigin": "https://jack01eo.mpanrc4imind.my",
+        "playerOrigin": "https://nadia01eo.tn76degree12ec3out.cfd",
+        "digit": "seth",
+        "continent": "EU",
+        "country": "FR",
+        "language": 0,
+        "siteType": 2001,
+        "usls": "rbp",
+        "sportTypes": [1, 2, 3, 4, 5, 6, 7, 8]
+      }
+    },
+    {
       "id": "liveonsat",
       "name": "LiveOnSat",
       "description": "LiveOnSat TV schedule + broadcast channel hints",
@@ -314,6 +346,7 @@
     "watchfooty.js",
     "streamic.js",
     "bzhsport.js",
+    "fctv33.js",
     "liveonsat.js",
     "livesoccertv.js",
     "goat/unlock.mjs",
