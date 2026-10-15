@@ -25,6 +25,8 @@ function downloadsLayout() {
             }),
             hubWithLoad(
               kitList('grid', {
+                style: 'grid',
+                cardKind: 'poster',
                 open: 'panel',
                 panel: 'offline',
                 kindMenu: 'kind',
