@@ -1334,18 +1334,30 @@ function liveSportsAggregateFeed(ctx, params) {
         liveFeedShouldMerge(query, cfg),
       );
     }
-    // Catalog chip after All — re-filter warm aggregate, do not re-scrape.
+    // Catalog chip after All — re-filter warm aggregate only when that
+    // catalog has rows. Never stash the full All list under raw:<chip>
+    // (that poisons the slot → empty UI + skip scrape).
     var wantFilter = String(query.catalogFilter || '').trim();
     if (wantFilter && wantFilter !== 'all' && wantFilter.indexOf('stremio:') !== 0) {
       var allHit = liveFeedCacheGet(host, liveFeedCacheKey('all'));
       if (allHit && Array.isArray(allHit.rows) && allHit.rows.length) {
-        liveFeedCacheSet(host, cacheKey, allHit.rows);
-        return liveFeedFinish(
-          host,
-          allHit.rows,
-          query,
-          liveFeedShouldMerge(query, cfg),
-        );
+        var scoped = [];
+        for (var si = 0; si < allHit.rows.length; si++) {
+          var srow = allHit.rows[si];
+          var sid = String(
+            (srow && (srow.pluginId || srow.livePluginId)) || '',
+          ).trim();
+          if (liveFeedCatalogIdMatches(sid, wantFilter)) scoped.push(srow);
+        }
+        if (scoped.length) {
+          liveFeedCacheSet(host, cacheKey, scoped);
+          return liveFeedFinish(
+            host,
+            scoped,
+            query,
+            liveFeedShouldMerge(query, cfg),
+          );
+        }
       }
     }
   }
