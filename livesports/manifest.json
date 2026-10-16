@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.37",
+  "version": "2.0.40",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -250,7 +250,7 @@
     {
       "id": "fctv33",
       "name": "FCTV33",
-      "description": "FCTV33 / MadPlay live schedule and stream resolve",
+      "description": "FCTV33 live schedule and stream resolve",
       "entry": "fctv33.js",
       "types": [
         "live_sport"
@@ -268,9 +268,9 @@
       "config": {
         "matchIdPrefix": "fctv_",
         "apiBase": "https://apis-data-defra10.tcpwe138stya.ru",
-        "webOrigin": "https://jack01eo.mpanrc4imind.my",
+        "webOrigin": "https://www.fctv33.com",
         "playerOrigin": "https://nadia01eo.tn76degree12ec3out.cfd",
-        "digit": "seth",
+        "digit": "foth",
         "continent": "EU",
         "country": "FR",
         "language": 0,

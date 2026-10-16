@@ -1,11 +1,12 @@
-// Unified live_sport plugin — catalog + resolve (FCTV33 / MadPlay TCPWE family)
-// Catalog half (top-level)
+// Unified live_sport plugin — catalog + resolve for https://www.fctv33.com (TCPWE / digit foth)
 var SPECS = {
   apiBase: 'https://apis-data-defra10.tcpwe138stya.ru',
-  webOrigin: 'https://jack01eo.mpanrc4imind.my',
-  // CDN Referer must be a g_player_domains host (jack site origin → 403).
+  // Site identity for API Origin/Referer (Nuxt DIGIT_ENV=foth).
+  webOrigin: 'https://www.fctv33.com',
+  // CDN allowlist Referer (fhlsport `deny by referer` otherwise).
+  // Not the same as g_player_domains.foth (HTML player iframe hosts).
   playerOrigin: 'https://nadia01eo.tn76degree12ec3out.cfd',
-  digit: 'seth',
+  digit: 'foth',
   continent: 'EU',
   country: 'FR',
   language: 0,
@@ -376,6 +377,27 @@ async function handshake(ctx, cfg) {
   } catch (_) {}
 }
 
+/**
+ * CDN hop origins (Referer/Origin for fhlsport).
+ * Prefer pack `playerOrigin` — g_player_domains[digit] are HTML iframe hosts and
+ * get `403 deny by referer access rule` on mil playlists.
+ */
+function loadPlayerOrigins(cfg) {
+  var origins = [];
+  function push(raw) {
+    var o = String(raw || '')
+      .trim()
+      .replace(/\/$/, '');
+    if (/^https?:\/\//i.test(o) && origins.indexOf(o) < 0) origins.push(o);
+  }
+  push(cfg.playerOrigin || SPECS.playerOrigin);
+  push(SPECS.playerOrigin);
+  // Empty Referer also passes playlist allowlist (last resort).
+  cfg.playerOrigin = origins[0] || String(SPECS.playerOrigin).replace(/\/$/, '');
+  cfg.playerOrigins = origins.length ? origins : [cfg.playerOrigin];
+  return cfg.playerOrigins;
+}
+
 async function fetchBs(ctx, cfg, code, query) {
   var base = String(cfg.apiBase || SPECS.apiBase).replace(/\/$/, '');
   var q = 'code=' + code + (query ? '&' + query : '');
@@ -419,6 +441,7 @@ async function catalogExtract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
   var pluginId = String(cfg.pluginId || cfg.providerId || 'fctv33');
   await handshake(ctx, cfg);
+  loadPlayerOrigins(cfg);
 
   var sportTypes = Array.isArray(cfg.sportTypes) ? cfg.sportTypes : SPECS.sportTypes;
   var language = Number(cfg.language != null ? cfg.language : SPECS.language);
@@ -528,20 +551,39 @@ var __resolveExtract = (function () {
     if (!/^https?:\/\//i.test(dec)) return null;
     var token = enCbcToken(ctx, rb);
     var mil = signMil(dec, token);
-    var player = String(cfg.playerOrigin || SPECS.playerOrigin).replace(/\/$/, '');
+    var players = Array.isArray(cfg.playerOrigins) ? cfg.playerOrigins.slice() : [];
+    if (!players.length) {
+      var one = String(cfg.playerOrigin || SPECS.playerOrigin || '').replace(/\/$/, '');
+      if (one) players.push(one);
+    }
+    // CDN Wtl108's non-browser TLS — pack calls host Chromium-fetch tool.
+    // Try each CDN allowlist player origin until hop returns a loopback URL.
+    var play = '';
+    if (ctx.live && typeof ctx.live.browserFetchHls === 'function') {
+      for (var pi = 0; pi < players.length; pi++) {
+        var player = String(players[pi] || '').replace(/\/$/, '');
+        if (!player) continue;
+        var headers = {
+          Referer: player + '/',
+          Origin: player,
+          'User-Agent': ua(),
+        };
+        try {
+          play = String((await ctx.live.browserFetchHls(mil, headers)) || '');
+        } catch (_) {
+          play = '';
+        }
+        if (play) break;
+      }
+    }
+    if (!play) return null;
     return {
-      url: mil,
+      url: play,
       name: stream.name || ('CH ' + stream.streamId),
       source: 'fctv33',
-      id: String(matchId),
-      headers: {
-        Referer: player + '/',
-        Origin: player,
-        'User-Agent': ua(),
-      },
-      // Host tool: Chromium fetch hop → loopback HLS (CDN Wtl108's non-browser TLS).
-      directPlayback: false,
-      playbackHop: 'browserFetch',
+      id: String(sportType || 1) + ':' + String(matchId) + ':' + String(stream.streamId),
+      headers: {},
+      directPlayback: true,
     };
   }
 
@@ -587,10 +629,17 @@ var __resolveExtract = (function () {
     });
   }
 
-  async function resolveByMatch(ctx, cfg, matchId, sportType) {
+  async function resolveByMatch(ctx, cfg, matchId, sportType, onlyStreamId) {
     await handshake(ctx, cfg);
+    loadPlayerOrigins(cfg);
     var channels = await listChannels(ctx, cfg, matchId, sportType);
     if (!channels.length) return [];
+    if (onlyStreamId) {
+      channels = channels.filter(function (s) {
+        return String(s.streamId) === String(onlyStreamId);
+      });
+      if (!channels.length) return [];
+    }
     var out = [];
     for (var i = 0; i < channels.length; i++) {
       try {
@@ -633,6 +682,11 @@ var __resolveExtract = (function () {
     var s = String(raw || '')
       .replace(/^fctv_/, '')
       .trim();
+    // sportType:matchId:streamId (channel handoff) or sportType:matchId
+    var m3 = s.match(/^(\d+):(\d+):(\d+)$/);
+    if (m3) {
+      return { sportType: Number(m3[1]), matchId: m3[2], streamId: m3[3] };
+    }
     var m = s.match(/^(\d+):(\d+)$/);
     if (m) return { sportType: Number(m[1]), matchId: m[2] };
     if (/^\d+$/.test(s)) return { sportType: 1, matchId: s };
@@ -652,10 +706,11 @@ var __resolveExtract = (function () {
       Number(ctx.sportType || (ctx.config && ctx.config.sportType) || 0) ||
       1;
     var sid = ref ? ref.matchId : '';
+    var onlyStreamId = ref && ref.streamId ? ref.streamId : '';
     if (!sid || ctx.fixtureSearch === true) {
       return resolveByFixture(ctx, cfg);
     }
-    var unlocked = await resolveByMatch(ctx, cfg, sid, sportType);
+    var unlocked = await resolveByMatch(ctx, cfg, sid, sportType, onlyStreamId);
     if (unlocked.length) return unlocked;
     return resolveByFixture(ctx, cfg);
   }
