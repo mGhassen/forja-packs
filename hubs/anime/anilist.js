@@ -47,20 +47,19 @@ var ANILIST_DETAILS_FIELDS = [
     ' type } } }',
 ].join(' ');
 
-var ANILIST_RELATION_KEEP = {
-  SIDE_STORY: 0,
-  SUMMARY: 1,
-  ALTERNATIVE: 2,
-  SPIN_OFF: 3,
-  SEQUEL: 4,
-  PREQUEL: 5,
-  PARENT: 6,
-  COMPILATION: 7,
-  CONTAINS: 8,
-  OTHER: 9,
+// Keep franchise links; drop CHARACTER / ADAPTATION / SOURCE / SAME_UNIVERSE.
+var ANILIST_RELATION_TYPES = {
+  SIDE_STORY: true,
+  SUMMARY: true,
+  ALTERNATIVE: true,
+  SPIN_OFF: true,
+  SEQUEL: true,
+  PREQUEL: true,
+  PARENT: true,
+  COMPILATION: true,
+  CONTAINS: true,
+  OTHER: true,
 };
-
-var ANILIST_RELATION_TYPES = Object.keys(ANILIST_RELATION_KEEP);
 
 var ANILIST_RELATION_FORMATS = {
   TV: true,
@@ -366,7 +365,7 @@ function anilistRelatedFromMedia(m, preferred) {
   for (var i = 0; i < edges.length; i++) {
     var e = edges[i] || {};
     var type = String(e.relationType || '');
-    if (ANILIST_RELATION_TYPES.indexOf(type) < 0) continue;
+    if (!ANILIST_RELATION_TYPES[type]) continue;
     var node = e.node;
     if (!node || String(node.type || 'ANIME') !== 'ANIME') continue;
     var fmt = String(node.format || '').toUpperCase();
@@ -379,12 +378,7 @@ function anilistRelatedFromMedia(m, preferred) {
     meta.relationType = type;
     out.push(meta);
   }
-  out.sort(function (a, b) {
-    var ra = ANILIST_RELATION_KEEP[a.relationType] ?? 99;
-    var rb = ANILIST_RELATION_KEEP[b.relationType] ?? 99;
-    if (ra !== rb) return ra - rb;
-    return String(a.name || '').localeCompare(String(b.name || ''));
-  });
+  // Preserve AniList edges order (chronological as editors set).
   return out;
 }
 

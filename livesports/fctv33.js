@@ -11,8 +11,10 @@ var SPECS = {
   language: 0,
   siteType: 2001,
   usls: 'rbp',
-  // 1 football · 2 basketball · 3 tennis · 4 cricket · 5 hockey · 6 baseball · 7 american-football · 8 other
-  sportTypes: [1, 2, 3, 4, 5, 6, 7, 8],
+  // 1 football · 2 basketball · 3 tennis · 4 cricket · 6 baseball · 7 motorsport
+  // 8 rugby · 9 NFL · 10 AFL · 11 hockey/curling · 12 badminton
+  // 5 (legacy hockey) returns bs/live 400 — skip.
+  sportTypes: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
 };
 
 var SPORT_KIND = {
@@ -20,11 +22,22 @@ var SPORT_KIND = {
   2: 'basketball',
   3: 'tennis',
   4: 'cricket',
-  5: 'hockey',
   6: 'baseball',
-  7: 'american-football',
-  8: 'other',
+  7: 'motorsport',
+  8: 'rugby',
+  9: 'american-football',
+  10: 'australian-football',
+  11: 'hockey',
+  12: 'badminton',
 };
+
+/** Site Live tab ≠ status===101 only. Verified: 101 in-play, 103 HT, 600 other, 0 after kickoff. */
+function matchIsAiring(m) {
+  if (!m || m.status >= 10000) return false;
+  if (m.status > 0) return true;
+  var t = Number(m.dateMs) || 0;
+  return t > 0 && t <= Date.now();
+}
 
 // AES-CBC token keys (CryptoJS Utf8.parse of atob strings from site chunk).
 var AES_KEY = 'a7981cc9eb2f4d19dcfea57b101ecd89';
@@ -179,6 +192,8 @@ function parseMatch(bytes) {
   var home = entities[1] || {};
   var away = entities[2] || {};
   if (!title && home.name && away.name) title = home.name + ' vs ' + away.name;
+  if (!title && home.name) title = home.name;
+  if (!title && away.name) title = away.name;
   if (!title) title = league.name || String(matchId);
   return {
     matchId: matchId,
@@ -441,7 +456,7 @@ async function catalogExtract(ctx) {
       var list = parseLiveMatches(body);
       for (var i = 0; i < list.length; i++) {
         var m = list[i];
-        // 10000+ = finished; keep upcoming (0) + live (101) and unknown
+        // 10000+ = finished
         if (m.status >= 10000) continue;
         if (byId[m.matchId]) continue;
         byId[m.matchId] = m;
@@ -453,13 +468,14 @@ async function catalogExtract(ctx) {
   Object.keys(byId).forEach(function (k) {
     var m = byId[k];
     var kind = SPORT_KIND[m.sportType] || 'other';
+    var airing = matchIsAiring(m);
     var row = {
       id: 'fctv_' + m.matchId,
       title: m.title,
       category: kind,
       date: m.dateMs || 0,
-      airing: m.status === 101,
-      popular: m.status === 101,
+      airing: airing,
+      popular: airing,
       sources: [{ source: 'fctv33', id: m.sportType + ':' + m.matchId }],
       catalog: 'forja_live',
       pluginId: pluginId,
@@ -523,7 +539,8 @@ var __resolveExtract = (function () {
         Origin: player,
         'User-Agent': ua(),
       },
-      directPlayback: typeof preferDirectPlayback === 'function' ? preferDirectPlayback(mil) : true,
+      // fhlsport/hedy segments need host Chromium fetch hop — never direct MediaKit.
+      directPlayback: false,
     };
   }
 
