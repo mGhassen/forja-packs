@@ -142,8 +142,25 @@ function extract(ctx) {
       return fetchText(base + '/catalogue/' + slug + '/').then(function (html) {
         var panel = pickPanel(parsePanels(html));
         if (!panel) return [];
-        return Promise.all([readersFor(slug, panel, 'vf'), readersFor(slug, panel, 'vostfr')]).then(function (r) {
-          return frAnimeRows(ctx, 'Anime-Sama', { vf: r[0], vostfr: r[1] }, base + '/');
+        // Sites split French dub across vf / vf2 / vfq; vostfr is the sub lane.
+        var cat = String(ctx.category || '')
+          .toLowerCase()
+          .trim();
+        var langs = [];
+        if (!cat || cat === 'dub') langs = langs.concat(['vf', 'vf2', 'vfq']);
+        if (!cat || cat === 'sub') langs.push('vostfr');
+        return Promise.all(
+          langs.map(function (lang) {
+            return readersFor(slug, panel, lang).then(function (urls) {
+              return { lang: lang, urls: urls };
+            });
+          }),
+        ).then(function (parts) {
+          var readers = {};
+          parts.forEach(function (p) {
+            if (p.urls && p.urls.length) readers[p.lang] = p.urls;
+          });
+          return frAnimeRows(ctx, 'Anime-Sama', readers, base + '/');
         });
       });
     })

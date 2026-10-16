@@ -6,10 +6,25 @@ var FR_ANIME_UA =
 // `language` must be sub/dub: it is the field the host's Anime SUB/DUB filter reads after
 // mapping. Labels name the audio; the subbed label avoids "VOSTFR"/"FRENCH", which the
 // Sources chips read as French audio.
+// Sites often split dubs across vf / vf2 / vfq — map every vf* key, not only `vf`.
 var FR_ANIME_LANGS = {
   vf: { language: 'dub', tag: '(DUB)', label: 'French dub' },
   vostfr: { language: 'sub', tag: '(SUB)', label: 'Japanese · sous-titres FR' },
 };
+
+function frAnimeLangMeta(lang) {
+  var k = String(lang || '')
+    .toLowerCase()
+    .trim();
+  if (!k) return null;
+  if (k.indexOf('vost') === 0 || k === 'sub') return FR_ANIME_LANGS.vostfr;
+  if (k === 'vf' || k === 'dub') return FR_ANIME_LANGS.vf;
+  if (k === 'vfq') return { language: 'dub', tag: '(DUB)', label: 'French dub · VFQ' };
+  if (/^vf\d+$/.test(k)) {
+    return { language: 'dub', tag: '(DUB)', label: 'French dub · ' + k.toUpperCase() };
+  }
+  return null;
+}
 
 var FR_ANIME_HOST_NAMES = {
   'ansembed.net': 'Vidmoly',
@@ -188,6 +203,7 @@ function frAnimeFetchText(ctx, url, referer) {
 function frAnimeResolveJw(ctx, embedUrl, referer) {
   var origin = (embedUrl.match(/^https?:\/\/[^/]+/i) || [''])[0].toLowerCase();
   return frAnimeFetchText(ctx, embedUrl, referer).then(function (html) {
+    if (/video not found|this video is not available/i.test(html)) return [];
     var file = (html.match(/sources:\s*\[\s*\{\s*file:\s*["'](https?:[^"']+)["']/) || [])[1];
     if (!file) {
       var js = frAnimeUnpack(html);
@@ -233,13 +249,20 @@ function frAnimeResolveEmbed(ctx, embedUrl, referer) {
     });
 }
 
-// readers: { vf: [embedUrl…], vostfr: [embedUrl…] } → stream rows tagged VF (DUB) / VOSTFR (SUB).
+// readers: { vf?, vf2?, vfq?, vostfr?, … } → stream rows tagged DUB / SUB.
+// Honours ctx.category (`sub`|`dub`) so a DUB filter does not wait on VOSTFR embeds.
 function frAnimeRows(ctx, provider, readers, referer) {
+  var cat = String((ctx && ctx.category) || '')
+    .toLowerCase()
+    .trim();
   var jobs = [];
-  Object.keys(FR_ANIME_LANGS).forEach(function (lang) {
+  Object.keys(readers || {}).forEach(function (lang) {
+    var meta = frAnimeLangMeta(lang);
+    if (!meta) return;
+    if (cat === 'dub' && meta.language !== 'dub') return;
+    if (cat === 'sub' && meta.language !== 'sub') return;
     var urls = readers[lang];
     if (!Array.isArray(urls)) return;
-    var meta = FR_ANIME_LANGS[lang];
     urls.forEach(function (raw, i) {
       var embed = String(raw || '').trim();
       if (!/^https?:\/\//i.test(embed)) return;

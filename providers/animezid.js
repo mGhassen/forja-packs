@@ -1,5 +1,5 @@
 var SPECS = {
-  base: 'https://animezid.cam',
+  base: 'https://animezid.org',
 };
 
 var AZ_UA =
