@@ -2335,6 +2335,10 @@
       ],
       "languages": [
         {
+          "kind": "sub",
+          "code": "ar"
+        },
+        {
           "kind": "dub",
           "code": "ar"
         }
