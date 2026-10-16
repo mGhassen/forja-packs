@@ -1103,26 +1103,41 @@ function tmdbNewReleasesForPage(
   page,
   limit,
 ) {
-  var win = tmdbRecentReleaseWindow(90, 60);
-  var movieQ = {
-    sort_by: 'primary_release_date.desc',
-    page: page,
-    'primary_release_date.gte': win.gte,
-    'primary_release_date.lte': win.lte,
-    'vote_count.gte': 10,
-  };
-  var tvQ = {
-    sort_by: 'first_air_date.desc',
-    page: page,
-    'first_air_date.gte': win.gte,
-    'first_air_date.lte': win.lte,
-    'vote_count.gte': 10,
-  };
-  return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit).then(
-    function (discover) {
-      if (watchProviders || typeFilter || tmdbHasMoodFilter(filter)) {
-        return tmdbSortMetasByReleaseDesc(discover);
-      }
+  var hasProvider = !!watchProviders;
+  var chromeScoped =
+    hasProvider || !!typeFilter || tmdbHasMoodFilter(filter);
+
+  // Date window discover. Provider chips drop vote_count — new anime often
+  // sits under the unfiltered gate. TV first_air_date is the series premiere,
+  // so long-running Crunchyroll shows miss a 90-day window until we pad.
+  function loadWindow(daysBack, daysForward, minVotes) {
+    var win = tmdbRecentReleaseWindow(daysBack, daysForward);
+    var movieQ = {
+      sort_by: 'primary_release_date.desc',
+      page: page,
+      'primary_release_date.gte': win.gte,
+      'primary_release_date.lte': win.lte,
+    };
+    var tvQ = {
+      sort_by: 'first_air_date.desc',
+      page: page,
+      'first_air_date.gte': win.gte,
+      'first_air_date.lte': win.lte,
+    };
+    if (minVotes != null) {
+      movieQ['vote_count.gte'] = minVotes;
+      tvQ['vote_count.gte'] = minVotes;
+    }
+    return tmdbFetchMixed(ctx, cfg, filter, typeFilter, movieQ, tvQ, limit);
+  }
+
+  function loadPopularPad() {
+    var q = { sort_by: 'popularity.desc', page: page };
+    return tmdbFetchMixed(ctx, cfg, filter, typeFilter, q, q, limit);
+  }
+
+  if (!chromeScoped) {
+    return loadWindow(90, 60, 10).then(function (discover) {
       return Promise.all([
         tmdbGet(ctx, cfg, '/movie/now_playing', { page: page }),
         tmdbGet(ctx, cfg, '/movie/upcoming', { page: page }),
@@ -1136,8 +1151,27 @@ function tmdbNewReleasesForPage(
           tmdbUniqueMetas(discover, curated, limit),
         );
       });
-    },
-  );
+    });
+  }
+
+  // Same pad shape as Featured: recent → wider window → provider popularity.
+  var minVotes = hasProvider ? null : 10;
+  return loadWindow(90, 60, minVotes).then(function (recent) {
+    if (recent.length >= TMDB_HOME_RAIL_CAP) {
+      return tmdbSortMetasByReleaseDesc(recent);
+    }
+    return loadWindow(365, 90, minVotes).then(function (wide) {
+      var merged = tmdbUniqueMetas(recent, wide, limit);
+      if (merged.length >= TMDB_HOME_RAIL_CAP) {
+        return tmdbSortMetasByReleaseDesc(merged);
+      }
+      return loadPopularPad().then(function (pad) {
+        return tmdbSortMetasByReleaseDesc(
+          tmdbUniqueMetas(merged, pad, limit),
+        );
+      });
+    });
+  });
 }
 
 function tmdbList(ctx, cfg, params) {
