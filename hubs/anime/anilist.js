@@ -848,14 +848,13 @@ function extract(ctx) {
       fields: [{ field: 'genre', label: 'Genre', options: anilistCategoryOptions() }],
       play: [
         {
-          id: 'audio',
-          field: 'category',
-          style: 'grouped',
-          default: 'sub',
-          options: [
-            { id: 'sub', label: 'SUB', value: 'sub', icon: 'subtitles' },
-            { id: 'dub', label: 'DUB', value: 'dub', icon: 'mic' },
-          ],
+          id: 'languages',
+          field: 'languages',
+          style: 'multiselect',
+          source: 'pluginLanguages',
+          settingsField: 'streamLanguages',
+          types: ['anime'],
+          default: [],
         },
       ],
     }, { maxAge: 86400 });

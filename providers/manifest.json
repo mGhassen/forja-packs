@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.66",
+  "version": "1.6.67",
   "tags": [
     "providers",
     "anime",
@@ -391,7 +391,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "cinejoy",
@@ -445,7 +455,7 @@
           },
           {
             "id": "turkce",
-            "label": "Türkçe",
+            "label": "T\u00fcrk\u00e7e",
             "movieOnly": true
           },
           {
@@ -592,7 +602,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "megaplay",
@@ -607,7 +627,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "animepahe",
@@ -905,7 +935,17 @@
             "pngStrip": "auto"
           }
         ]
-      }
+      },
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "allmovieland",
@@ -1178,7 +1218,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "anibd",
@@ -1224,7 +1274,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "animedunya",
@@ -1389,7 +1449,17 @@
       "types": [
         "anime"
       ],
-      "kind": "http"
+      "kind": "http",
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
+      ]
     },
     {
       "id": "dailymotion",
@@ -2150,6 +2220,16 @@
       "entry": "recloud.js",
       "types": [
         "anime"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
       ]
     },
     {
@@ -2168,6 +2248,16 @@
       "entry": "luna.js",
       "types": [
         "anime"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
       ]
     },
     {
@@ -2195,6 +2285,16 @@
       "entry": "anipm.js",
       "types": [
         "anime"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "en"
+        },
+        {
+          "kind": "dub",
+          "code": "en"
+        }
       ]
     },
     {
@@ -2260,6 +2360,16 @@
         "hop-mp4upload",
         "hop-doodstream",
         "hop-mixdrop"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "ar"
+        },
+        {
+          "kind": "dub",
+          "code": "ar"
+        }
       ]
     },
     {
@@ -2273,6 +2383,16 @@
       ],
       "types": [
         "anime"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "fr"
+        },
+        {
+          "kind": "dub",
+          "code": "fr"
+        }
       ]
     },
     {
@@ -2286,6 +2406,16 @@
       ],
       "types": [
         "anime"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "fr"
+        },
+        {
+          "kind": "dub",
+          "code": "fr"
+        }
       ]
     },
     {

@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.51",
+  "version": "1.0.53",
   "tags": [
     "anime"
   ],
@@ -81,6 +81,16 @@
                 "label": "Number chips"
               }
             ]
+          },
+          {
+            "id": "streamLanguages",
+            "type": "multi_select",
+            "label": "Stream languages",
+            "subtitle": "Empty = all providers. Filters which Forja plugins run on Play and Sources.",
+            "source": "pluginLanguages",
+            "types": ["anime"],
+            "default": [],
+            "reloadHub": false
           }
         ],
         "greenPlay": {
