@@ -268,29 +268,71 @@ function anilistApplyAir(entry, m, isoByEp) {
   return entry;
 }
 
+// AniList streamingEpisodes is a recent window (titles like "Episode 130 - …"),
+// not a full 1..N list. Parse real numbers; pad to episodes / nextAiring.
+function anilistParseEpisodeNumber(title) {
+  var t = String(title || '').trim();
+  if (!t) return 0;
+  var m =
+    t.match(/\bEpisode\s+(\d+)\b/i) ||
+    t.match(/\bEp\.?\s*(\d+)\b/i) ||
+    t.match(/#\s*(\d+)\b/) ||
+    t.match(/\bE(\d+)\b/i);
+  if (!m) return 0;
+  var n = Number(m[1]);
+  return n > 0 ? n : 0;
+}
+
 function anilistVideosFromMedia(m) {
   var isoByEp = anilistAiringIsoByEpisode(m);
   var stream = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
   var known = {};
+  var maxKnown = 0;
+  var parsed = 0;
   var i;
   for (i = 0; i < stream.length; i++) {
     var ep = stream[i] || {};
-    var num = i + 1;
+    var num = anilistParseEpisodeNumber(ep.title);
+    if (!(num > 0)) continue;
+    parsed++;
     known[num] = {
       title: String(ep.title || '').trim(),
       thumbnail: anilistAbsUrl(ep.thumbnail || ''),
     };
+    if (num > maxKnown) maxKnown = num;
+  }
+  // Titles without numbers — keep old index map so short lists still work.
+  if (parsed === 0) {
+    for (i = 0; i < stream.length; i++) {
+      var raw = stream[i] || {};
+      var fb = i + 1;
+      known[fb] = {
+        title: String(raw.title || '').trim(),
+        thumbnail: anilistAbsUrl(raw.thumbnail || ''),
+      };
+      if (fb > maxKnown) maxKnown = fb;
+    }
+  }
+  for (var airKey in isoByEp) {
+    if (!Object.prototype.hasOwnProperty.call(isoByEp, airKey)) continue;
+    var airEp = Number(airKey);
+    if (airEp > maxKnown) maxKnown = airEp;
   }
   var total = Number(m.episodes) || 0;
-  var nextEp =
-    m.nextAiringEpisode && Number(m.nextAiringEpisode.episode) > 0
-      ? Number(m.nextAiringEpisode.episode)
-      : 0;
-  var count = stream.length > 0 ? stream.length : total;
+  var next = m && m.nextAiringEpisode;
+  var nextEp = next && Number(next.episode) > 0 ? Number(next.episode) : 0;
+  var nextAt = next ? Number(next.airingAt) : 0;
+  var nextAhead =
+    nextEp > 0 && (!(nextAt > 0) || nextAt * 1000 > Date.now());
+  var count = total;
+  if (maxKnown > count) count = maxKnown;
+  if (nextEp > 0) {
+    var through = nextAhead ? nextEp - 1 : nextEp;
+    if (through > count) count = through;
+    // Include the upcoming episode when it is the next slot.
+    if (nextEp > count && nextEp - count <= 2) count = nextEp;
+  }
   if (count <= 0 && nextEp > 0) count = nextEp;
-  // Rest of a short season, plus the next episode when it is the one after the list.
-  if (total > count && total - count <= 30) count = total;
-  if (nextEp > count && nextEp - count <= 2) count = nextEp;
   if (count <= 0) return [];
   var videos = [];
   var j;

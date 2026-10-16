@@ -539,8 +539,9 @@ var __resolveExtract = (function () {
         Origin: player,
         'User-Agent': ua(),
       },
-      // fhlsport/hedy segments need host Chromium fetch hop — never direct MediaKit.
+      // Host tool: Chromium fetch hop → loopback HLS (CDN Wtl108's non-browser TLS).
       directPlayback: false,
+      playbackHop: 'browserFetch',
     };
   }
 

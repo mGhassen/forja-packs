@@ -1048,12 +1048,58 @@ function hubIsGenericEpisodeTitle(title) {
   return /^Episode\s+\d+$/i.test(String(title || '').trim());
 }
 
+// AniList streamingEpisodes is a short window; TMDB facts.episodeCount is the
+// declared total. Pad sparse / short meta.videos to 1..declared so the picker
+// matches the facts panel (and play episode numbers stay absolute).
+function hubPadMetaVideosToDeclared(meta) {
+  if (!meta || typeof meta !== 'object') return meta;
+  var declared = Number(meta.facts && meta.facts.episodeCount) || 0;
+  var videos = Array.isArray(meta.videos) ? meta.videos : [];
+  var byEp = {};
+  var maxEp = 0;
+  for (var i = 0; i < videos.length; i++) {
+    var v = videos[i];
+    if (!v || typeof v !== 'object') continue;
+    var ep = Number(v.episode) > 0 ? Number(v.episode) : 0;
+    if (!(ep > 0)) continue;
+    byEp[ep] = v;
+    if (ep > maxEp) maxEp = ep;
+  }
+  var target = declared > maxEp ? declared : maxEp;
+  if (!(target > 0)) return meta;
+  var dense = videos.length === target;
+  if (dense) {
+    for (var d = 1; d <= target; d++) {
+      if (!byEp[d]) {
+        dense = false;
+        break;
+      }
+    }
+  }
+  if (dense) return meta;
+  var out = [];
+  for (var j = 1; j <= target; j++) {
+    if (byEp[j]) out.push(byEp[j]);
+    else {
+      out.push({
+        id: String(j),
+        episode: j,
+        season: 1,
+        title: 'Episode ' + j,
+      });
+    }
+  }
+  meta.videos = out;
+  return meta;
+}
+
 // Details meta only — fill empty pack video thumbs/titles from matched TV season.
 function hubEnrichMetaVideos(ctx, meta, hit) {
   if (!meta || !hit || !hit.id) return Promise.resolve(meta);
   if (String(hit.mediaType || '').toLowerCase() === 'movie') {
     return Promise.resolve(meta);
   }
+  hubPadMetaVideosToDeclared(meta);
   var videos = Array.isArray(meta.videos) ? meta.videos : [];
   if (!videos.length) return Promise.resolve(meta);
 
