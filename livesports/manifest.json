@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.41",
+  "version": "2.0.45",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -14,7 +14,7 @@
     {
       "id": "streamed",
       "name": "Streamed",
-      "description": "streamed.pk schedule and stream resolve",
+      "description": "streamed.st schedule and stream resolve",
       "entry": "streamed.js",
       "types": [
         "live_sport"
@@ -34,7 +34,7 @@
         "resolve": "live-streamed"
       },
       "config": {
-        "origin": "https://streamed.pk",
+        "origin": "https://streamed.st",
         "embedOrigin": "https://embed.st",
         "nativeUnlock": "streamed",
         "ownedSources": [
@@ -121,7 +121,7 @@
     {
       "id": "timstreams",
       "name": "TimStreams",
-      "description": "timst.cfd schedule and stream resolve",
+      "description": "timst.top schedule and stream resolve",
       "entry": "timstreams.js",
       "types": [
         "live_sport"
@@ -141,10 +141,10 @@
         "resolve": "live-timstreams"
       },
       "config": {
-        "origin": "https://timst.cfd",
-        "api": "https://timst.cfd/api/live-upcoming",
-        "channelsApi": "https://timst.cfd/api/channels",
-        "replaysApi": "https://timst.cfd/api/replays",
+        "origin": "https://timst.top",
+        "api": "https://timst.top/api/live-upcoming",
+        "channelsApi": "https://timst.top/api/channels",
+        "replaysApi": "https://timst.top/api/replays",
         "sportsChannelGenre": 2,
         "embedOrigin": "https://embed.st"
       }

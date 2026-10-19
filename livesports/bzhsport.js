@@ -72,13 +72,39 @@ function bzhHtmlText(s) {
 }
 
 function bzhParseDateMs(dateStr, timeStr, tzOffsetMin) {
-  var d = String(dateStr || '').match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
   var t = String(timeStr || '').match(/^(\d{1,2}):(\d{2})$/);
-  if (!d || !t) return 0;
+  if (!t) return 0;
+  var tz = Number(tzOffsetMin || 0);
+  var hour = Number(t[1]);
+  var min = Number(t[2]);
+  // Near-term rows use French labels instead of DD-Mon-YYYY.
+  var label = String(dateStr || '')
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, '');
+  var dayOffset = null;
+  if (label === 'aujourdhui') dayOffset = 0;
+  else if (label === 'demain') dayOffset = 1;
+  if (dayOffset != null) {
+    // Calendar day in site TZ (fixed UTC+tz), then convert back to UTC ms.
+    var siteNow = new Date(Date.now() + tz * 60000);
+    var utc =
+      Date.UTC(
+        siteNow.getUTCFullYear(),
+        siteNow.getUTCMonth(),
+        siteNow.getUTCDate() + dayOffset,
+        hour,
+        min,
+      ) -
+      tz * 60000;
+    return utc;
+  }
+  var d = String(dateStr || '').match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!d) return 0;
   var mon = BZH_MONTHS[d[2].toLowerCase()];
   if (mon == null) return 0;
-  var utc = Date.UTC(Number(d[3]), mon, Number(d[1]), Number(t[1]), Number(t[2]));
-  return utc - Number(tzOffsetMin || 0) * 60000;
+  var absUtc = Date.UTC(Number(d[3]), mon, Number(d[1]), hour, min);
+  return absUtc - tz * 60000;
 }
 
 function bzhSplitTeams(title) {

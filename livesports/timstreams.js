@@ -1,9 +1,9 @@
 // Unified live_sport plugin — catalog + resolve (timstreams)
 // Catalog half (top-level)
 var SPECS = {
-  origin: 'https://timst.cfd',
-  api: 'https://timst.cfd/api/live-upcoming',
-  channelsApi: 'https://timst.cfd/api/channels',
+  origin: 'https://timst.top',
+  api: 'https://timst.top/api/live-upcoming',
+  channelsApi: 'https://timst.top/api/channels',
   // Channel genre id 2 = Sports (site Live TV).
   sportsChannelGenre: 2,
 };
@@ -167,10 +167,10 @@ async function catalogExtract(ctx) {
 // Resolve half (closed scope — no name collisions with catalog)
 var __resolveExtract = (function () {
 var SPECS = {
-  origin: 'https://timst.cfd',
-  api: 'https://timst.cfd/api/live-upcoming',
-  channelsApi: 'https://timst.cfd/api/channels',
-  replaysApi: 'https://timst.cfd/api/replays',
+  origin: 'https://timst.top',
+  api: 'https://timst.top/api/live-upcoming',
+  channelsApi: 'https://timst.top/api/channels',
+  replaysApi: 'https://timst.top/api/replays',
   embedOrigin: 'https://embed.st',
 };
 
@@ -182,7 +182,7 @@ function embedReferer(raw) {
   try {
     return new URL(String(raw || '').trim()).origin + '/';
   } catch (_) {
-    return 'https://timst.cfd/';
+    return 'https://timst.top/';
   }
 }
 
@@ -198,8 +198,8 @@ async function fetchEvents(ctx, cfg) {
   var headers = {
     'User-Agent': ua(),
     Accept: 'application/json',
-    Referer: 'https://timst.cfd/',
-    Origin: 'https://timst.cfd',
+    Referer: 'https://timst.top/',
+    Origin: 'https://timst.top',
   };
   var out = [];
   var seen = {};
@@ -251,6 +251,13 @@ function withName(row, name) {
 async function unlockEmbed(ctx, url, cfg) {
   var raw = String(url || '').trim();
   if (!raw) return null;
+
+  if (isEhgEmbedUrl(raw)) {
+    try {
+      var ehg = await resolveEhgEmbed(ctx, raw, cfg || {});
+      if (ehg && ehg.length) return ehg[0];
+    } catch (_) {}
+  }
 
   if (isGasmJwEmbedUrl(raw)) {
     try {

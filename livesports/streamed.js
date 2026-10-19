@@ -1,7 +1,7 @@
 // Unified live_sport plugin — catalog + resolve (streamed)
 // Catalog half (top-level)
 var SPECS = {
-  "origin": "https://streamed.pk",
+  "origin": "https://streamed.st",
   "embedOrigin": "https://embed.st"
 };
 
@@ -9,22 +9,23 @@ function ua() {
   return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 }
 
-function streamedHeaders() {
+function streamedHeaders(cfg) {
+  var origin = streamedOrigin(cfg);
   return {
     Accept: 'application/json',
-    Origin: 'https://streamed.pk',
-    Referer: 'https://streamed.pk/',
+    Origin: origin,
+    Referer: origin + '/',
     'User-Agent': ua(),
   };
 }
 
 function streamedOrigin(cfg) {
-  return cfg.origin.replace(/\/$/, '');
+  return String((cfg && cfg.origin) || SPECS.origin).replace(/\/$/, '');
 }
 
 async function fetchJson(ctx, path, cfg) {
   var base = streamedOrigin(cfg);
-  var res = await ctx.fetch(base + path, { headers: streamedHeaders() });
+  var res = await ctx.fetch(base + path, { headers: streamedHeaders(cfg) });
   if (!res.ok) throw new Error('streamed ' + path + ' ' + res.status);
   return res.json();
 }
@@ -175,7 +176,7 @@ async function catalogExtract(ctx) {
 // Resolve half (closed scope — no name collisions with catalog)
 var __resolveExtract = (function () {
 var SPECS = {
-  "origin": "https://streamed.pk",
+  "origin": "https://streamed.st",
   "embedOrigin": "https://embed.st"
 };
 

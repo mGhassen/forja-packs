@@ -117,11 +117,6 @@ function hubPosterTypeLabel(meta) {
     return 'DRAMA';
   }
   if (kind === 'anime' || surface === 'anime') return 'ANIME';
-  // Pinned from a hub (Arabic, Kids, …) — show that hub, not FILM / TV.
-  var hubLabel = String(meta.hubLabel || '').trim();
-  if (hubLabel && surface && surface !== 'tmdb') {
-    return hubLabel.toUpperCase();
-  }
   if (hint === 'tv' || kind === 'tv' || kind === 'series' || kind === 'shows') {
     return 'TV';
   }
@@ -382,6 +377,8 @@ function hubPaintPoster(item, opts) {
   if (mediaType === 'movie' || mediaType === 'tv') {
     paint.props.mediaType = mediaType;
   }
+  var listStatus = String(meta.listStatus || meta.status || '').trim();
+  if (listStatus) paint.props.listStatus = listStatus;
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
   if (meta.background || meta.backdrop || opts.backdropUrl) {
     paint.props.backdropUrl = String(

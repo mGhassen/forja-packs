@@ -475,6 +475,24 @@ function looksLikeImageMagic(bytes) {
   );
 }
 
+/** RIFF/WEBP (or similar) whose payload is MPEG-TS — HLS proxy unwraps these. */
+function bytesHaveMpegTsInImageShell(bytes) {
+  if (!bytes || bytes.length < 200) return false;
+  var isWebp =
+    (bytes[0] & 0xff) === 0x52 &&
+    (bytes[1] & 0xff) === 0x49 &&
+    (bytes[8] & 0xff) === 0x57 &&
+    (bytes[9] & 0xff) === 0x45;
+  if (!isWebp) return false;
+  var limit = Math.min(bytes.length - 188, 8192);
+  for (var i = 0; i < limit; i++) {
+    if ((bytes[i] & 0xff) === 0x47 && (bytes[i + 188] & 0xff) === 0x47) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function resolvePlaylistUri(baseUrl, line) {
   var ref = String(line || '').trim();
   if (!ref) return '';
@@ -535,11 +553,6 @@ async function mediaPlaylistIsPlayable(ctx, mediaUrl, headers, bodyText) {
     if (abs) segs.push(abs);
   }
   if (!segs.length) return false;
-  var bait = 0;
-  for (var b = 0; b < segs.length; b++) {
-    if (isImageBaitUri(segs[b])) bait++;
-  }
-  if (bait === segs.length) return false;
   var sample = segs[0];
   for (var s = 0; s < segs.length; s++) {
     if (!isImageBaitUri(segs[s])) {
@@ -551,8 +564,12 @@ async function mediaPlaylistIsPlayable(ctx, mediaUrl, headers, bodyText) {
   if (!segRes.ok) return false;
   var buf = await arrayBuffer(segRes);
   var bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  if (looksLikeImageMagic(bytes.subarray(0, 16))) return false;
-  return bytes.length > 0;
+  if (!bytes.length) return false;
+  // Pure stills fail; WebP/PNG shells that wrap MPEG-TS are playable via /hls-proxy.
+  if (looksLikeImageMagic(bytes.subarray(0, 16))) {
+    return bytesHaveMpegTsInImageShell(bytes);
+  }
+  return true;
 }
 
 /**
@@ -639,6 +656,113 @@ function isEpiEmbedsUrl(url) {
   } catch (_) {
     return false;
   }
+}
+
+/** TimStreams / Live TV short embeds (ehgembxe → embeds.gay XOR playlist). */
+function isEhgEmbedUrl(url) {
+  try {
+    var host = new URL(String(url || '').trim()).host.toLowerCase();
+    return host === 'ehgembxe.cfd' || host.endsWith('.ehgembxe.cfd');
+  } catch (_) {
+    return false;
+  }
+}
+
+function xorDecodePackedEvalScript(js) {
+  var body = String(js || '');
+  var m = body.match(/\[([0-9,]{80,})\],\w+=(\d+),\w+=(\d+)/);
+  if (!m || body.indexOf('fromCharCode') < 0) return '';
+  var nums = m[1].split(',');
+  var nq = parseInt(m[2], 10);
+  var wv = parseInt(m[3], 10);
+  if (!isFinite(nq) || !isFinite(wv)) return '';
+  var out = '';
+  for (var i = 0; i < nums.length; i++) {
+    var n = parseInt(nums[i], 10);
+    if (!isFinite(n)) continue;
+    out += String.fromCharCode(((n ^ nq) - wv + 256) % 256);
+  }
+  return out;
+}
+
+function extractEmbedsGayTokenUrl(html) {
+  var raw = String(html || '');
+  var direct = raw.match(/https?:\/\/[^\"'\s<>]*embeds\.gay\/p\/[a-f0-9]+/i);
+  if (direct) return direct[0];
+  var parts = raw.split(/<\/script>/i);
+  for (var i = 0; i < parts.length; i++) {
+    var decoded = xorDecodePackedEvalScript(parts[i]);
+    if (!decoded) continue;
+    var hit = decoded.match(/https?:\/\/[^\"'\s]+\/p\/[a-f0-9]+/i);
+    if (hit) return hit[0];
+  }
+  return '';
+}
+
+async function decryptEmbedsGayPlaylist(ctx, tokenUrl) {
+  var tUrl = String(tokenUrl || '').trim();
+  if (!tUrl) return '';
+  var res = await ctx.fetch(tUrl, {
+    headers: {
+      'User-Agent': ua(),
+      Accept: '*/*',
+      Referer: 'https://ehgembxe.cfd/',
+    },
+  });
+  if (!res || !res.ok) return '';
+  var buf = await arrayBuffer(res);
+  var bytes = new Uint8Array(buf);
+  if (bytes.length < 2) return '';
+  var tk = tUrl.replace(/\/+$/, '').split('/').pop() || '';
+  if (!tk) return '';
+  var s0 = bytes[0];
+  var out = '';
+  for (var i = 1; i < bytes.length; i++) {
+    out += String.fromCharCode(
+      bytes[i] ^ tk.charCodeAt((i - 1) % tk.length) ^ ((s0 + i - 1) & 255),
+    );
+  }
+  return out.trim();
+}
+
+async function resolveEhgEmbed(ctx, embedUrl, cfg) {
+  var raw = String(embedUrl || '').trim();
+  if (!raw || !isEhgEmbedUrl(raw)) return null;
+  var pageRes = await ctx.fetch(raw, {
+    headers: {
+      'User-Agent': ua(),
+      Accept: 'text/html,application/xhtml+xml',
+      Referer: String((cfg && cfg.origin) || 'https://timst.top').replace(/\/$/, '') + '/',
+      Origin: String((cfg && cfg.origin) || 'https://timst.top').replace(/\/$/, ''),
+    },
+  });
+  if (!pageRes || !pageRes.ok) return null;
+  var html = await pageRes.text();
+  var tUrl = extractEmbedsGayTokenUrl(html);
+  if (!tUrl) return null;
+  var signed = await decryptEmbedsGayPlaylist(ctx, tUrl);
+  if (!signed || !/\.m3u8/i.test(signed)) return null;
+  var origin = '';
+  try {
+    origin = new URL(raw).origin;
+  } catch (_) {
+    origin = 'https://ehgembxe.cfd';
+  }
+  var headers = {
+    Referer: origin + '/',
+    Origin: origin,
+    'User-Agent': ua(),
+  };
+  var playable = await selectPlayableM3u8(ctx, signed, headers);
+  if (!playable) return null;
+  return [
+    {
+      url: playable,
+      headers: headers,
+      // TikTok WebP-shelled TS — MediaKit needs /hls-proxy unwrap (not direct).
+      directPlayback: false,
+    },
+  ];
 }
 
 function isEmbedIndiaUrl(url) {
