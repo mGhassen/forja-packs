@@ -102,21 +102,30 @@ function frAnimeEpisode(ctx) {
   return ctx.type === 'movie' ? 1 : Number(ctx.mappedEpisode || ctx.episode || 1) || 1;
 }
 
-// Site searches match title substrings, so also try the head before ':' and the first two words.
+// Site searches match title substrings. VoirAnime rejects long phrases and tokens with
+// apostrophes ("Chillin'" → none; "Chillin" → hits), so also try bare + first-word forms.
+// Shortest first: FindSlug is sequential and stops on score ≥ 1 — long VA misses are slow.
 function frAnimeQueries(titles) {
   var out = [];
   function add(q) {
-    q = String(q || '').trim();
+    q = String(q || '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (q && out.indexOf(q) < 0) out.push(q);
+    var bare = q.replace(/[''ʼ`]/g, '').replace(/\s+/g, ' ').trim();
+    if (bare && bare !== q && out.indexOf(bare) < 0) out.push(bare);
   }
   titles.forEach(function (t) {
     add(t);
     var head = t.split(/\s*[:–]\s*|\s+-\s+/)[0].trim();
     add(head);
-    var words = head.split(/\s+/);
+    var words = head.split(/\s+/).filter(Boolean);
     if (words.length > 2) add(words.slice(0, 2).join(' '));
+    if (words.length > 1) add(words[0]);
   });
-  return out;
+  return out.sort(function (a, b) {
+    return a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
+  });
 }
 
 // names: [title, …alt names] → 1 exact · 0.9 exact before ':' · 0.7 prefix · 0.5 substring · 0

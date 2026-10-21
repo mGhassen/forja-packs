@@ -30,16 +30,21 @@ function extract(ctx) {
       })
       .then(function (html) {
         var hits = [];
-        var re = /<a\s+href="[^"]*\/catalogue\/([^"\/]+)\/?"[\s\S]*?search-result-title">([^<]*)<\/h3>(?:\s*<p[^>]*search-result-subtitle">([^<]*)<\/p>)?/gi;
+        // Titles wrap the match in <mark>; meta <p> sits between title and subtitle.
+        var re =
+          /<a\s+href="[^"]*\/catalogue\/([^"\/]+)\/?"[\s\S]*?search-result-title">([\s\S]*?)<\/h3>(?:[\s\S]*?search-result-subtitle">([\s\S]*?)<\/p>)?/gi;
         var m;
+        function plain(s) {
+          return frAnimeDecodeEntities(String(s || '').replace(/<[^>]+>/g, '')).trim();
+        }
         while ((m = re.exec(html)) !== null) {
-          var names = [frAnimeDecodeEntities(m[2]).trim()];
-          frAnimeDecodeEntities(m[3] || '')
+          var names = [plain(m[2])].filter(Boolean);
+          plain(m[3] || '')
             .split(',')
             .forEach(function (n) {
               if (n.trim()) names.push(n.trim());
             });
-          hits.push({ slug: m[1], names: names });
+          if (names.length) hits.push({ slug: m[1], names: names });
         }
         return hits;
       });

@@ -32,7 +32,10 @@ function extract(ctx) {
         var hits = [];
         var re = /<a\s+href="\/([^"\/]+)\/"\s+class="va-search-result"[\s\S]*?va-search-result-title">([^<]*)<\/span>/gi;
         var m;
-        while ((m = re.exec(html)) !== null) hits.push({ slug: m[1], names: [frAnimeDecodeEntities(m[2]).trim()] });
+        while ((m = re.exec(html)) !== null) {
+          var name = frAnimeDecodeEntities(String(m[2] || '').replace(/<[^>]+>/g, '')).trim();
+          if (name) hits.push({ slug: m[1], names: [name] });
+        }
         return hits;
       });
   }

@@ -3,15 +3,13 @@
 
 var ANILIST_DEFAULTS = {
   graphql: 'https://graphql.anilist.co',
-  // Offline AniList catalog — used when graphql.anilist.co is down (403/5xx).
+  // Offline AniList catalog — raced when graphql.anilist.co is down/hanging.
   graphqlMirrors: ['https://graphql.aniraku.tech/'],
   perPage: 24,
 };
 
 // Shared cooldown across extract runs in the same engine isolate.
 var _anilistCooldownUntilMs = 0;
-// Sticky mirror after primary fails — skip dead AniList on later queries.
-var _anilistPreferredEndpoint = '';
 
 var ANILIST_CARD_FIELDS = [
   'id',
@@ -469,7 +467,7 @@ function anilistArmCooldown(res) {
   _anilistCooldownUntilMs = Date.now() + retryAfter * 1000;
 }
 
-function anilistGraphqlEndpoints(cfg) {
+function anilistGraphqlEndpoints(cfg, skipPrimary) {
   var primary = String(
     (cfg && cfg.graphql) || ANILIST_DEFAULTS.graphql || '',
   ).trim();
@@ -483,33 +481,73 @@ function anilistGraphqlEndpoints(cfg) {
     seen[u] = true;
     out.push(u);
   }
-  if (_anilistPreferredEndpoint) add(_anilistPreferredEndpoint);
-  add(primary);
+  if (!skipPrimary) add(primary);
   for (var i = 0; i < mirrors.length; i++) add(mirrors[i]);
   return out;
+}
+
+function anilistIsOutageMessage(msg, errObj) {
+  msg = String(msg || '');
+  if (/temporarily disabled/i.test(msg)) return true;
+  if (/stability issues/i.test(msg)) return true;
+  if (/too many requests/i.test(msg) || /\b429\b/.test(msg)) return true;
+  if (errObj && Number(errObj.status) === 403) return true;
+  return false;
 }
 
 function anilistShouldFailoverStatus(status) {
   if (status === 403 || status === 429) return true;
   if (status === 502 || status === 503 || status === 504) return true;
-  return status >= 500;
+  return status >= 500 || status === 0;
 }
 
+// One POST → data or reject. Treats AniList "temporarily disabled" as failure.
+function anilistFetchOnce(ctx, url, headers, body) {
+  return ctx.fetch(url, { method: 'POST', headers: headers, body: body }).then(
+    function (res) {
+      if (anilistShouldFailoverStatus(res.status) || !res.ok) {
+        if (res.status === 429) anilistArmCooldown(res);
+        throw new Error('anilist HTTP ' + res.status + ' @ ' + url);
+      }
+      return res.json().then(function (json) {
+        if (json && json.errors && json.errors.length) {
+          var err0 = json.errors[0] || {};
+          var msg = String(err0.message || '');
+          if (anilistIsOutageMessage(msg, err0)) {
+            if (/too many requests/i.test(msg) || /\b429\b/.test(msg)) {
+              anilistArmCooldown(res);
+            }
+            throw new Error(msg || 'anilist outage @ ' + url);
+          }
+          throw new Error(msg || 'anilist error');
+        }
+        if (!json || !json.data) {
+          throw new Error('anilist empty @ ' + url);
+        }
+        return { url: url, data: json.data };
+      });
+    },
+  );
+}
+
+// Race primary + mirrors. First valid payload wins — AniList hang must not block.
 function anilistQuery(ctx, cfg, query, variables) {
   var now = Date.now();
-  if (now < _anilistCooldownUntilMs) {
-    var waitSec = Math.max(1, Math.ceil((_anilistCooldownUntilMs - now) / 1000));
-    return Promise.reject(
-      new Error('anilist rate limited; retry in ' + waitSec + 's'),
-    );
-  }
-  var endpoints = anilistGraphqlEndpoints(cfg);
-  if (!endpoints.length) {
-    return Promise.reject(new Error('anilist: no graphql endpoint'));
-  }
+  var cooling = now < _anilistCooldownUntilMs;
   var primary = String(
     (cfg && cfg.graphql) || ANILIST_DEFAULTS.graphql || '',
   ).trim();
+  // On AniList 429 cooldown, skip primary and use mirrors only.
+  var endpoints = anilistGraphqlEndpoints(cfg, cooling);
+  if (!endpoints.length) {
+    if (cooling) {
+      var waitSec = Math.max(1, Math.ceil((_anilistCooldownUntilMs - now) / 1000));
+      return Promise.reject(
+        new Error('anilist rate limited; retry in ' + waitSec + 's'),
+      );
+    }
+    return Promise.reject(new Error('anilist: no graphql endpoint'));
+  }
   // AniList Cloudflare rejects bare POSTs (fake 403 "temporarily disabled").
   // Browser / Apollo send anilist.co Referer; Origin alone is not enough.
   var headers = {
@@ -520,55 +558,32 @@ function anilistQuery(ctx, cfg, query, variables) {
   };
   var body = JSON.stringify({ query: query, variables: variables || {} });
 
-  function tryAt(i) {
-    if (i >= endpoints.length) {
-      return Promise.reject(new Error('anilist unreachable'));
-    }
-    var url = endpoints[i];
-    var hasNext = i + 1 < endpoints.length;
-    return ctx
-      .fetch(url, { method: 'POST', headers: headers, body: body })
-      .then(
-        function (res) {
-          if (res.status === 429) {
-            if (hasNext) return tryAt(i + 1);
-            anilistArmCooldown(res);
-            throw new Error('anilist HTTP 429');
-          }
-          if (!res.ok) {
-            if (anilistShouldFailoverStatus(res.status) && hasNext) {
-              if (url === _anilistPreferredEndpoint) {
-                _anilistPreferredEndpoint = '';
-              }
-              return tryAt(i + 1);
-            }
-            throw new Error('anilist HTTP ' + res.status);
-          }
-          return res.json().then(function (json) {
-            if (json && json.errors && json.errors.length) {
-              var msg = String(json.errors[0].message || '');
-              if (/too many requests/i.test(msg) || /\b429\b/.test(msg)) {
-                if (hasNext) return tryAt(i + 1);
-                anilistArmCooldown(res);
-                throw new Error('anilist HTTP 429');
-              }
-              throw new Error(msg || 'anilist error');
-            }
-            if (url && url !== primary) _anilistPreferredEndpoint = url;
-            return json && json.data ? json.data : {};
-          });
-        },
-        function (err) {
-          if (url === _anilistPreferredEndpoint) {
-            _anilistPreferredEndpoint = '';
-          }
-          if (hasNext) return tryAt(i + 1);
-          throw err;
-        },
-      );
-  }
+  return new Promise(function (resolve, reject) {
+    var left = endpoints.length;
+    var lastErr = null;
+    var won = false;
 
-  return tryAt(0);
+    function onFail(err) {
+      lastErr = err;
+      left -= 1;
+      if (!won && left <= 0) {
+        reject(lastErr || new Error('anilist unreachable'));
+      }
+    }
+
+    function onWin(hit) {
+      if (won) return;
+      won = true;
+      if (hit.url && hit.url !== primary) {
+        console.warn('[anilist] failover → ' + hit.url);
+      }
+      resolve(hit.data);
+    }
+
+    for (var i = 0; i < endpoints.length; i++) {
+      anilistFetchOnce(ctx, endpoints[i], headers, body).then(onWin, onFail);
+    }
+  });
 }
 
 function anilistRailItemsFromList(railId, list, preferred) {
