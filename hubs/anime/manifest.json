@@ -4,7 +4,7 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.53",
+  "version": "1.0.54",
   "tags": [
     "anime"
   ],
@@ -107,6 +107,9 @@
       "enrich": "anime-enrich-tmdb",
       "config": {
         "graphql": "https://graphql.anilist.co",
+        "graphqlMirrors": [
+          "https://graphql.aniraku.tech/"
+        ],
         "perPage": 24
       },
       "prelude": "_kit.js,_search.js,_layout.js"
