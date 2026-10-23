@@ -1334,7 +1334,7 @@ async function iptvSetActiveKey(ctx, key) {
 
 function iptvPortalPublic(portal) {
   if (!portal) return null;
-  return {
+  var out = {
     key: iptvPortalKey(portal),
     label: String(portal.label || portal.name || portal.username || '').trim(),
     url: String(portal.url || '').trim(),
@@ -1344,6 +1344,9 @@ function iptvPortalPublic(portal) {
     maxConnections: portal.maxConnections,
     expiry: portal.expiry,
   };
+  var addedAt = String((portal && portal.addedAt) || '').trim();
+  if (addedAt) out.addedAt = addedAt;
+  return out;
 }
 
 function iptvPortalFromParams(p) {
@@ -1394,12 +1397,24 @@ async function iptvUpsertPortalRow(ctx, portal, opts) {
   var found = false;
   for (var i = 0; i < portals.length; i++) {
     if (iptvSamePortalKey(iptvPortalKey(portals[i]), key)) {
-      portals[i] = Object.assign({}, portals[i], portal, { key: key });
+      var prev = portals[i] || {};
+      portals[i] = Object.assign({}, prev, portal, {
+        key: key,
+        addedAt: prev.addedAt || portal.addedAt || new Date().toISOString(),
+      });
       found = true;
       break;
     }
   }
-  if (!found) portals.push(Object.assign({}, portal, { key: key }));
+  if (!found) {
+    // Newest insert first — host also sorts by addedAt desc.
+    portals.unshift(
+      Object.assign({}, portal, {
+        key: key,
+        addedAt: portal.addedAt || new Date().toISOString(),
+      }),
+    );
+  }
   await iptvSavePortals(ctx, portals);
   if (o.select !== false) await iptvSetActiveKey(ctx, key);
   return portals;
@@ -1510,7 +1525,7 @@ function iptvPortalListItem(portal, activeKey) {
   var pub = iptvPortalPublic(portal);
   if (!pub || !pub.key) return null;
   var label = pub.label || pub.username || pub.key;
-  return {
+  var item = {
     id: pub.key,
     type: 'portal',
     kind: 'portal',
@@ -1537,6 +1552,8 @@ function iptvPortalListItem(portal, activeKey) {
       portalKey: pub.key,
     },
   };
+  if (pub.addedAt) item.addedAt = pub.addedAt;
+  return item;
 }
 
 /** Side-panel layout token — foundation paints portalList from items. */

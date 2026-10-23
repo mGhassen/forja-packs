@@ -42,6 +42,10 @@ function myListLayout() {
                 statusTab: 'status',
                 // ↑ from top-row posters → status tabs (status↓ already → grid).
                 focusUp: 'status',
+                // Desktop baseline; TV × chromeScale → slightly larger than
+                // default 100px film posters, denser titles.
+                cardWidth: 170,
+                titleFontSize: 12,
                 emptyTitle: 'Nothing in this list yet',
                 emptyDescription:
                   'Open a title and tap + to set a watch status.',
