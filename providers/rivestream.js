@@ -103,6 +103,10 @@ function extract(ctx) {
         }
         var sources = data.data.sources;
         if (!Array.isArray(sources) || !sources.length) return [];
+        var subs = forjaCaptionsToSubtitles(
+          data.data.captions,
+          'RiveStream',
+        );
         var rows = [];
         sources.forEach(function (src) {
           if (!src || typeof src !== 'object') return;
@@ -111,12 +115,14 @@ function extract(ctx) {
           seen[rawUrl] = true;
           var srcName = String(src.source || provider);
           var quality = String(src.quality || 'Auto');
-          rows.push({
+          var row = {
             url: rawUrl,
             name: '[Rive - ' + srcName + '] ' + quality,
             quality: quality,
             headers: playHeaders,
-          });
+          };
+          if (subs.length) row.subtitles = subs;
+          rows.push(row);
         });
         return rows;
       })

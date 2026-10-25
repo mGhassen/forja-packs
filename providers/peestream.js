@@ -72,13 +72,19 @@ function extract(ctx) {
             } else {
               reqHeaders = { 'User-Agent': ua };
             }
-            rows.push({
+            var row = {
               url: streamUrl,
               name: 'PeeStream · ' + sourceId + ' · ' + quality,
               quality: quality,
               type: 'hls',
               headers: reqHeaders,
-            });
+            };
+            var subs = forjaCaptionsToSubtitles(
+              stream.captions,
+              'PeeStream',
+            );
+            if (subs.length) row.subtitles = subs;
+            rows.push(row);
           } catch (e) {}
         });
         return rows;
@@ -125,13 +131,19 @@ function extract(ctx) {
             if (!streamUrl) return;
             var stName = String(st.name || pName);
             var quality = String(st.quality || '1080p');
-            rows.push({
+            var row = {
               url: streamUrl,
               name: 'PeeStream · ' + stName + ' · ' + quality,
               quality: quality,
               type: 'hls',
               headers: { 'User-Agent': ua },
-            });
+            };
+            var subs = forjaCaptionsToSubtitles(
+              st.captions || st.subtitles || result.captions,
+              'PeeStream',
+            );
+            if (subs.length) row.subtitles = subs;
+            rows.push(row);
           });
         });
         return rows;

@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.73",
+  "version": "1.6.76",
   "tags": [
     "providers",
     "anime",
@@ -33,7 +33,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "id": "vixsrc",
@@ -357,7 +358,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "id": "vidcore",
@@ -401,7 +403,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "id": "cinejoy",
@@ -612,7 +615,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "id": "megaplay",
@@ -1284,7 +1288,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "id": "animedunya",
@@ -1656,7 +1661,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "kind": "http",
@@ -1756,7 +1762,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "kind": "http",
@@ -2061,7 +2068,8 @@
           "kind": "dub",
           "code": "en"
         }
-      ]
+      ],
+      "prelude": "_subtitles.js"
     },
     {
       "kind": "http",
@@ -2794,6 +2802,7 @@
     "vidzee.js",
     "multiembed.js",
     "kisskh.js",
+    "_subtitles.js",
     "_kisskh_kkey.js",
     "larozaa.js",
     "_streamcrypto.js",

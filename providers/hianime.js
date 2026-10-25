@@ -114,14 +114,15 @@ function extract(ctx) {
             file = parsed.toString();
           } catch (e) {}
         }
-        return [
-          {
-            url: file,
-            name: 'HiAnime [' + name + '] (' + kind.toUpperCase() + ')',
-            language: kind === 'dub' ? 'Dub' : 'Sub',
-            headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
-          },
-        ];
+        var row = {
+          url: file,
+          name: 'HiAnime [' + name + '] (' + kind.toUpperCase() + ')',
+          language: kind === 'dub' ? 'Dub' : 'Sub',
+          headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+        };
+        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'HiAnime');
+        if (subs.length) row.subtitles = subs;
+        return [row];
       })
       .catch(function () {
         return [];

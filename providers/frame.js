@@ -62,12 +62,18 @@ function extract(ctx) {
             if (!sUrl) return;
             var quality =
               stream.quality != null ? String(stream.quality) : '1080p';
-            rows.push({
+            var row = {
               url: sUrl,
               name: 'FRAME ' + p.name + ' · ' + quality,
               quality: quality,
               headers: playHeaders,
-            });
+            };
+            var subs = forjaCaptionsToSubtitles(
+              stream.captions || stream.subtitles || result.captions,
+              'FRAME',
+            );
+            if (subs.length) row.subtitles = subs;
+            rows.push(row);
           });
         });
         return rows;

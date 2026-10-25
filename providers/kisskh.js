@@ -257,6 +257,7 @@ function extract(ctx) {
                     language: label,
                     name: label,
                     content: text,
+                    sourceName: 'KissKh',
                   };
                 });
               })

@@ -120,15 +120,16 @@ function extract(ctx) {
             file = parsed.toString();
           } catch (e) {}
         }
-        return [
-          {
-            url: file,
-            name: 'AnimeKai [' + name + '] (' + kind.toUpperCase() + ')',
-            language: kind === 'dub' ? 'Dub' : 'Sub',
-            headers: { 'User-Agent': ua, Referer: host + '/', Origin: host },
-            pngStrip: 'auto',
-          },
-        ];
+        var row = {
+          url: file,
+          name: 'AnimeKai [' + name + '] (' + kind.toUpperCase() + ')',
+          language: kind === 'dub' ? 'Dub' : 'Sub',
+          headers: { 'User-Agent': ua, Referer: host + '/', Origin: host },
+          pngStrip: 'auto',
+        };
+        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'AnimeKai');
+        if (subs.length) row.subtitles = subs;
+        return [row];
       })
       .catch(function () {
         return [];

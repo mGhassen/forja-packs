@@ -208,6 +208,8 @@ function extract(ctx) {
   function rowsFromData(data, title) {
     var out = [];
     var playlists = [];
+    var stream = data.stream;
+    var subs = forjaCaptionsToSubtitles(stream && stream.captions, 'VidLink');
     function push(url, quality, upstream, needsProxy) {
       if (!url) return;
       var hdrs = headersForUrl(url, upstream);
@@ -219,10 +221,10 @@ function extract(ctx) {
         headers: hdrs,
       };
       if (needsProxy) row.requiresProxy = true;
+      if (subs.length) row.subtitles = subs;
       out.push(row);
       if (ctx.emit) ctx.emit(row);
     }
-    var stream = data.stream;
     var playlistUrl = stream && stream.playlist;
     var isDash =
       (stream && stream.deliveryType === 'dash') ||
@@ -347,12 +349,16 @@ function extract(ctx) {
         ' playlist=' +
         (stream.playlist ? 'yes' : 'no') +
         ' qualities=' +
-        (stream.qualities ? 'yes' : 'no'),
+        (stream.qualities ? 'yes' : 'no') +
+        ' captions=' +
+        ((stream.captions && stream.captions.length) || 0),
       );
       return rowsFromData(data, ctx.title || 'Vidlink');
     })
     .then(function (rows) {
-      log('rows=' + ((rows && rows.length) || 0));
+      var nSubs =
+        rows && rows[0] && rows[0].subtitles ? rows[0].subtitles.length : 0;
+      log('rows=' + ((rows && rows.length) || 0) + ' subtitles=' + nSubs);
       return rows;
     })
     .catch(function (e) {

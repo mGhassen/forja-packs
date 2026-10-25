@@ -399,15 +399,19 @@ function extract(ctx) {
                 }
                 return extractEmbedSource(embedUrl).then(function (extracted) {
                   if (extracted && extracted.data && extracted.data.sources && extracted.data.sources.file) {
-                    return [
-                      {
-                        url: extracted.data.sources.file,
-                        name: 'Anikoto ' + item.name,
-                        headers: { 'User-Agent': ua, Referer: extracted.origin + '/' },
-                        language: audio === 'dub' ? 'Dub' : 'Sub',
-                        pngStrip: 'auto',
-                      },
-                    ];
+                    var row = {
+                      url: extracted.data.sources.file,
+                      name: 'Anikoto ' + item.name,
+                      headers: { 'User-Agent': ua, Referer: extracted.origin + '/' },
+                      language: audio === 'dub' ? 'Dub' : 'Sub',
+                      pngStrip: 'auto',
+                    };
+                    var subs = forjaMegaplayTracksToSubtitles(
+                      extracted.data.tracks,
+                      'Anikoto',
+                    );
+                    if (subs.length) row.subtitles = subs;
+                    return [row];
                   }
                   return ctx.hop(embedUrl).then(function (rows) {
                     return rows.map(function (r) {

@@ -80,6 +80,10 @@ function extract(ctx) {
 
   function rowsFromPayload(payload) {
     var hdrs = playHeaders(payload && payload.referer);
+    var payloadSubs = forjaCaptionsToSubtitles(
+      (payload && (payload.captions || payload.subtitles)) || [],
+      'Hexa',
+    );
     if (payload && Array.isArray(payload.sources) && payload.sources.length) {
       return Promise.resolve(
         payload.sources
@@ -90,12 +94,19 @@ function extract(ctx) {
             var label = 'Hexa';
             if (s.server) label += ' ' + s.server;
             else if (s.quality) label += ' ' + s.quality;
-            return {
+            var row = {
               url: s.url,
               name: label,
               quality: s.quality || '',
               headers: hdrs,
             };
+            var subs = forjaCaptionsToSubtitles(
+              s.captions || s.subtitles,
+              'Hexa',
+            );
+            if (!subs.length) subs = payloadSubs;
+            if (subs.length) row.subtitles = subs;
+            return row;
           }),
       );
     }
