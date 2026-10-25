@@ -150,19 +150,65 @@ function ppvHeaders(cfg) {
   };
 }
 
-function ppvIframesFromDetail(data) {
+/** Host paints `Ppv · {language}` — emit broadcast/lang only, not a PPV prefix. */
+function ppvMirrorLabel(data) {
+  var tag = String((data && (data.source_tag || data.tag)) || '').trim();
+  var locale = String((data && data.locale) || '').trim().toLowerCase();
+  if (tag && locale) return tag + ' (' + locale + ')';
+  if (tag) return tag;
+  if (locale) return locale;
+  return 'Stream';
+}
+
+function ppvUrlsFromNode(data) {
   if (!data) return [];
-  var sources = data.sources;
-  if (!Array.isArray(sources)) return [];
   var out = [];
   var seen = {};
-  for (var i = 0; i < sources.length; i++) {
-    var s = sources[i];
-    if (!s) continue;
-    var url = String(s.data || s.url || '').trim();
-    if (!url || !/^https?:/i.test(url) || seen[url]) continue;
-    seen[url] = 1;
-    out.push(url);
+  function push(url) {
+    var u = String(url || '').trim();
+    if (!u || !/^https?:/i.test(u) || seen[u]) return;
+    seen[u] = 1;
+    out.push(u);
+  }
+  var top = String(data.iframe || '').trim();
+  if (top) push(top);
+  var sources = data.sources;
+  if (Array.isArray(sources)) {
+    for (var i = 0; i < sources.length; i++) {
+      var s = sources[i];
+      if (!s) continue;
+      push(s.data || s.url);
+    }
+  }
+  return out;
+}
+
+/** Parent + language/broadcast substreams → { url, name, language, id }. */
+function ppvMirrorsFromDetail(data) {
+  if (!data) return [];
+  var out = [];
+  var seen = {};
+  function addNode(node) {
+    if (!node) return;
+    var label = ppvMirrorLabel(node);
+    var nodeId = node.id != null ? String(node.id) : '';
+    var urls = ppvUrlsFromNode(node);
+    for (var i = 0; i < urls.length; i++) {
+      var url = urls[i];
+      if (seen[url]) continue;
+      seen[url] = 1;
+      out.push({
+        url: url,
+        name: label,
+        language: label,
+        id: nodeId,
+      });
+    }
+  }
+  addNode(data);
+  var subs = data.substreams;
+  if (Array.isArray(subs)) {
+    for (var j = 0; j < subs.length; j++) addNode(subs[j]);
   }
   return out;
 }
@@ -175,6 +221,51 @@ function ppvPlayableUrl(data) {
     if (url && /\.m3u8|\.mp4/i.test(url)) return url;
   }
   return '';
+}
+
+/** Schedule list row (iframe + nested substreams) — same shape as detail for mirrors. */
+function ppvFindListStream(data, streamId) {
+  var want = String(streamId || '');
+  if (!want || !data || !Array.isArray(data.streams)) return null;
+  var parentHit = null;
+  for (var c = 0; c < data.streams.length; c++) {
+    var cat = data.streams[c];
+    var rows = (cat && cat.streams) || [];
+    for (var i = 0; i < rows.length; i++) {
+      var s = rows[i];
+      if (!s || s.id == null) continue;
+      if (String(s.id) === want) return s;
+      var subs = s.substreams;
+      if (!Array.isArray(subs)) continue;
+      for (var j = 0; j < subs.length; j++) {
+        var sub = subs[j];
+        if (sub && sub.id != null && String(sub.id) === want) {
+          // Substream detail 404s — expand from parent list row.
+          return s;
+        }
+      }
+      if (!parentHit && String(s.uri_name || '') === want) parentHit = s;
+    }
+  }
+  return parentHit;
+}
+
+function ppvPushMirrors(out, seen, mirrors, headers) {
+  for (var j = 0; j < mirrors.length; j++) {
+    var mirror = mirrors[j];
+    var embed = mirror && mirror.url;
+    if (!embed || seen[embed]) continue;
+    seen[embed] = 1;
+    var label = (mirror && (mirror.language || mirror.name)) || 'Stream';
+    out.push({
+      url: embed,
+      name: label,
+      language: label,
+      id: mirror && mirror.id ? String(mirror.id) : undefined,
+      headers: headers,
+      directPlayback: false,
+    });
+  }
 }
 
 async function unlockPpvEmbed(ctx, iframe, cfg, headers) {
@@ -190,9 +281,10 @@ async function unlockPpvEmbed(ctx, iframe, cfg, headers) {
     };
   }
   try {
-    if (isEmbedIndiaUrl(raw)) {
-      var embedIndia = await resolveEmbedIndia(ctx, raw, cfg);
-      if (embedIndia && embedIndia.length) return embedIndia[0];
+    // taifood-blog.asia / embedindia — path POST /fetch + island gasm.
+    if (isGasmJwEmbedUrl(raw)) {
+      var gasm = await resolveEmbedIndia(ctx, raw, cfg);
+      if (gasm && gasm.length) return gasm[0];
     }
     if (raw.indexOf('embed.st') >= 0) {
       var embedResolved = await resolveGoatEmbed(ctx, raw, cfg);
@@ -236,33 +328,41 @@ async function listPpv(ctx, cfg) {
       });
       var base = apis[i].replace(/\/$/, '');
       var detail = await ctx.fetch(base + '/' + streamId, { headers: apiHeaders });
-      if (!detail.ok) continue;
-      var body = await detail.json();
-      if (!body || body.success !== true || !body.data) continue;
-      headers = apiHeaders;
-      var direct = ppvPlayableUrl(body.data);
-      if (direct && !seen[direct]) {
-        seen[direct] = 1;
-        out.push({
-          url: direct,
-          name: 'PPV',
-          headers: headers,
-          directPlayback: true,
-        });
+      if (detail.ok) {
+        var body = await detail.json();
+        if (body && body.success === true && body.data) {
+          headers = apiHeaders;
+          var label = ppvMirrorLabel(body.data);
+          var direct = ppvPlayableUrl(body.data);
+          if (direct && !seen[direct]) {
+            seen[direct] = 1;
+            out.push({
+              url: direct,
+              name: label,
+              language: label,
+              id: body.data.id != null ? String(body.data.id) : streamId,
+              headers: headers,
+              directPlayback: true,
+            });
+          }
+          ppvPushMirrors(out, seen, ppvMirrorsFromDetail(body.data), headers);
+        }
       }
-      var fromDetail = ppvIframesFromDetail(body.data);
-      for (var j = 0; j < fromDetail.length; j++) {
-        var embed = fromDetail[j];
-        if (!embed || seen[embed]) continue;
-        seen[embed] = 1;
-        out.push({
-          url: embed,
-          name: 'PPV',
-          headers: headers,
-          directPlayback: false,
-        });
+      // Detail may omit substreams / 404 for substream ids — expand from schedule list.
+      if (out.length <= 1) {
+        var listRes = await ctx.fetch(base, { headers: apiHeaders });
+        if (listRes.ok) {
+          var listBody = await listRes.json();
+          if (listBody && listBody.success === true) {
+            var hit = ppvFindListStream(listBody, streamId);
+            if (hit) {
+              headers = apiHeaders;
+              ppvPushMirrors(out, seen, ppvMirrorsFromDetail(hit), headers);
+            }
+          }
+        }
       }
-      break;
+      if (out.length) break;
     } catch (_) {}
   }
   return out;

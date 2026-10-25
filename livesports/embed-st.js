@@ -699,13 +699,27 @@ function isEmbedIndiaUrl(url) {
   }
 }
 
+/** PPV player host — same /embed/{path} + POST /fetch + island gasm as embedindia. */
+function isPpvPlayerEmbedUrl(url) {
+  try {
+    var host = new URL(String(url || '').trim()).host.toLowerCase();
+    return host === 'taifood-blog.asia' || host.endsWith('.taifood-blog.asia');
+  } catch (_) {
+    return false;
+  }
+}
+
+function isGasmPathEmbedUrl(url) {
+  return isEmbedIndiaUrl(url) || isPpvPlayerEmbedUrl(url);
+}
+
 function isGasmJwEmbedUrl(url) {
-  return isEmbedIndiaUrl(url) || isEpiEmbedsUrl(url);
+  return isGasmPathEmbedUrl(url) || isEpiEmbedsUrl(url);
 }
 
 function parseEmbedIndiaUrl(raw) {
   var u = String(raw || '').trim();
-  if (!u || !isEmbedIndiaUrl(u)) return null;
+  if (!u || !isGasmPathEmbedUrl(u)) return null;
   try {
     var url = new URL(u);
     // Sports: /embed/{league}/{date}/{slug}
