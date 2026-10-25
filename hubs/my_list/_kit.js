@@ -386,6 +386,7 @@ function hubPaintPoster(item, opts) {
       meta.trackerLinkAction == null ? true : !!meta.trackerLinkAction;
     paint.props.trackerMark = {
       letter: 'S',
+      icon: 'simkl',
       linked: linked,
       openTrackerLink: openTracker,
     };

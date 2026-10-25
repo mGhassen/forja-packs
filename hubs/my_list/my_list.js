@@ -423,7 +423,17 @@ function myListLoadFeed(ctx, params) {
   status = String(status);
   var hiddenKeys = (params && params.hiddenKeys) || [];
 
-  return Promise.resolve(store.list({})).then(function (allLocal) {
+  // Pack opts in: host runs saved list mode when Settings auto-sync is on
+  // (throttled), then refreshes the Simkl library cache before we merge.
+  var ready =
+    simkl && typeof simkl.syncListsIfAuto === 'function'
+      ? Promise.resolve(simkl.syncListsIfAuto()).catch(function () {
+          return { synced: false };
+        })
+      : Promise.resolve({ synced: false });
+
+  return ready.then(function () {
+    return Promise.resolve(store.list({})).then(function (allLocal) {
     if (!Array.isArray(allLocal)) allLocal = [];
     var localForStatus = [];
     for (var i = 0; i < allLocal.length; i++) {
@@ -531,6 +541,7 @@ function myListLoadFeed(ctx, params) {
           return finish(mergeLocalHubs(filtered, localForStatus), true);
         },
       );
+    });
     });
   });
 }
