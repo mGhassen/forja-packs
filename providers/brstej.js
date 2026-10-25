@@ -1,6 +1,10 @@
 var SPECS = {
-  origin: 'https://hd1.brstej.com',
+  // Vanity entry — EngineJS follows redirects; first success pins the live host.
+  origin: 'https://brstej.com',
 };
+
+/** Final origin after redirect (e.g. brsteej.beer). Skips hops on later extracts. */
+var liveOrigin = '';
 
 var UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
@@ -33,6 +37,18 @@ function parseVid(raw) {
     return '';
   }
   return raw;
+}
+
+function baseOf(cfg) {
+  if (liveOrigin) return liveOrigin;
+  return String(cfg.origin || cfg.brstej || SPECS.origin).replace(/\/$/, '');
+}
+
+function rememberOrigin(url) {
+  try {
+    var o = new URL(String(url || ''));
+    if (o.protocol && o.host) liveOrigin = o.protocol + '//' + o.host;
+  } catch (e) {}
 }
 
 function pushEmbed(items, seen, embedUrl, referer, name) {
@@ -75,7 +91,7 @@ function collectBrstejServers($, rawHtml, referer) {
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var base = String(cfg.origin || cfg.brstej || SPECS.origin).replace(/\/$/, '');
+  var base = baseOf(cfg);
   var vid = parseVid(cfg.videoId || '');
   if (!vid) {
     ctx.log('brstej: missing videoId');
@@ -83,21 +99,15 @@ function extract(ctx) {
   }
 
   var url = base + '/play.php?vid=' + encodeURIComponent(vid);
-  var referer = base + '/watch.php?vid=' + encodeURIComponent(vid);
+  var referer = base + '/video.php?vid=' + encodeURIComponent(vid);
 
   return ctx
     .fetch(url, { headers: headers(referer) })
     .then(function (res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      // Prefer final host after hd1 → uo redirects.
-      try {
-        var finalUrl = String(res.url || url);
-        var o = new URL(finalUrl);
-        if (o.protocol && o.host) {
-          base = o.protocol + '//' + o.host;
-          referer = base + '/watch.php?vid=' + encodeURIComponent(vid);
-        }
-      } catch (e) {}
+      rememberOrigin(res.url || url);
+      base = baseOf(cfg);
+      referer = base + '/video.php?vid=' + encodeURIComponent(vid);
       return res.text();
     })
     .then(function (body) {

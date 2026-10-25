@@ -4,7 +4,7 @@
   "name": "ForjaHQ Aflem",
   "description": "Arabic series, films and TV shows from Brstej.",
   "author": "ForjaHQ",
-  "version": "1.0.27",
+  "version": "1.0.30",
   "tags": [
     "aflem",
     "arabic"
@@ -39,7 +39,7 @@
         }
       },
       "config": {
-        "origin": "https://hd1.brstej.com"
+        "origin": "https://brstej.com"
       },
       "prelude": "_kit.js,_search.js,_layout.js"
     }

@@ -1,13 +1,17 @@
 // Brstej hub — browse / search / details (protocol 1).
-// Aflem hub — scrape Brstej (hd1.brstej.com). Playback: provider `brstej`.
+// Aflem hub — scrape Brstej (brstej.com → live host). Playback: provider `brstej`.
 // Host surface: arabic.
 
 var BRSTEJ_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
+// Vanity entry — EngineJS follows redirects; first success pins the live host.
 var BRSTEJ_DEFAULTS = {
-  origin: 'https://hd1.brstej.com',
+  origin: 'https://brstej.com',
 };
+
+/** Final origin after redirect (e.g. brsteej.beer). Skips hops on later calls. */
+var brstejLiveOrigin = '';
 
 var BRSTEJ_FEED_RAILS = ['spotlight', 'latest', 'top'];
 
@@ -129,10 +133,16 @@ function brstejChromeOf(params) {
 }
 
 function brstejBase(cfg) {
+  if (brstejLiveOrigin) return brstejLiveOrigin;
   return String(cfg.origin || cfg.brstej || BRSTEJ_DEFAULTS.origin).replace(
     /\/$/,
     '',
   );
+}
+
+function brstejRememberOrigin(url) {
+  var o = brstejOrigin(url);
+  if (o) brstejLiveOrigin = o;
 }
 
 function brstejHeaders(referer) {
@@ -178,8 +188,10 @@ function brstejFetchHtml(ctx, url, referer) {
     .fetch(url, { headers: brstejHeaders(referer || brstejOrigin(url) + '/') })
     .then(function (res) {
       if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
+      var finalUrl = res.url || url;
+      brstejRememberOrigin(finalUrl);
       return res.text().then(function (html) {
-        return { html: html, url: res.url || url };
+        return { html: html, url: finalUrl };
       });
     });
 }
@@ -221,7 +233,73 @@ function brstejPickPoster($, base) {
   return '';
 }
 
+function brstejCleanText(raw) {
+  return String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Category chips that are site chrome, not genres. */
+var BRSTEJ_GENRE_SKIP = {
+  'حلقات التجهيز': true,
+  'افلام': true,
+  'الأقسام': true,
+};
+
+function brstejPickStoryParagraph($) {
+  var panel = $('.pwr-panel.pwr-description').first();
+  if (!panel.length) return '';
+  var story = '';
+  panel.find('h2, h3, .pwr-heading, .pwr-title').each(function () {
+    if (story) return;
+    var head = brstejCleanText($(this).text());
+    if (head.indexOf('قصة') < 0) return;
+    var p = $(this).nextAll('p').first();
+    var text = brstejCleanText(p.text());
+    if (text.length > 40) story = text;
+  });
+  if (story) return story;
+
+  var first = brstejCleanText(panel.find('p').first().text());
+  if (!first) return '';
+  // Film SEO blurb embeds the plot after "حول :".
+  var m =
+    /(?:تدور\s*)?قصة\s*(?:المسلسل|الفيلم)\s*حول\s*:\s*(.+)$/i.exec(first) ||
+    /قصة\s*(?:المسلسل|الفيلم)\s*:\s*(.+)$/i.exec(first);
+  if (m) {
+    var plot = brstejCleanText(m[1])
+      .replace(/\s*(?:فيلم|مسلسلات?)\s+.+\s+على\s+فيديو\s+برستيج\s*$/i, '')
+      .trim();
+    if (plot.length > 40) return plot;
+  }
+  if (first.length > 80) return first;
+  return '';
+}
+
 function brstejPickDescription($) {
+  var story = brstejPickStoryParagraph($);
+  if (story) return story;
+
+  var pds = $('p.pds-description, .pds-description').first();
+  if (pds.length) {
+    var pdsText = brstejCleanText(pds.text());
+    if (pdsText.length > 40) return pdsText;
+  }
+
+  var sels = [
+    '.pwr-panel.pwr-description p',
+    '.pm-video-description',
+    '.description',
+    '.story',
+    '.txtv',
+  ];
+  for (var j = 0; j < sels.length; j++) {
+    var el = $(sels[j]).first();
+    if (!el.length) continue;
+    var text = brstejCleanText(el.text());
+    if (text.length > 40) return text;
+  }
+
   var metas = [
     'meta[property="og:description"]',
     'meta[name="description"]',
@@ -230,17 +308,126 @@ function brstejPickDescription($) {
   for (var i = 0; i < metas.length; i++) {
     var m = $(metas[i]).first();
     if (!m.length) continue;
-    var c = (m.attr('content') || '').trim();
+    var c = brstejCleanText(m.attr('content') || '');
     if (c) return c;
   }
-  var sels = ['.pm-video-description', '.description', '.story', '.txtv'];
-  for (var j = 0; j < sels.length; j++) {
-    var el = $(sels[j]).first();
-    if (!el.length) continue;
-    var text = (el.text() || '').replace(/\s+/g, ' ').trim();
-    if (text.length > 40) return text;
+  return '';
+}
+
+function brstejPickEpisodeOverview($) {
+  var panel = $('.pwr-panel.pwr-description').first();
+  if (!panel.length) return '';
+  var overview = '';
+  panel.find('h2, h3, .pwr-heading, .pwr-title').each(function () {
+    if (overview) return;
+    var head = brstejCleanText($(this).text());
+    if (head.indexOf('وصف') < 0) return;
+    var p = $(this).nextAll('p').first();
+    var text = brstejCleanText(p.text());
+    if (text.length > 40) overview = text;
+  });
+  return overview;
+}
+
+function brstejPickGenres($) {
+  var out = [];
+  var seen = {};
+  $('dl.pwr-meta').each(function () {
+    var dl = $(this);
+    dl.find('dt').each(function () {
+      var label = brstejCleanText($(this).text());
+      if (label.indexOf('الأقسام') < 0 && label.indexOf('اقسام') < 0) return;
+      var dd = $(this).next('dd');
+      if (!dd.length) return;
+      dd.find('a').each(function () {
+        var g = brstejCleanText($(this).text());
+        if (!g || BRSTEJ_GENRE_SKIP[g] || seen[g]) return;
+        seen[g] = true;
+        out.push(g);
+      });
+    });
+  });
+  return out;
+}
+
+function brstejPickRuntime(rawHtml) {
+  var m = /duration_str\s*:\s*"([^"]+)"/.exec(String(rawHtml || ''));
+  return m ? String(m[1] || '').trim() : '';
+}
+
+function brstejFormatRuntime(str) {
+  var parts = String(str || '')
+    .split(':')
+    .map(function (p) {
+      return Number(p);
+    });
+  if (parts.length === 3 && !isNaN(parts[0])) {
+    var h = parts[0];
+    var m = parts[1] || 0;
+    if (h > 0) return h + 'h' + (m ? ' ' + m + 'm' : '');
+    return m + 'm';
+  }
+  if (parts.length === 2 && !isNaN(parts[0])) {
+    var mins = parts[0];
+    var secs = parts[1] || 0;
+    if (mins >= 60) {
+      return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    }
+    if (mins > 0) return mins + 'm';
+    if (secs > 0) return secs + 's';
   }
   return '';
+}
+
+function brstejPickYear() {
+  var texts = [];
+  for (var i = 0; i < arguments.length; i++) {
+    if (arguments[i]) texts.push(String(arguments[i]));
+  }
+  var blob = texts.join(' ');
+  var years = blob.match(/20[1-3]\d/g);
+  return years && years.length ? years[years.length - 1] : '';
+}
+
+function brstejReleaseInfo(year, runtimeStr) {
+  var bits = [];
+  if (year) bits.push(String(year));
+  var rt = brstejFormatRuntime(runtimeStr);
+  if (rt) bits.push(rt);
+  return bits.join(' • ');
+}
+
+function brstejPickDlValue($, labels) {
+  var want = {};
+  for (var i = 0; i < labels.length; i++) want[labels[i]] = true;
+  var found = '';
+  $('dl.pwr-meta dt').each(function () {
+    if (found) return;
+    var label = brstejCleanText($(this).text());
+    if (!want[label]) return;
+    var dd = $(this).next('dd');
+    found = brstejCleanText(dd.text());
+  });
+  return found;
+}
+
+function brstejApplyPageInfo(out, $, rawHtml) {
+  out.description = brstejPickDescription($);
+  out.genres = brstejPickGenres($);
+  out.runtime = brstejPickRuntime(rawHtml);
+  out.year = brstejPickYear(
+    out.title,
+    (out.genres || []).join(' '),
+    $('h1').first().text(),
+  );
+  out.releaseInfo = brstejReleaseInfo(out.year, out.runtime);
+  out.episodeOverview = brstejPickEpisodeOverview($);
+  var epNo = brstejPickDlValue($, ['رقم الحلقة']);
+  var seasonNo = brstejPickDlValue($, ['الموسم']);
+  if (epNo) out.episode = Number(epNo) || null;
+  if (seasonNo) out.pageSeason = Number(seasonNo) || null;
+  var seriesName = brstejPickDlValue($, ['المسلسل']);
+  if (seriesName) out.seriesName = seriesName;
 }
 
 function brstejFillVideoThumbs(videos, poster) {
@@ -302,8 +489,27 @@ function brstejNormTitle(title) {
 }
 
 function brstejSerieHrefId(href) {
-  var m = /(?:view-serie|series1)\.php\?id=(\d+)/.exec(String(href || ''));
+  // Site switched numeric ids → hex (e.g. series1.php?id=eb59ad819).
+  var m = /(?:view-serie|series1)\.php\?id=([A-Za-z0-9_-]+)/.exec(
+    String(href || ''),
+  );
   return m ? m[1] : '';
+}
+
+/** Episode / film page ids — watch.php redirects to video.php on the new host. */
+function brstejWatchVid(href) {
+  var m = /(?:watch|video)\.php\?vid=([^&"'\s]+)/i.exec(String(href || ''));
+  return m ? m[1] : '';
+}
+
+function brstejEpisodeHrefSel(prefix) {
+  prefix = prefix || '';
+  return (
+    prefix +
+    'a[href*="video.php"], ' +
+    prefix +
+    'a[href*="watch.php"]'
+  );
 }
 
 /** Pager links appear as `?page=N`, `&page=N`, or HTML-escaped `&amp;page=N`. */
@@ -375,21 +581,25 @@ function brstejParseEpisodeCards(ctx, html, base) {
   if (!$) return out;
   $(BRSTEJ_EPISODE_CARDS.join(', ')).each(function () {
     var card = $(this);
-    var a = card.find('h3 a[href*="watch.php"]').first();
-    if (!a.length) a = card.find('a[href*="watch.php"][title]').first();
-    if (!a.length) a = card.find('a[href*="watch.php"]').first();
+    var a = card.find('h3 a[href*="video.php"], h3 a[href*="watch.php"]').first();
+    if (!a.length) {
+      a = card.find('a[href*="video.php"][title], a[href*="watch.php"][title]').first();
+    }
+    if (!a.length) {
+      a = card.find('a[href*="video.php"], a[href*="watch.php"]').first();
+    }
     if (!a.length) return;
     var href = a.attr('href') || '';
-    var m = /watch\.php\?vid=([^&"\s]+)/.exec(href);
-    if (!m || seen[m[1]]) return;
+    var vid = brstejWatchVid(href);
+    if (!vid || seen[vid]) return;
     var title =
       brstejText(a) ||
       String(a.attr('title') || '').trim() ||
       String(card.find('a[aria-label]').first().attr('aria-label') || '').trim();
     if (!title) return;
-    seen[m[1]] = true;
+    seen[vid] = true;
     var meta = brstejMeta(
-      'watch:' + m[1],
+      'watch:' + vid,
       title,
       brstejImg($, card.find('img').first(), base),
       { url: brstejAbs(base, href) },
@@ -722,9 +932,8 @@ function brstejParseEpisodeAnchors($, anchors, base) {
   anchors.each(function () {
     var a = $(this);
     var href = a.attr('href') || '';
-    var m = /watch\.php\?vid=([^&"\s]+)/.exec(href);
-    if (!m) return;
-    var vid = m[1];
+    var vid = brstejWatchVid(href);
+    if (!vid) return;
     var t = (a.attr('title') || '').trim();
     if (!t) {
       var em = a.find('em').first();
@@ -775,7 +984,7 @@ function brstejAppendPdsSeasons($, base, out) {
         : si + 1;
     var eps = brstejParseEpisodeAnchors(
       $,
-      section.find('a[href*="watch.php"]'),
+      section.find(brstejEpisodeHrefSel()),
       base,
     );
     for (var i = 0; i < eps.length; i++) {
@@ -796,7 +1005,7 @@ function brstejAppendPwrSeasons($, base, out) {
     var seasonNum = m ? Number(m[1]) : si + 1;
     var eps = brstejParseEpisodeAnchors(
       $,
-      panel.find('a[href*="watch.php"]'),
+      panel.find(brstejEpisodeHrefSel()),
       base,
     );
     for (var i = 0; i < eps.length; i++) {
@@ -804,6 +1013,22 @@ function brstejAppendPwrSeasons($, base, out) {
       out.videos.push(eps[i]);
     }
   });
+}
+
+function brstejAttachEpisodeOverview(out) {
+  if (!out || !out.episodeOverview || !out.videos || !out.videos.length) return;
+  var ep = Number(out.episode);
+  var season = Number(out.pageSeason) || 1;
+  for (var i = 0; i < out.videos.length; i++) {
+    var v = out.videos[i];
+    if (!v) continue;
+    if (ep && Number(v.episode) === ep && Number(v.season || 1) === season) {
+      v.overview = out.episodeOverview;
+      return;
+    }
+  }
+  // Fall back: stamp the first video when numbers are missing.
+  if (!out.videos[0].overview) out.videos[0].overview = out.episodeOverview;
 }
 
 function brstejParseSerieHtml(ctx, html, base) {
@@ -814,7 +1039,7 @@ function brstejParseSerieHtml(ctx, html, base) {
   var title = ($('h1').first().text() || $('h2').first().text() || '').trim();
   out.title = brstejStripPrefix(title);
   out.poster = brstejPickPoster($, base);
-  out.description = brstejPickDescription($);
+  brstejApplyPageInfo(out, $, html);
 
   var seasonButtons = $('.SeasonsBoxUL button.tablinks');
   if (seasonButtons.length) {
@@ -824,7 +1049,7 @@ function brstejParseSerieHtml(ctx, html, base) {
       if (!seasonDiv.length) return;
       var eps = brstejParseEpisodeAnchors(
         $,
-        seasonDiv.find('a[href*="watch.php"]'),
+        seasonDiv.find(brstejEpisodeHrefSel()),
         base,
       );
       for (var i = 0; i < eps.length; i++) {
@@ -835,13 +1060,21 @@ function brstejParseSerieHtml(ctx, html, base) {
   } else {
     var eps = brstejParseEpisodeAnchors(
       $,
-      $('#pm-grid a[href*="watch.php"]'),
+      $('#pm-grid').find(brstejEpisodeHrefSel()),
       base,
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
   }
   if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
+  if (out.videos.length) {
+    var epsBit = out.videos.length + ' eps';
+    if (!out.releaseInfo) {
+      out.releaseInfo = out.year ? out.year + ' • ' + epsBit : epsBit;
+    } else if (out.releaseInfo.indexOf('eps') < 0) {
+      out.releaseInfo += ' • ' + epsBit;
+    }
+  }
   return out;
 }
 
@@ -856,7 +1089,8 @@ function brstejParseWatchHtml(ctx, html, base) {
     : ($('h1').first().text() || '').trim();
   out.title = brstejStripPrefix(brstejStripEpisode(title));
   out.poster = brstejPickPoster($, base);
-  out.description = brstejPickDescription($);
+  brstejApplyPageInfo(out, $, html);
+  if (out.seriesName) out.title = brstejStripPrefix(out.seriesName);
 
   var seasonLis = $('.SeasonsBoxUL li[data-serie]');
   if (seasonLis.length) {
@@ -866,7 +1100,7 @@ function brstejParseWatchHtml(ctx, html, base) {
       var seasonNum = Number(n) || si + 1;
       var epDiv = $('.SeasonsEpisodes[data-serie="' + n + '"]');
       var eps = epDiv.length
-        ? brstejParseEpisodeAnchors($, epDiv.find('a[href*="watch.php"]'), base)
+        ? brstejParseEpisodeAnchors($, epDiv.find(brstejEpisodeHrefSel()), base)
         : [];
       for (var i = 0; i < eps.length; i++) {
         eps[i].season = seasonNum;
@@ -876,7 +1110,7 @@ function brstejParseWatchHtml(ctx, html, base) {
   } else {
     var eps = brstejParseEpisodeAnchors(
       $,
-      $('.SeasonsEpisodes a[href*="watch.php"]'),
+      $('.SeasonsEpisodes').find(brstejEpisodeHrefSel()),
       base,
     );
     for (var j = 0; j < eps.length; j++) out.videos.push(eps[j]);
@@ -889,6 +1123,7 @@ function brstejParseWatchHtml(ctx, html, base) {
     out.title = brstejStripMoviePrefix(title);
   }
   brstejFillVideoThumbs(out.videos, out.poster);
+  brstejAttachEpisodeOverview(out);
   return out;
 }
 
@@ -926,7 +1161,7 @@ function brstejDetails(ctx, cfg, params) {
   var url;
   var fromWatch = false;
   if (showId.indexOf('watch:') === 0) {
-    url = base + '/watch.php?vid=' + encodeURIComponent(showId.substring(6));
+    url = base + '/video.php?vid=' + encodeURIComponent(showId.substring(6));
     fromWatch = true;
   } else if (showId.indexOf('serie:') === 0) {
     url = base + '/series1.php?id=' + encodeURIComponent(showId.substring(6));
@@ -952,6 +1187,8 @@ function brstejDetails(ctx, cfg, params) {
       meta.description = parsed.description || '';
       meta.background = poster;
       meta.videos = parsed.videos || [];
+      if (parsed.genres && parsed.genres.length) meta.genres = parsed.genres;
+      if (parsed.releaseInfo) meta.releaseInfo = parsed.releaseInfo;
       if (parsed.movie) meta.badge = 'MOVIE';
       return hubOk('details', { meta: meta }, { maxAge: 900, swr: 3600 });
     })
