@@ -391,6 +391,10 @@ function hubPaintPoster(item, opts) {
       openTrackerLink: openTracker,
     };
   }
+  // Pack openBind chrome → host bind sheet (labels / pin / tracker icon).
+  if (meta.openBind && typeof meta.openBind === 'object') {
+    paint.props.openBind = meta.openBind;
+  }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
   if (meta.background || meta.backdrop || opts.backdropUrl) {
     paint.props.backdropUrl = String(

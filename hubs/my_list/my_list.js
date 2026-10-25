@@ -485,6 +485,14 @@ function myListLoadFeed(ctx, params) {
         if (!row.releaseInfo && (row.releaseDate || row.year)) {
           row.releaseInfo = String(row.releaseDate || row.year);
         }
+        // Product chrome for host Open with… sheet (pack owns labels/modes).
+        row.openBind = {
+          pin: true,
+          trackerLabel: 'Match',
+          trackerTitle: 'Match on Simkl',
+          openLabel: 'Open with',
+          trackerIcon: 'simkl',
+        };
         if (simklOn) {
           row.trackerLink = true;
           row.trackerLinked = myListTrackerLinked(row);
