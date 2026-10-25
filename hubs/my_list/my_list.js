@@ -433,7 +433,38 @@ function myListLoadFeed(ctx, params) {
       if (st === status) localForStatus.push(e);
     }
 
-    function finish(merged) {
+    function myListTrackerLinked(row) {
+      if (!row) return false;
+      var mt = String(row.mediaType || row.type || '').toLowerCase();
+      var open = row.open || row.metaOpen || row.catalogOpen;
+      if (mt === 'anime' || (open && String(open.surface || '') === 'anime')) {
+        var aid = open && open.id != null ? parseInt(String(open.id), 10) : 0;
+        if (aid > 0) return true;
+        var ids = row.ids || (row.meta && row.meta.ids);
+        if (ids && ids.anilist != null) {
+          var an = parseInt(String(ids.anilist), 10);
+          return !isNaN(an) && an > 0;
+        }
+        return false;
+      }
+      var t = asInt(row.tmdbId);
+      if (t != null) return true;
+      var mids = row.ids || (row.meta && row.meta.ids);
+      if (mids && mids.tmdb != null) {
+        var tn = parseInt(String(mids.tmdb), 10);
+        return !isNaN(tn) && tn > 0;
+      }
+      return false;
+    }
+
+    function myListIsAnimeRow(row) {
+      var mt = String(row.mediaType || row.type || '').toLowerCase();
+      if (mt === 'anime') return true;
+      var open = row.open || row.metaOpen || row.catalogOpen;
+      return !!(open && String(open.surface || '') === 'anime');
+    }
+
+    function finish(merged, simklOn) {
       var shaped = [];
       for (var i = 0; i < merged.length; i++) {
         var row = myListShapeRow(merged[i]);
@@ -443,6 +474,12 @@ function myListLoadFeed(ctx, params) {
         }
         if (!row.releaseInfo && (row.releaseDate || row.year)) {
           row.releaseInfo = String(row.releaseDate || row.year);
+        }
+        if (simklOn) {
+          row.trackerLink = true;
+          row.trackerLinked = myListTrackerLinked(row);
+          // Anime tracks via AniList — S is status-only (no TMDB match sheet).
+          row.trackerLinkAction = !myListIsAnimeRow(row);
         }
         shaped.push(row);
       }
@@ -468,16 +505,16 @@ function myListLoadFeed(ctx, params) {
     }
 
     if (!simkl || typeof simkl.isLoggedIn !== 'function') {
-      return finish(localForStatus);
+      return finish(localForStatus, false);
     }
 
     return Promise.resolve(simkl.isLoggedIn()).then(function (loggedIn) {
       if (!loggedIn || typeof simkl.watchlist !== 'function') {
-        return finish(localForStatus);
+        return finish(localForStatus, false);
       }
       return Promise.resolve(simkl.watchlist({ status: status })).then(
         function (raw) {
-          if (!Array.isArray(raw)) return finish(localForStatus);
+          if (!Array.isArray(raw)) return finish(localForStatus, true);
           var cards = [];
           for (var i = 0; i < raw.length; i++) {
             var card = simklCardItem(raw[i]);
@@ -491,7 +528,7 @@ function myListLoadFeed(ctx, params) {
             status,
             hiddenKeys,
           );
-          return finish(mergeLocalHubs(filtered, localForStatus));
+          return finish(mergeLocalHubs(filtered, localForStatus), true);
         },
       );
     });

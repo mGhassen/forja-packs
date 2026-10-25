@@ -379,6 +379,17 @@ function hubPaintPoster(item, opts) {
   }
   var listStatus = String(meta.listStatus || meta.status || '').trim();
   if (listStatus) paint.props.listStatus = listStatus;
+  // Pack owns Simkl chrome: letter mark + openTrackerLink for host paint only.
+  if (meta.trackerLink) {
+    var linked = !!meta.trackerLinked;
+    var openTracker =
+      meta.trackerLinkAction == null ? true : !!meta.trackerLinkAction;
+    paint.props.trackerMark = {
+      letter: 'S',
+      linked: linked,
+      openTrackerLink: openTracker,
+    };
+  }
   if (opts.aspect) paint.props.aspect = String(opts.aspect);
   if (meta.background || meta.backdrop || opts.backdropUrl) {
     paint.props.backdropUrl = String(

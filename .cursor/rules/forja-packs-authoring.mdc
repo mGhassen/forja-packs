@@ -7,6 +7,8 @@ alwaysApply: true
 
 This repo is **EngineJS packs only**. Host Dart/Rust → [Forja](https://github.com/mGhassen/Forja). Schemas/kits/starters → [forja-sdk](https://github.com/mGhassen/forja-sdk).
 
+**Product lives here.** Hub chrome (My List tracker marks, feed shaping, labels, layout) is pack JS + `paint.props` — do not ask the Forja host to invent it. Host only paints props / runs generic store+Simkl APIs. Law detail: Forja rule `forja-pack-product-host` + skill `forja-pack-product-host`.
+
 When creating or extending packs, read and follow `.cursor/skills/create-forja-pack/SKILL.md` and **`sdk-kit.md`** (kit/protocol, envelopes, `ctx`, schemas) before writing JS.
 
 ## Trees
