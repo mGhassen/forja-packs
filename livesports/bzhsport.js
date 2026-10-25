@@ -1,7 +1,7 @@
-// Unified live_sport plugin — catalog + resolve (BZH-Sport / bzh.lat)
+// Unified live_sport plugin — catalog + resolve (BZH-Sport / volkamax.club)
 // Catalog half (top-level)
 var SPECS = {
-  origins: ['https://bzh.lat', 'https://volkamax.club'],
+  origins: ['https://volkamax.club'],
   // Schedule times are fixed UTC+1 (site default, no DST shift).
   tzOffsetMin: 60,
 };

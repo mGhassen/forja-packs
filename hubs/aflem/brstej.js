@@ -329,6 +329,13 @@ function brstejPickEpisodeOverview($) {
   return overview;
 }
 
+function brstejPushUnique(list, seen, value) {
+  value = brstejCleanText(value);
+  if (!value || BRSTEJ_GENRE_SKIP[value] || seen[value]) return;
+  seen[value] = true;
+  list.push(value);
+}
+
 function brstejPickGenres($) {
   var out = [];
   var seen = {};
@@ -340,14 +347,63 @@ function brstejPickGenres($) {
       var dd = $(this).next('dd');
       if (!dd.length) return;
       dd.find('a').each(function () {
-        var g = brstejCleanText($(this).text());
-        if (!g || BRSTEJ_GENRE_SKIP[g] || seen[g]) return;
-        seen[g] = true;
-        out.push(g);
+        brstejPushUnique(out, seen, $(this).text());
       });
     });
   });
   return out;
+}
+
+/** Series detail facts: الدولة / التصنيف / بداية العرض / الاسم الأصلي / … */
+function brstejPickSeriesFacts($) {
+  var facts = {};
+  $('dl.pds-series-facts dt').each(function () {
+    var label = brstejCleanText($(this).text());
+    if (!label) return;
+    var dd = $(this).next('dd');
+    if (!dd.length) return;
+    var time = dd.find('time').first();
+    var val = time.length
+      ? brstejCleanText(time.attr('datetime') || time.text())
+      : brstejCleanText(dd.text());
+    if (val) facts[label] = val;
+  });
+  return facts;
+}
+
+/** Cast strip — `a.pca-person` (visible grid + details.pca-more). */
+function brstejPickCast($, base) {
+  var out = [];
+  var seen = {};
+  $('a.pca-person').each(function () {
+    var a = $(this);
+    var name =
+      brstejCleanText(a.find('.pca-name').first().text()) ||
+      brstejCleanText(a.find('img').first().attr('alt') || '');
+    if (!name || seen[name]) return;
+    seen[name] = true;
+    var img = a.find('img.pca-avatar, img').first();
+    var photo = img.length ? brstejImg($, img, base) : '';
+    var role = brstejCleanText(a.find('.pca-role').first().text());
+    var row = { name: name };
+    if (photo) row.profilePath = photo;
+    if (role) row.character = role;
+    out.push(row);
+  });
+  return out;
+}
+
+function brstejPickLdJson(rawHtml) {
+  var m =
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i.exec(
+      String(rawHtml || ''),
+    );
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1]);
+  } catch (e) {
+    return null;
+  }
 }
 
 function brstejPickRuntime(rawHtml) {
@@ -411,11 +467,63 @@ function brstejPickDlValue($, labels) {
   return found;
 }
 
-function brstejApplyPageInfo(out, $, rawHtml) {
+function brstejApplyPageInfo(out, $, rawHtml, base) {
   out.description = brstejPickDescription($);
   out.genres = brstejPickGenres($);
   out.runtime = brstejPickRuntime(rawHtml);
+  out.cast = brstejPickCast($, base);
+
+  var facts = brstejPickSeriesFacts($);
+  if (facts['التصنيف']) {
+    // Prefer the factual genre chip first (دراما) over section rails.
+    out.genres = [facts['التصنيف']].concat(
+      out.genres.filter(function (g) {
+        return g !== facts['التصنيف'];
+      }),
+    );
+  }
+  if (facts['بداية العرض']) out.premiereDate = facts['بداية العرض'];
+  if (facts['الدولة']) out.country = facts['الدولة'];
+  if (facts['اللغة']) out.language = facts['اللغة'];
+  if (facts['الاسم الأصلي']) out.originalTitle = facts['الاسم الأصلي'];
+  if (facts['نوع العمل'] && /فيلم/.test(facts['نوع العمل'])) out.movie = true;
+
+  var ld = brstejPickLdJson(rawHtml);
+  if (ld && typeof ld === 'object') {
+    if (!out.description && ld.description) {
+      out.description = brstejCleanText(ld.description);
+    }
+    if (!out.premiereDate && (ld.startDate || ld.datePublished)) {
+      out.premiereDate = String(ld.startDate || ld.datePublished);
+    }
+    if (ld.genre) {
+      var ldGenres = Array.isArray(ld.genre) ? ld.genre : [ld.genre];
+      var seenG = {};
+      for (var i = 0; i < out.genres.length; i++) seenG[out.genres[i]] = true;
+      for (var j = 0; j < ldGenres.length; j++) {
+        brstejPushUnique(out.genres, seenG, ldGenres[j]);
+      }
+    }
+    if ((!out.cast || !out.cast.length) && Array.isArray(ld.actor)) {
+      out.cast = [];
+      var seenA = {};
+      for (var a = 0; a < ld.actor.length; a++) {
+        var person = ld.actor[a] || {};
+        var n = brstejCleanText(person.name || '');
+        if (!n || seenA[n]) continue;
+        seenA[n] = true;
+        out.cast.push({ name: n });
+      }
+    }
+    if (!out.originalTitle && ld.alternateName) {
+      out.originalTitle = brstejCleanText(
+        Array.isArray(ld.alternateName) ? ld.alternateName[0] : ld.alternateName,
+      );
+    }
+  }
+
   out.year = brstejPickYear(
+    out.premiereDate,
     out.title,
     (out.genres || []).join(' '),
     $('h1').first().text(),
@@ -1039,7 +1147,7 @@ function brstejParseSerieHtml(ctx, html, base) {
   var title = ($('h1').first().text() || $('h2').first().text() || '').trim();
   out.title = brstejStripPrefix(title);
   out.poster = brstejPickPoster($, base);
-  brstejApplyPageInfo(out, $, html);
+  brstejApplyPageInfo(out, $, html, base);
 
   var seasonButtons = $('.SeasonsBoxUL button.tablinks');
   if (seasonButtons.length) {
@@ -1089,7 +1197,7 @@ function brstejParseWatchHtml(ctx, html, base) {
     : ($('h1').first().text() || '').trim();
   out.title = brstejStripPrefix(brstejStripEpisode(title));
   out.poster = brstejPickPoster($, base);
-  brstejApplyPageInfo(out, $, html);
+  brstejApplyPageInfo(out, $, html, base);
   if (out.seriesName) out.title = brstejStripPrefix(out.seriesName);
 
   var seasonLis = $('.SeasonsBoxUL li[data-serie]');
@@ -1189,7 +1297,37 @@ function brstejDetails(ctx, cfg, params) {
       meta.videos = parsed.videos || [];
       if (parsed.genres && parsed.genres.length) meta.genres = parsed.genres;
       if (parsed.releaseInfo) meta.releaseInfo = parsed.releaseInfo;
+      if (parsed.premiereDate) meta.premiereDate = parsed.premiereDate;
+      if (parsed.cast && parsed.cast.length) meta.cast = parsed.cast;
       if (parsed.movie) meta.badge = 'MOVIE';
+      var facts = {};
+      if (parsed.country) facts.originCountries = [parsed.country];
+      if (parsed.language) facts.originalLanguage = parsed.language;
+      if (parsed.premiereDate) facts.releaseDate = parsed.premiereDate;
+      if (parsed.originalTitle) facts.originalTitle = parsed.originalTitle;
+      facts.mediaType = parsed.movie ? 'movie' : 'tv';
+      if (parsed.runtime) {
+        var rtParts = String(parsed.runtime)
+          .split(':')
+          .map(function (p) {
+            return Number(p);
+          });
+        if (rtParts.length === 3 && !isNaN(rtParts[0])) {
+          facts.runtimeMinutes = rtParts[0] * 60 + (rtParts[1] || 0);
+        } else if (rtParts.length === 2 && !isNaN(rtParts[0])) {
+          facts.runtimeMinutes = rtParts[0];
+        }
+      }
+      if (meta.videos.length) {
+        facts.episodeCount = meta.videos.length;
+        var seasons = {};
+        for (var vi = 0; vi < meta.videos.length; vi++) {
+          var sn = Number(meta.videos[vi].season) || 1;
+          seasons[sn] = true;
+        }
+        facts.seasonCount = Object.keys(seasons).length;
+      }
+      if (Object.keys(facts).length) meta.facts = facts;
       return hubOk('details', { meta: meta }, { maxAge: 900, swr: 3600 });
     })
     .catch(function (e) {
