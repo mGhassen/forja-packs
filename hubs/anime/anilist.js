@@ -41,17 +41,17 @@ var ANILIST_DETAILS_FIELDS = [
   'airingSchedule(perPage: 50) { nodes { episode airingAt } }',
   'streamingEpisodes { title thumbnail }',
   'characters(page: 1, perPage: 16, sort: [ROLE, RELEVANCE, ID]) { edges { ' +
-    'role node { name { full } image { large } } } }',
+  'role node { name { full } image { large } } } }',
   'staff(page: 1, perPage: 10, sort: [RELEVANCE, ID]) { edges { ' +
-    'role node { name { full } image { large } } } }',
+  'role node { name { full } image { large } } } }',
   'relations { edges { relationType(version: 2) node { ' +
-    ANILIST_CARD_FIELDS +
-    ' type } } }',
+  ANILIST_CARD_FIELDS +
+  ' type } } }',
   // Community "more like this" — not franchise relations.
   'recommendations(page: 1, perPage: 12, sort: [RATING_DESC]) { nodes { ' +
-    'rating mediaRecommendation { ' +
-    ANILIST_CARD_FIELDS +
-    ' type } } }',
+  'rating mediaRecommendation { ' +
+  ANILIST_CARD_FIELDS +
+  ' type } } }',
 ].join(' ');
 
 // Keep franchise links; drop CHARACTER / ADAPTATION / SOURCE / SAME_UNIVERSE.
@@ -389,8 +389,8 @@ function anilistPersonImage(node) {
 function anilistCharactersFromMedia(m) {
   var edges =
     m &&
-    m.characters &&
-    Array.isArray(m.characters.edges)
+      m.characters &&
+      Array.isArray(m.characters.edges)
       ? m.characters.edges
       : [];
   var out = [];
@@ -513,8 +513,8 @@ function anilistWalkNeighbors(media) {
   var wanted = { PREQUEL: true, SEQUEL: true, PARENT: true };
   var edges =
     media &&
-    media.relations &&
-    Array.isArray(media.relations.edges)
+      media.relations &&
+      Array.isArray(media.relations.edges)
       ? media.relations.edges
       : [];
   var scored = [];
@@ -763,8 +763,8 @@ function anilistSeasonChainIdSet(seasons) {
 function anilistRelatedFromMedia(m, preferred, excludeIds) {
   var edges =
     m &&
-    m.relations &&
-    Array.isArray(m.relations.edges)
+      m.relations &&
+      Array.isArray(m.relations.edges)
       ? m.relations.edges
       : [];
   var exclude = excludeIds || {};
@@ -813,8 +813,8 @@ function anilistRelatedFromMedia(m, preferred, excludeIds) {
 function anilistRecommendationsFromMedia(m, preferred) {
   var nodes =
     m &&
-    m.recommendations &&
-    Array.isArray(m.recommendations.nodes)
+      m.recommendations &&
+      Array.isArray(m.recommendations.nodes)
       ? m.recommendations.nodes
       : [];
   var out = [];
@@ -914,7 +914,6 @@ function anilistFetchOnce(ctx, url, headers, body) {
   );
 }
 
-// Race primary + mirrors. First valid payload wins — AniList hang must not block.
 function anilistQuery(ctx, cfg, query, variables) {
   var now = Date.now();
   var cooling = now < _anilistCooldownUntilMs;
@@ -1059,24 +1058,24 @@ function anilistFeedQuery(cfg, params) {
       var fetchSize = Number(spec.fetchSize) > 0 ? Number(spec.fetchSize) : 50;
       parts.push(
         railId +
-          ': Page(page: 1, perPage: ' +
-          fetchSize +
-          ') { airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) { episode airingAt media { ' +
-          ANILIST_CARD_FIELDS +
-          ' isAdult } } }',
+        ': Page(page: 1, perPage: ' +
+        fetchSize +
+        ') { airingSchedules(airingAt_greater: $airFrom, airingAt_lesser: $airTo, notYetAired: false, sort: [TIME_DESC]) { episode airingAt media { ' +
+        ANILIST_CARD_FIELDS +
+        ' isAdult } } }',
       );
       continue;
     }
     var limit = Number(spec.limit) > 0 ? Number(spec.limit) : perPage;
     parts.push(
       railId +
-        ': Page(page: 1, perPage: ' +
-        limit +
-        ') { media(' +
-        anilistMediaArgs(spec) +
-        ') { ' +
-        ANILIST_CARD_FIELDS +
-        ' } }',
+      ': Page(page: 1, perPage: ' +
+      limit +
+      ') { media(' +
+      anilistMediaArgs(spec) +
+      ') { ' +
+      ANILIST_CARD_FIELDS +
+      ' } }',
     );
   }
   return (
