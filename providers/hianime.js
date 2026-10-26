@@ -120,7 +120,10 @@ function extract(ctx) {
           language: kind === 'dub' ? 'Dub' : 'Sub',
           headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
         };
-        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'HiAnime');
+        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'HiAnime', {
+          referer: origin + '/',
+          origin: origin,
+        });
         if (subs.length) row.subtitles = subs;
         return [row];
       })

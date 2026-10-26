@@ -2,7 +2,16 @@
 // Shapes: VidLink/PeeStream `captions[{url,language}]`, Rive `captions[{file,label}]`,
 // MegaPlay `tracks[{file,label,kind}]`.
 
-function forjaCaptionsToSubtitles(captions, sourceName) {
+function forjaStampSubtitleHeaders(row, opts) {
+  if (!opts || typeof opts !== 'object') return row;
+  var referer = String(opts.referer || opts.Referer || '').trim();
+  var origin = String(opts.origin || opts.Origin || '').trim();
+  if (referer) row.referer = referer;
+  if (origin) row.origin = origin;
+  return row;
+}
+
+function forjaCaptionsToSubtitles(captions, sourceName, opts) {
   var out = [];
   if (!Array.isArray(captions)) return out;
   for (var i = 0; i < captions.length; i++) {
@@ -20,12 +29,13 @@ function forjaCaptionsToSubtitles(captions, sourceName) {
       name: name,
     };
     if (sourceName) row.sourceName = String(sourceName);
+    forjaStampSubtitleHeaders(row, opts);
     out.push(row);
   }
   return out;
 }
 
-function forjaMegaplayTracksToSubtitles(tracks, sourceName) {
+function forjaMegaplayTracksToSubtitles(tracks, sourceName, opts) {
   var out = [];
   if (!Array.isArray(tracks)) return out;
   for (var i = 0; i < tracks.length; i++) {
@@ -49,6 +59,7 @@ function forjaMegaplayTracksToSubtitles(tracks, sourceName) {
       name: lang,
     };
     if (sourceName) row.sourceName = String(sourceName);
+    forjaStampSubtitleHeaders(row, opts);
     out.push(row);
   }
   return out;

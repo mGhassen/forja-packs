@@ -409,6 +409,10 @@ function extract(ctx) {
                     var subs = forjaMegaplayTracksToSubtitles(
                       extracted.data.tracks,
                       'Anikoto',
+                      {
+                        referer: extracted.origin + '/',
+                        origin: extracted.origin,
+                      },
                     );
                     if (subs.length) row.subtitles = subs;
                     return [row];

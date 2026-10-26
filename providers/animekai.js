@@ -127,7 +127,10 @@ function extract(ctx) {
           headers: { 'User-Agent': ua, Referer: host + '/', Origin: host },
           pngStrip: 'auto',
         };
-        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'AnimeKai');
+        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'AnimeKai', {
+          referer: host + '/',
+          origin: host,
+        });
         if (subs.length) row.subtitles = subs;
         return [row];
       })
