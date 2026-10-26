@@ -293,20 +293,22 @@ function anilistParseEpisodeNumber(title) {
 function anilistVideosFromMedia(m) {
   var isoByEp = anilistAiringIsoByEpisode(m);
   var stream = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
+  var total = Number(m.episodes) || 0;
   var known = {};
-  var maxKnown = 0;
+  var maxParsed = 0;
   var parsed = 0;
   var i;
   for (i = 0; i < stream.length; i++) {
     var ep = stream[i] || {};
     var num = anilistParseEpisodeNumber(ep.title);
-    if (!(num > 0)) continue;
+    if (!(num > 0) || num !== Math.floor(num)) continue; // skip 48.5 digressions
     parsed++;
+    if (num > maxParsed) maxParsed = num;
     known[num] = {
       title: String(ep.title || '').trim(),
       thumbnail: anilistAbsUrl(ep.thumbnail || ''),
+      abs: num,
     };
-    if (num > maxKnown) maxKnown = num;
   }
   // Titles without numbers — keep old index map so short lists still work.
   if (parsed === 0) {
@@ -316,35 +318,57 @@ function anilistVideosFromMedia(m) {
       known[fb] = {
         title: String(raw.title || '').trim(),
         thumbnail: anilistAbsUrl(raw.thumbnail || ''),
+        abs: fb,
       };
-      if (fb > maxKnown) maxKnown = fb;
+      if (fb > maxParsed) maxParsed = fb;
     }
   }
+  // AniList often stamps franchise-absolute titles ("Episode 72") on a 24-ep
+  // cour. Remap into 1..total — never pad the picker to the absolute max.
+  var offset = 0;
+  if (total > 0 && maxParsed > total) {
+    offset = maxParsed - total;
+  }
+  var byRel = {};
+  Object.keys(known).forEach(function (key) {
+    var row = known[key];
+    var rel = Number(row.abs) - offset;
+    if (!(rel >= 1)) return;
+    if (total > 0 && rel > total) return;
+    byRel[rel] = row;
+  });
+
+  var maxAir = 0;
   for (var airKey in isoByEp) {
     if (!Object.prototype.hasOwnProperty.call(isoByEp, airKey)) continue;
     var airEp = Number(airKey);
-    if (airEp > maxKnown) maxKnown = airEp;
+    if (airEp > maxAir) maxAir = airEp;
   }
-  var total = Number(m.episodes) || 0;
+
   var next = m && m.nextAiringEpisode;
   var nextEp = next && Number(next.episode) > 0 ? Number(next.episode) : 0;
   var nextAt = next ? Number(next.airingAt) : 0;
   var nextAhead =
     nextEp > 0 && (!(nextAt > 0) || nextAt * 1000 > Date.now());
+
   var count = total;
-  if (maxKnown > count) count = maxKnown;
-  if (nextEp > 0) {
-    var through = nextAhead ? nextEp - 1 : nextEp;
-    if (through > count) count = through;
-    // Include the upcoming episode when it is the next slot.
-    if (nextEp > count && nextEp - count <= 2) count = nextEp;
+  if (!(count > 0)) {
+    count = Math.max(maxAir, Object.keys(byRel).length);
+    if (nextEp > 0) {
+      var through = nextAhead ? nextEp - 1 : nextEp;
+      if (through > count) count = through;
+      if (nextEp > count && nextEp - count <= 2) count = nextEp;
+    }
+  } else if (nextEp > 0 && nextEp <= total + 2) {
+    // Airing cour: include the next slot without growing past declared + 1.
+    if (nextEp > count) count = nextEp;
   }
   if (count <= 0 && nextEp > 0) count = nextEp;
   if (count <= 0) return [];
   var videos = [];
   var j;
   for (j = 1; j <= count; j++) {
-    var row = known[j] || {};
+    var row = byRel[j] || {};
     var entry = {
       id: String(j),
       episode: j,
@@ -449,8 +473,8 @@ function anilistCanWalkSeasonNode(node) {
   if (!node || String(node.type || '') !== 'ANIME') return false;
   var fmt = String(node.format || '').toUpperCase();
   if (fmt === 'TV' || fmt === 'TV_SHORT') return true;
-  // Bridge: film between TV cours (Youjo Senki).
-  if (fmt === 'MOVIE') return true;
+  // Bridges between TV cours (Youjo Senki film; Slime Coleus OVA).
+  if (fmt === 'MOVIE' || fmt === 'OVA' || fmt === 'SPECIAL') return true;
   // Multi-ep ONA cour — not 1-ep specials (One Piece → MONSTERS).
   if (fmt === 'ONA') {
     var eps = node.episodes;
@@ -462,6 +486,7 @@ function anilistCanWalkSeasonNode(node) {
 function anilistIsSeasonEntry(node) {
   var fmt = String((node && node.format) || '').toUpperCase();
   if (fmt === 'TV' || fmt === 'TV_SHORT') return true;
+  if (fmt === 'OVA' || fmt === 'SPECIAL') return true;
   if (fmt === 'ONA') {
     var eps = node.episodes;
     return !(typeof eps === 'number') || eps > 1;
@@ -469,15 +494,22 @@ function anilistIsSeasonEntry(node) {
   return false;
 }
 
+function anilistIsOvaOrSpecial(node) {
+  var fmt = String((node && node.format) || '').toUpperCase();
+  return fmt === 'OVA' || fmt === 'SPECIAL';
+}
+
 function anilistWalkRank(node) {
   var fmt = String((node && node.format) || '').toUpperCase();
   if (fmt === 'TV' || fmt === 'TV_SHORT') return 0;
   if (fmt === 'ONA') return 1;
-  if (fmt === 'MOVIE') return 2;
+  if (fmt === 'OVA' || fmt === 'SPECIAL') return 2;
+  if (fmt === 'MOVIE') return 3;
   return 9;
 }
 
 function anilistWalkNeighbors(media) {
+  // Continuity spine. SIDE_STORY OVAs are collected after BFS (Miruro rail).
   var wanted = { PREQUEL: true, SEQUEL: true, PARENT: true };
   var edges =
     media &&
@@ -504,6 +536,31 @@ function anilistWalkNeighbors(media) {
   });
 }
 
+// Miruro-style: OVA / SPECIAL linked as SIDE_STORY (or OTHER) sit in the
+// seasons rail chronologically — not only PREQUEL/SEQUEL TV.
+function anilistSideStoryOvaIds(fetched, seen) {
+  var extras = {};
+  var types = { SIDE_STORY: true, OTHER: true };
+  Object.keys(seen).forEach(function (key) {
+    var media = fetched[Number(key)];
+    if (!media) return;
+    var edges =
+      media.relations && Array.isArray(media.relations.edges)
+        ? media.relations.edges
+        : [];
+    for (var i = 0; i < edges.length; i++) {
+      var e = edges[i] || {};
+      if (!types[String(e.relationType || '')]) continue;
+      var node = e.node;
+      if (!node || String(node.type || '') !== 'ANIME') continue;
+      if (!anilistIsOvaOrSpecial(node)) continue;
+      var id = Number(node.id);
+      if (id > 0) extras[id] = true;
+    }
+  });
+  return Object.keys(extras).map(Number);
+}
+
 var ANILIST_SEASONS_FIELDS =
   'id title { romaji english } format episodes status type ' +
   'coverImage { large extraLarge } startDate { year month day } ' +
@@ -511,8 +568,8 @@ var ANILIST_SEASONS_FIELDS =
   'id type format episodes status title { romaji english } ' +
   'coverImage { large extraLarge } startDate { year month day } } } }';
 
-// BFS PREQUEL/SEQUEL/PARENT spine. Movies bridge but are not season chips.
-// Returns ordered list of season Media maps (TV / TV_SHORT / multi-ep ONA).
+// BFS PREQUEL/SEQUEL/PARENT spine + SIDE_STORY OVAs. Movies bridge only.
+// Returns ordered Media maps (TV / OVA / SPECIAL / multi-ep ONA).
 function anilistGetSeasons(ctx, cfg, anilistId) {
   var cached = _anilistSeasonsById[anilistId];
   if (cached) return Promise.resolve(cached);
@@ -544,6 +601,27 @@ function anilistGetSeasons(ctx, cfg, anilistId) {
       });
   }
 
+  function finishSeasons(seed, seen) {
+    var seasons = [];
+    Object.keys(seen).forEach(function (key) {
+      var media = fetched[Number(key)];
+      if (media && anilistIsSeasonEntry(media)) seasons.push(media);
+    });
+    seasons.sort(function (a, b) {
+      var ka = anilistStartKey(a);
+      var kb = anilistStartKey(b);
+      if (ka !== kb) return ka - kb;
+      return Number(a.id) - Number(b.id);
+    });
+    if (!seasons.length) seasons = [seed];
+    anilistTrimSeasonsCache(_anilistSeasonsById);
+    _anilistSeasonsById[anilistId] = seasons;
+    for (var si = 0; si < seasons.length; si++) {
+      _anilistSeasonsById[Number(seasons[si].id)] = seasons;
+    }
+    return seasons;
+  }
+
   return fetchMedia(anilistId).then(function (seed) {
     if (!seed) return [];
 
@@ -553,24 +631,21 @@ function anilistGetSeasons(ctx, cfg, anilistId) {
 
     function step() {
       if (!queue.length) {
-        var seasons = [];
-        Object.keys(seen).forEach(function (key) {
-          var media = fetched[Number(key)];
-          if (media && anilistIsSeasonEntry(media)) seasons.push(media);
-        });
-        seasons.sort(function (a, b) {
-          var ka = anilistStartKey(a);
-          var kb = anilistStartKey(b);
-          if (ka !== kb) return ka - kb;
-          return Number(a.id) - Number(b.id);
-        });
-        if (!seasons.length) seasons = [seed];
-        anilistTrimSeasonsCache(_anilistSeasonsById);
-        _anilistSeasonsById[anilistId] = seasons;
-        for (var si = 0; si < seasons.length; si++) {
-          _anilistSeasonsById[Number(seasons[si].id)] = seasons;
+        var ovaIds = anilistSideStoryOvaIds(fetched, seen);
+        var pending = [];
+        for (var oi = 0; oi < ovaIds.length; oi++) {
+          if (seen[ovaIds[oi]]) continue;
+          seen[ovaIds[oi]] = true;
+          pending.push(ovaIds[oi]);
         }
-        return seasons;
+        if (!pending.length) return Promise.resolve(finishSeasons(seed, seen));
+        return Promise.all(
+          pending.map(function (id) {
+            return fetchMedia(id);
+          }),
+        ).then(function () {
+          return finishSeasons(seed, seen);
+        });
       }
       var id = queue.shift();
       return fetchMedia(id).then(function (media) {
@@ -591,18 +666,84 @@ function anilistGetSeasons(ctx, cfg, anilistId) {
   });
 }
 
+function anilistTitleBlob(m) {
+  var t = (m && m.title) || {};
+  return [t.romaji, t.english, t.native]
+    .map(function (s) {
+      return String(s || '').trim();
+    })
+    .filter(Boolean)
+    .join(' ');
+}
+
+function anilistParsePartNumber(m) {
+  var blob = anilistTitleBlob(m);
+  var match =
+    blob.match(/\bPart\s*(\d+)\b/i) ||
+    blob.match(/\bCour\s*(\d+)\b/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function anilistParseSeasonFromTitle(m) {
+  var blob = anilistTitleBlob(m);
+  var match = blob.match(/\b(\d+)(?:st|nd|rd|th)\s+Season\b/i);
+  if (match) return Number(match[1]);
+  match = blob.match(/\bSeason\s*(\d+)\b/i);
+  if (match) return Number(match[1]);
+  return 0;
+}
+
+// Miruro-style labels: Season N / Season N - Part M / OVA N / Special N + year.
 function anilistSeasonsPayload(seasons, currentId) {
   if (!Array.isArray(seasons) || seasons.length <= 1) return null;
   var out = [];
+  var tvCounter = 0;
+  var ovaCounter = 0;
+  var specialCounter = 0;
+  var lastTvSeasonNum = 0;
   for (var i = 0; i < seasons.length; i++) {
     var m = seasons[i];
     var id = Number(m.id);
     if (!(id > 0)) continue;
+    var fmt = String(m.format || '').toUpperCase();
+    var part = anilistParsePartNumber(m);
+    var titledSeason = anilistParseSeasonFromTitle(m);
+    var year =
+      m.startDate && Number(m.startDate.year) > 0
+        ? Number(m.startDate.year)
+        : 0;
+    var label;
+    if (fmt === 'OVA') {
+      ovaCounter += 1;
+      label = 'OVA ' + ovaCounter;
+    } else if (fmt === 'SPECIAL') {
+      specialCounter += 1;
+      label = 'Special ' + specialCounter;
+    } else {
+      var seasonNum;
+      if (part > 1 && lastTvSeasonNum > 0) {
+        seasonNum = lastTvSeasonNum;
+      } else if (titledSeason > 0) {
+        seasonNum = titledSeason;
+        lastTvSeasonNum = seasonNum;
+        if (seasonNum > tvCounter) tvCounter = seasonNum;
+      } else {
+        tvCounter += 1;
+        seasonNum = tvCounter;
+        lastTvSeasonNum = seasonNum;
+      }
+      label = 'Season ' + seasonNum;
+      if (part > 0) label += ' - Part ' + part;
+    }
+    var cover = m.coverImage || {};
+    var poster = anilistAbsUrl(cover.extraLarge || cover.large || '');
     var row = {
       number: out.length + 1,
       id: 'anilist:' + id,
-      label: 'Season ' + (out.length + 1),
+      label: label,
     };
+    if (year > 0) row.year = year;
+    if (poster) row.poster = poster;
     if (id === Number(currentId)) row.selected = true;
     out.push(row);
   }

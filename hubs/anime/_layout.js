@@ -15,6 +15,9 @@ function anilistLayout() {
     pages: {
       anime: {
         feed: true,
+        // First-paint batch only (home/asian_drama pattern). Later rails
+        // lazy-load via LazyViewportGate + row prefetch.
+        feedRails: ['spotlight', 'trending', 'this_season'],
         pageSize: Number(ANILIST_DEFAULTS.perPage) || 24,
         // TV D-pad — vertical chain is pack focusUp/focusDown on widgets.
         // Visual: trending → continue? → mood-chips → mood-results?
