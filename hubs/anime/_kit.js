@@ -844,15 +844,19 @@ function hubApplyTmdbHit(meta, hit) {
   if (hit.rating != null && !(Number(meta.rating) > 0)) {
     meta.rating = Number(hit.rating);
   }
-  if (hit.premiereDate && !String(meta.premiereDate || '').trim()) {
-    meta.premiereDate = String(hit.premiereDate);
-  }
-  if (
-    hit.premiereDate &&
-    hubIsFutureIsoDate(hit.premiereDate) &&
-    !String(meta.status || '').trim()
-  ) {
-    meta.status = 'NOT_YET_RELEASED';
+  // Anime: keep AniList status / year — TMDB series first_air (2018) must not
+  // stamp a 2027 cour as "Coming soon • Oct 2, 2018".
+  if (!hubIsAnimeMeta(meta)) {
+    if (hit.premiereDate && !String(meta.premiereDate || '').trim()) {
+      meta.premiereDate = String(hit.premiereDate);
+    }
+    if (
+      hit.premiereDate &&
+      hubIsFutureIsoDate(hit.premiereDate) &&
+      !String(meta.status || '').trim()
+    ) {
+      meta.status = 'NOT_YET_RELEASED';
+    }
   }
   // Pack-owned cast/crew (AniList Characters/Staff) wins over TMDB.
   if (
@@ -872,7 +876,25 @@ function hubApplyTmdbHit(meta, hit) {
   if (Array.isArray(hit.trailers) && hit.trailers.length) {
     meta.trailers = hit.trailers;
   }
-  if (hit.facts && typeof hit.facts === 'object') meta.facts = hit.facts;
+  if (hit.facts && typeof hit.facts === 'object') {
+    if (hubIsAnimeMeta(meta)) {
+      // Cour-scoped entry: TMDB franchise Seasons/Episodes totals are wrong next
+      // to AniList Season 1…N chips. Keep network / production / language.
+      var facts = Object.assign({}, hit.facts);
+      delete facts.seasonCount;
+      var courEps = Number(meta.episodes) || 0;
+      if (!(courEps > 0) && Array.isArray(meta.videos) && meta.videos.length) {
+        courEps = meta.videos.length;
+      }
+      if (courEps > 0) facts.episodeCount = courEps;
+      else delete facts.episodeCount;
+      delete facts.releaseDate;
+      delete facts.lastAirDate;
+      meta.facts = facts;
+    } else {
+      meta.facts = hit.facts;
+    }
+  }
   if (Array.isArray(hit.backdrops) && hit.backdrops.length) {
     meta.backdrops = hit.backdrops;
   }
@@ -1048,12 +1070,20 @@ function hubIsGenericEpisodeTitle(title) {
   return /^Episode\s+\d+$/i.test(String(title || '').trim());
 }
 
-// AniList streamingEpisodes is a short window; TMDB facts.episodeCount is the
-// declared total. Pad sparse / short meta.videos to 1..declared so the picker
-// matches the facts panel (and play episode numbers stay absolute).
+function hubIsAnimeMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  if (String(meta.type || '').toLowerCase() === 'anime') return true;
+  var open = meta.open;
+  return !!(open && String(open.surface || '').toLowerCase() === 'anime');
+}
+
+// Pad sparse pack videos to the pack's declared total. For anime, that is
+// AniList Media.episodes (one cour) — never TMDB franchise number_of_episodes.
 function hubPadMetaVideosToDeclared(meta) {
   if (!meta || typeof meta !== 'object') return meta;
-  var declared = Number(meta.facts && meta.facts.episodeCount) || 0;
+  var declared = hubIsAnimeMeta(meta)
+    ? Number(meta.episodes) || 0
+    : Number(meta.facts && meta.facts.episodeCount) || 0;
   var videos = Array.isArray(meta.videos) ? meta.videos : [];
   var byEp = {};
   var maxEp = 0;
@@ -1097,6 +1127,11 @@ function hubPadMetaVideosToDeclared(meta) {
 function hubEnrichMetaVideos(ctx, meta, hit) {
   if (!meta || !hit || !hit.id) return Promise.resolve(meta);
   if (String(hit.mediaType || '').toLowerCase() === 'movie') {
+    return Promise.resolve(meta);
+  }
+  // Anime: AniList owns the episode list. TMDB S1 absolute numbers would invent
+  // E46…E96 for a 12-ep cour and stamp wrong titles/stills.
+  if (hubIsAnimeMeta(meta)) {
     return Promise.resolve(meta);
   }
   hubPadMetaVideosToDeclared(meta);

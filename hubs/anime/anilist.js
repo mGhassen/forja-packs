@@ -11,6 +11,11 @@ var ANILIST_DEFAULTS = {
 // Shared cooldown across extract runs in the same engine isolate.
 var _anilistCooldownUntilMs = 0;
 
+// Season-chain cache (AniList Media id → ordered season spine).
+var _anilistSeasonsById = {};
+var _anilistSeasonsMediaById = {};
+var _ANILIST_SEASONS_CACHE_MAX = 80;
+
 var ANILIST_CARD_FIELDS = [
   'id',
   'idMal',
@@ -397,15 +402,245 @@ function anilistStaffFromMedia(m) {
   return out;
 }
 
-function anilistRelatedFromMedia(m, preferred) {
+function anilistRelationLabel(type) {
+  switch (String(type || '')) {
+    case 'SIDE_STORY':
+      return 'Side Story';
+    case 'SUMMARY':
+      return 'Summary';
+    case 'ALTERNATIVE':
+      return 'Alternative';
+    case 'SPIN_OFF':
+      return 'Spin-off';
+    case 'SEQUEL':
+      return 'Sequel';
+    case 'PREQUEL':
+      return 'Prequel';
+    case 'PARENT':
+      return 'Parent';
+    case 'COMPILATION':
+      return 'Compilation';
+    case 'CONTAINS':
+      return 'Contains';
+    case 'OTHER':
+      return 'Other';
+    default:
+      return String(type || '').replace(/_/g, ' ');
+  }
+}
+
+function anilistTrimSeasonsCache(map) {
+  var keys = Object.keys(map);
+  if (keys.length <= _ANILIST_SEASONS_CACHE_MAX) return;
+  var drop = keys.length - _ANILIST_SEASONS_CACHE_MAX;
+  for (var i = 0; i < drop; i++) delete map[keys[i]];
+}
+
+function anilistStartKey(node) {
+  var d = node && node.startDate;
+  if (!d || typeof d !== 'object') return 0;
+  var y = Number(d.year) || 0;
+  var m = Number(d.month) || 0;
+  var day = Number(d.day) || 0;
+  return y * 10000 + m * 100 + day;
+}
+
+function anilistCanWalkSeasonNode(node) {
+  if (!node || String(node.type || '') !== 'ANIME') return false;
+  var fmt = String(node.format || '').toUpperCase();
+  if (fmt === 'TV' || fmt === 'TV_SHORT') return true;
+  // Bridge: film between TV cours (Youjo Senki).
+  if (fmt === 'MOVIE') return true;
+  // Multi-ep ONA cour — not 1-ep specials (One Piece → MONSTERS).
+  if (fmt === 'ONA') {
+    var eps = node.episodes;
+    return !(typeof eps === 'number') || eps > 1;
+  }
+  return false;
+}
+
+function anilistIsSeasonEntry(node) {
+  var fmt = String((node && node.format) || '').toUpperCase();
+  if (fmt === 'TV' || fmt === 'TV_SHORT') return true;
+  if (fmt === 'ONA') {
+    var eps = node.episodes;
+    return !(typeof eps === 'number') || eps > 1;
+  }
+  return false;
+}
+
+function anilistWalkRank(node) {
+  var fmt = String((node && node.format) || '').toUpperCase();
+  if (fmt === 'TV' || fmt === 'TV_SHORT') return 0;
+  if (fmt === 'ONA') return 1;
+  if (fmt === 'MOVIE') return 2;
+  return 9;
+}
+
+function anilistWalkNeighbors(media) {
+  var wanted = { PREQUEL: true, SEQUEL: true, PARENT: true };
+  var edges =
+    media &&
+    media.relations &&
+    Array.isArray(media.relations.edges)
+      ? media.relations.edges
+      : [];
+  var scored = [];
+  for (var i = 0; i < edges.length; i++) {
+    var e = edges[i] || {};
+    var type = String(e.relationType || '');
+    if (!wanted[type]) continue;
+    var node = e.node;
+    if (!anilistCanWalkSeasonNode(node)) continue;
+    var id = Number(node.id);
+    if (!(id > 0)) continue;
+    scored.push({ id: id, rank: anilistWalkRank(node) });
+  }
+  scored.sort(function (a, b) {
+    return a.rank - b.rank;
+  });
+  return scored.map(function (s) {
+    return s.id;
+  });
+}
+
+var ANILIST_SEASONS_FIELDS =
+  'id title { romaji english } format episodes status type ' +
+  'coverImage { large extraLarge } startDate { year month day } ' +
+  'relations { edges { relationType(version: 2) node { ' +
+  'id type format episodes status title { romaji english } ' +
+  'coverImage { large extraLarge } startDate { year month day } } } }';
+
+// BFS PREQUEL/SEQUEL/PARENT spine. Movies bridge but are not season chips.
+// Returns ordered list of season Media maps (TV / TV_SHORT / multi-ep ONA).
+function anilistGetSeasons(ctx, cfg, anilistId) {
+  var cached = _anilistSeasonsById[anilistId];
+  if (cached) return Promise.resolve(cached);
+
+  var query =
+    'query ($id: Int) { Media(id: $id, type: ANIME) { ' +
+    ANILIST_SEASONS_FIELDS +
+    ' } }';
+  var fetched = {};
+
+  function fetchMedia(id) {
+    if (fetched[id]) return Promise.resolve(fetched[id]);
+    var mem = _anilistSeasonsMediaById[id];
+    if (mem) {
+      fetched[id] = mem;
+      return Promise.resolve(mem);
+    }
+    return anilistQuery(ctx, cfg, query, { id: id })
+      .then(function (data) {
+        var media = data && data.Media;
+        if (!media || !media.id) return null;
+        fetched[id] = media;
+        anilistTrimSeasonsCache(_anilistSeasonsMediaById);
+        _anilistSeasonsMediaById[id] = media;
+        return media;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  return fetchMedia(anilistId).then(function (seed) {
+    if (!seed) return [];
+
+    var queue = [anilistId];
+    var seen = {};
+    seen[anilistId] = true;
+
+    function step() {
+      if (!queue.length) {
+        var seasons = [];
+        Object.keys(seen).forEach(function (key) {
+          var media = fetched[Number(key)];
+          if (media && anilistIsSeasonEntry(media)) seasons.push(media);
+        });
+        seasons.sort(function (a, b) {
+          var ka = anilistStartKey(a);
+          var kb = anilistStartKey(b);
+          if (ka !== kb) return ka - kb;
+          return Number(a.id) - Number(b.id);
+        });
+        if (!seasons.length) seasons = [seed];
+        anilistTrimSeasonsCache(_anilistSeasonsById);
+        _anilistSeasonsById[anilistId] = seasons;
+        for (var si = 0; si < seasons.length; si++) {
+          _anilistSeasonsById[Number(seasons[si].id)] = seasons;
+        }
+        return seasons;
+      }
+      var id = queue.shift();
+      return fetchMedia(id).then(function (media) {
+        if (media) {
+          var neighbors = anilistWalkNeighbors(media);
+          for (var ni = 0; ni < neighbors.length; ni++) {
+            var n = neighbors[ni];
+            if (seen[n]) continue;
+            seen[n] = true;
+            queue.push(n);
+          }
+        }
+        return step();
+      });
+    }
+
+    return step();
+  });
+}
+
+function anilistSeasonsPayload(seasons, currentId) {
+  if (!Array.isArray(seasons) || seasons.length <= 1) return null;
+  var out = [];
+  for (var i = 0; i < seasons.length; i++) {
+    var m = seasons[i];
+    var id = Number(m.id);
+    if (!(id > 0)) continue;
+    var row = {
+      number: out.length + 1,
+      id: 'anilist:' + id,
+      label: 'Season ' + (out.length + 1),
+    };
+    if (id === Number(currentId)) row.selected = true;
+    out.push(row);
+  }
+  return out.length > 1 ? out : null;
+}
+
+function anilistSeasonChainIdSet(seasons) {
+  var set = {};
+  if (!Array.isArray(seasons)) return set;
+  for (var i = 0; i < seasons.length; i++) {
+    var id = Number(seasons[i] && seasons[i].id);
+    if (id > 0) set[id] = true;
+  }
+  return set;
+}
+
+function anilistRelatedFromMedia(m, preferred, excludeIds) {
   var edges =
     m &&
     m.relations &&
     Array.isArray(m.relations.edges)
       ? m.relations.edges
       : [];
+  var exclude = excludeIds || {};
   var out = [];
   var seen = {};
+  var typeRank = {
+    SIDE_STORY: 0,
+    SUMMARY: 1,
+    ALTERNATIVE: 2,
+    SPIN_OFF: 3,
+    SEQUEL: 4,
+    PREQUEL: 5,
+    PARENT: 6,
+    COMPILATION: 7,
+    CONTAINS: 8,
+    OTHER: 9,
+  };
   for (var i = 0; i < edges.length; i++) {
     var e = edges[i] || {};
     var type = String(e.relationType || '');
@@ -415,14 +650,22 @@ function anilistRelatedFromMedia(m, preferred) {
     var fmt = String(node.format || '').toUpperCase();
     if (!fmt || !ANILIST_RELATION_FORMATS[fmt]) continue;
     var id = Number(node.id);
-    if (!(id > 0) || seen[id]) continue;
+    if (!(id > 0) || seen[id] || exclude[id]) continue;
     seen[id] = true;
     var meta = anilistMeta(node, preferred);
     if (!meta) continue;
-    meta.relationType = type;
+    // Host paints badge; format chips are stripped — relation label stays.
+    meta.badge = anilistRelationLabel(type);
+    meta._relationRank = typeRank[type] != null ? typeRank[type] : 99;
     out.push(meta);
   }
-  // Preserve AniList edges order (chronological as editors set).
+  out.sort(function (a, b) {
+    var ra = a._relationRank != null ? a._relationRank : 99;
+    var rb = b._relationRank != null ? b._relationRank : 99;
+    if (ra !== rb) return ra - rb;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  for (var j = 0; j < out.length; j++) delete out[j]._relationRank;
   return out;
 }
 
@@ -867,27 +1110,33 @@ function anilistDetails(ctx, cfg, params) {
     if (characters.length) meta.cast = characters;
     var staff = anilistStaffFromMedia(media);
     if (staff.length) meta.crew = staff;
-    var related = anilistRelatedFromMedia(media, preferred);
     var recommendations = anilistRecommendationsFromMedia(media, preferred);
-    var payload = {
-      meta: meta,
-      layout: {
-        fullBleedBackdrop: true,
-        firstBodyRowFraction: 0.65,
-      },
-    };
-    var rails = {};
-    if (related.length) {
-      rails.related = { title: 'Related', items: related };
-    }
-    if (recommendations.length) {
-      rails.recommendations = {
-        title: 'More Like This',
-        items: recommendations,
+
+    return anilistGetSeasons(ctx, cfg, id).then(function (seasons) {
+      var chainIds = anilistSeasonChainIdSet(seasons);
+      var related = anilistRelatedFromMedia(media, preferred, chainIds);
+      var payload = {
+        meta: meta,
+        layout: {
+          fullBleedBackdrop: true,
+          firstBodyRowFraction: 0.65,
+        },
       };
-    }
-    if (Object.keys(rails).length) payload.rails = rails;
-    return hubOk('details', payload, { maxAge: 1800, swr: 3600 });
+      var seasonsPayload = anilistSeasonsPayload(seasons, id);
+      if (seasonsPayload) payload.seasons = seasonsPayload;
+      var rails = {};
+      if (related.length) {
+        rails.related = { title: 'Related', items: related };
+      }
+      if (recommendations.length) {
+        rails.recommendations = {
+          title: 'More Like This',
+          items: recommendations,
+        };
+      }
+      if (Object.keys(rails).length) payload.rails = rails;
+      return hubOk('details', payload, { maxAge: 1800, swr: 3600 });
+    });
   });
 }
 
