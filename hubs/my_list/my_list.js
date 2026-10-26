@@ -562,7 +562,8 @@ function extract(ctx) {
   }
   if (action === 'feed' || action === 'rail') {
     return myListLoadFeed(ctx, params).then(function (items) {
-      return hubItems(action, items, { maxAge: 600, swr: 3600 });
+      // Short TTL — list is local+Simkl; long cache skipped auto-sync on open.
+      return hubItems(action, items, { maxAge: 30, swr: 120 });
     });
   }
   return hubFail(
