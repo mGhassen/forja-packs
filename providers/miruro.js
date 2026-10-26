@@ -1,10 +1,10 @@
 var SPECS = {
   bases: [
+    'https://www.miruro.cx',
     'https://www.miruro.to',
     'https://www.miruro.tv',
     'https://www.miruro.bz',
     'https://www.miruro.ru',
-    'https://www.miruro.cx',
   ],
 };
 
