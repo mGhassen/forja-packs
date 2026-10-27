@@ -1,7 +1,8 @@
 // Unified live_sport plugin — catalog + resolve (BZH-Sport / volkamax.club)
 // Catalog half (top-level)
+// bzh.lat apex redirects away from the schedule; volkamax is the live mirror.
 var SPECS = {
-  origins: ['https://volkamax.club'],
+  origins: ['https://volkamax.club', 'https://bzh.lat'],
   // Schedule times are fixed UTC+1 (site default, no DST shift).
   tzOffsetMin: 60,
 };
@@ -396,39 +397,98 @@ function nextPlayerIframe(html, baseUrl) {
   return '';
 }
 
+async function sniffUnlocked(ctx, embedUrl, referer) {
+  if (!ctx.live || typeof ctx.live.sniffEmbed !== 'function') return null;
+  var raw = String(embedUrl || '').trim();
+  if (!raw) return null;
+  try {
+    var m3u8 = await ctx.live.sniffEmbed(raw, String(referer || raw));
+    if (!m3u8 || !/^https?:\/\//i.test(String(m3u8))) return null;
+    var headers = playHeaders(raw);
+    return { url: String(m3u8), headers: headers };
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Follow nested iframes until a playable page:
- * holdfold `_econfig`, or xstream JW `streamUrls`.
+ * holdfold `_econfig`, xstream JW `streamUrls`, daddy, or WebView sniff
+ * (zonalive → ordernap / truckrefuse often 403 ctx.fetch).
+ * `allowSniff` only on unlock-on-play — Providers discover is EngineJS + 3s.
  */
-async function unlockEmbed(ctx, embedUrl, referer) {
+async function unlockEmbed(ctx, embedUrl, referer, allowSniff) {
   var url = String(embedUrl || '').trim();
   if (!url || isSkippableIframe(url)) return null;
+  if (isDaddyLiveUrl(url)) {
+    try {
+      var daddy = await resolveDaddyLiveEmbed(ctx, url, {});
+      if (daddy && daddy.length && daddy[0].url) {
+        return {
+          url: daddy[0].url,
+          headers: daddy[0].headers || playHeaders(url),
+        };
+      }
+    } catch (_) {}
+  }
+  if (isVideocdnUrl(url)) {
+    try {
+      var vcdn = await resolveVideocdnEmbed(ctx, url);
+      if (vcdn && vcdn.length && vcdn[0].url) {
+        return {
+          url: vcdn[0].url,
+          headers: vcdn[0].headers || playHeaders(url),
+        };
+      }
+    } catch (_) {}
+  }
   var ref = referer;
+  var lastUrl = url;
   for (var hop = 0; hop <= MAX_IFRAME_HOPS && url; hop++) {
+    lastUrl = url;
     var html;
     try {
       var res = await ctx.fetch(url, { headers: { 'User-Agent': ua(), Referer: ref } });
-      if (!res.ok) return null;
+      if (!res.ok) break;
       html = await res.text();
     } catch (_) {
-      return null;
+      break;
     }
     var cfgM = String(html || '').match(/_econfig\s*=\s*'([A-Za-z0-9+/=]+)'/);
     if (cfgM) {
       var conf = decodeEconfig(cfgM[1]);
-      if (!conf) return null;
+      if (!conf) break;
       var m3u8 = String(conf.stream_url_nop2p || conf.stream_url || '').trim();
-      if (!/^https?:\/\//i.test(m3u8)) return null;
+      if (!/^https?:\/\//i.test(m3u8)) break;
       var headers = playHeaders(url);
-      if (!(await liveM3u8(ctx, m3u8, headers))) return null;
+      if (!(await liveM3u8(ctx, m3u8, headers))) break;
       return { url: m3u8, headers: headers };
     }
     var fromJw = await unlockStreamUrls(ctx, html, url);
     if (fromJw) return fromJw;
     var next = nextPlayerIframe(html, url);
-    if (!next) return null;
+    if (!next) break;
+    if (isDaddyLiveUrl(next)) {
+      try {
+        var daddyNext = await resolveDaddyLiveEmbed(ctx, next, {});
+        if (daddyNext && daddyNext.length && daddyNext[0].url) {
+          return {
+            url: daddyNext[0].url,
+            headers: daddyNext[0].headers || playHeaders(next),
+          };
+        }
+      } catch (_) {}
+    }
     ref = url;
     url = next;
+  }
+  if (!allowSniff) return null;
+  // Gated CDN embeds (ordernap / truckrefuse) — WebView resource sniff.
+  var sniffed = await sniffUnlocked(ctx, lastUrl, ref || referer);
+  if (sniffed) return sniffed;
+  if (lastUrl !== embedUrl) {
+    sniffed = await sniffUnlocked(ctx, embedUrl, referer);
+    if (sniffed) return sniffed;
   }
   return null;
 }
@@ -487,6 +547,17 @@ async function findEvent(ctx, cfg) {
   return { origin: home.origin, ev: hit.ev };
 }
 
+function discoverEmbedRow(ctx, embed) {
+  var url = String((embed && embed.url) || '').trim();
+  if (!url || isSkippableIframe(url)) return null;
+  return {
+    url: url,
+    name: NAME + ' · ' + (embed.label || 'Link'),
+    source: 'bzhsport',
+    viewers: Number(ctx.viewers || 0),
+  };
+}
+
 async function listEventStreams(ctx, cfg) {
   var found = await findEvent(ctx, cfg);
   if (!found) return [];
@@ -496,9 +567,10 @@ async function listEventStreams(ctx, cfg) {
   var embeds = parseEventEmbeds(await res.text(), pageUrl);
   if (!embeds.length) return [];
 
+  // Providers discover: fast HTTP unlock only (EngineJS, short timeout).
   var unlocked = await Promise.all(
     embeds.map(function (e) {
-      return unlockEmbed(ctx, e.url, pageUrl).catch(function () {
+      return unlockEmbed(ctx, e.url, pageUrl, false).catch(function () {
         return null;
       });
     }),
@@ -512,6 +584,14 @@ async function listEventStreams(ctx, cfg) {
     if (seen[dedupe]) continue;
     seen[dedupe] = 1;
     out.push(streamRow(ctx, u, embeds[i].label));
+  }
+  if (out.length) return out;
+  // Hand off player pages for unlock-on-play (WebView sniff / daddy).
+  for (var j = 0; j < embeds.length; j++) {
+    var row = discoverEmbedRow(ctx, embeds[j]);
+    if (!row || seen[row.url]) continue;
+    seen[row.url] = 1;
+    out.push(row);
   }
   return out;
 }
@@ -533,8 +613,9 @@ async function resolveStream(ctx, cfg) {
         },
       ];
     }
-    var unlocked = await unlockEmbed(ctx, raw, bzhOrigins(cfg)[0] + '/');
+    var unlocked = await unlockEmbed(ctx, raw, bzhOrigins(cfg)[0] + '/', true);
     if (unlocked) return [streamRow(ctx, unlocked, 'Link')];
+    return [];
   }
   return listEventStreams(ctx, cfg);
 }

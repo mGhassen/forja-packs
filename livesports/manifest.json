@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.48",
+  "version": "2.0.49",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -223,7 +223,7 @@
     {
       "id": "bzhsport",
       "name": "BZH-Sport",
-      "description": "volkamax.club schedule, 24/7 channels, and stream resolve",
+      "description": "BZH-Sport schedule, 24/7 channels, and stream resolve",
       "entry": "bzhsport.js",
       "types": [
         "live_sport"
@@ -241,7 +241,8 @@
       "config": {
         "matchIdPrefix": "bzh_",
         "origins": [
-          "https://volkamax.club"
+          "https://volkamax.club",
+          "https://bzh.lat"
         ],
         "tzOffsetMin": 60
       }

@@ -864,8 +864,18 @@ function isDaddyLiveHost(host) {
     h.endsWith('.dlive.sx') ||
     h === 'dlhd.sx' ||
     h.endsWith('.dlhd.sx') ||
+    h === 'dlhd.st' ||
+    h.endsWith('.dlhd.st') ||
+    h === 'dlstreams.st' ||
+    h.endsWith('.dlstreams.st') ||
+    h === 'dlstreams.top' ||
+    h.endsWith('.dlstreams.top') ||
     h === 'thedaddy.to' ||
     h.endsWith('.thedaddy.to') ||
+    h === 'thedaddy.pk' ||
+    h.endsWith('.thedaddy.pk') ||
+    h === 'dembed.st' ||
+    h.endsWith('.dembed.st') ||
     h === 'lovecdn.ru' ||
     h.endsWith('.lovecdn.ru') ||
     h === 'lovetier.bz' ||
@@ -880,6 +890,8 @@ function isDaddyLiveUrl(url) {
     var path = u.pathname.toLowerCase();
     return (
       path.indexOf('/stream/stream-') >= 0 ||
+      path.indexOf('/cast/stream-') >= 0 ||
+      path.indexOf('/player/stream-') >= 0 ||
       path.indexOf('/daddy.php') >= 0 ||
       path.indexOf('/premiumtv/') >= 0 ||
       path.indexOf('/watch.php') >= 0
