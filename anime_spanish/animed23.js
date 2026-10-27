@@ -17,11 +17,10 @@ function extract(ctx) {
 
   function langMeta(code) {
     var c = String(code || '').toUpperCase();
-    if (c === 'LAT') return { language: 'dub', tag: '(DUB)', label: 'Latino' };
-    if (c === 'CAST' || c === 'CAT') {
-      return { language: 'dub', tag: '(DUB)', label: c === 'CAT' ? 'Catalán' : 'Castellano' };
-    }
-    return { language: 'sub', tag: '(SUB)', label: 'Sub ES' };
+    if (c === 'LAT') return esAnimeLangMeta('', 'lat');
+    if (c === 'CAST') return esAnimeLangMeta('', 'cast');
+    if (c === 'CAT' || c === 'CA') return esAnimeLangMeta('', 'ca');
+    return esAnimeLangMeta('', 'sub');
   }
 
   function search(query) {
@@ -170,7 +169,10 @@ function extract(ctx) {
           '&open=1',
         page.url,
       ).then(function (langHtml) {
-        var langs = parseLangOptions(langHtml || '');
+        var langs = parseLangOptions(langHtml || '').filter(function (code) {
+          return esAnimeCategoryOk(ctx, langMeta(code));
+        });
+        if (!langs.length) return [];
         return Promise.all(
           langs.map(function (code) {
             return loadLang(id, code, page.url).catch(function () {

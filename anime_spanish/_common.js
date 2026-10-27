@@ -90,33 +90,91 @@ function esAnimePick(hits, queryOrTitles) {
 }
 
 function esAnimeLangMeta(text, force) {
+  // force: 'sub' | 'dub' | 'lat' | 'cast' | 'ca'
+  if (force === 'lat' || force === 'latino') {
+    return { language: 'dub', langCode: 'lat', tag: '(DUB)', label: 'Latino' };
+  }
+  if (force === 'cast' || force === 'castellano' || force === 'es') {
+    return {
+      language: 'dub',
+      langCode: 'es',
+      tag: '(DUB)',
+      label: 'Castellano',
+    };
+  }
+  if (force === 'ca' || force === 'catalan' || force === 'catalán') {
+    return { language: 'dub', langCode: 'ca', tag: '(DUB)', label: 'Catalán' };
+  }
   if (force === 'dub') {
-    return { language: 'dub', tag: '(DUB)', label: 'Latino' };
+    return { language: 'dub', langCode: 'lat', tag: '(DUB)', label: 'Latino' };
   }
   if (force === 'sub') {
-    return { language: 'sub', tag: '(SUB)', label: 'Sub ES' };
+    return { language: 'sub', langCode: 'es', tag: '(SUB)', label: 'Sub ES' };
   }
   var s = String(text || '').toLowerCase();
   if (/\b(catalan|catalán)\b/.test(s)) {
-    return { language: 'dub', tag: '(DUB)', label: 'Catalán' };
+    return { language: 'dub', langCode: 'ca', tag: '(DUB)', label: 'Catalán' };
   }
   if (
-    /\b(latino|castellano|doblaje|audio[\s-]?latino|español[\s-]?latino|espanol[\s-]?latino|audio[\s-]?español|audio[\s-]?espanol)\b/.test(
+    /\b(castellano|español[\s-]?españa|espanol[\s-]?espana|audio[\s-]?castellano)\b/.test(
       s,
     )
   ) {
-    return { language: 'dub', tag: '(DUB)', label: 'Latino' };
+    return {
+      language: 'dub',
+      langCode: 'es',
+      tag: '(DUB)',
+      label: 'Castellano',
+    };
+  }
+  if (
+    /\b(latino|doblaje|audio[\s-]?latino|español[\s-]?latino|espanol[\s-]?latino)\b/.test(
+      s,
+    )
+  ) {
+    return { language: 'dub', langCode: 'lat', tag: '(DUB)', label: 'Latino' };
   }
   // Explicit sub markers on Spanish sites.
   if (
     /\b(sub[\s-]?espa[nñ]ol|subtitulado|sub[\s-]?esp|vose|subtitulos)\b/.test(s)
   ) {
-    return { language: 'sub', tag: '(SUB)', label: 'Sub ES' };
+    return { language: 'sub', langCode: 'es', tag: '(SUB)', label: 'Sub ES' };
   }
-  return { language: 'sub', tag: '(SUB)', label: 'Sub ES' };
+  return { language: 'sub', langCode: 'es', tag: '(SUB)', label: 'Sub ES' };
+}
+
+function esAnimeSelectedLangCodes(ctx) {
+  var rows = (ctx && ctx.languages) || [];
+  if (!Array.isArray(rows) || !rows.length) return null;
+  var out = [];
+  var seen = {};
+  rows.forEach(function (r) {
+    if (!r || typeof r !== 'object') return;
+    var kind = String(r.kind || '')
+      .toLowerCase()
+      .trim();
+    var code = String(r.code || '')
+      .toLowerCase()
+      .trim();
+    if ((kind !== 'sub' && kind !== 'dub') || !code) return;
+    var key = kind + ':' + code;
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({ kind: kind, code: code });
+  });
+  return out.length ? out : null;
 }
 
 function esAnimeCategoryOk(ctx, meta) {
+  var selected = esAnimeSelectedLangCodes(ctx);
+  if (selected) {
+    var code = String((meta && meta.langCode) || '').toLowerCase();
+    var kind = String((meta && meta.language) || '').toLowerCase();
+    for (var i = 0; i < selected.length; i++) {
+      if (selected[i].kind === kind && selected[i].code === code) return true;
+    }
+    return false;
+  }
   var cat = String((ctx && ctx.category) || '')
     .toLowerCase()
     .trim();
@@ -320,7 +378,9 @@ function esAnimeHopAll(ctx, brand, embeds) {
               url: play,
               name: label,
               title: meta.label,
-              language: meta.language, // sub | dub — Sources chips; ES filter keeps both
+              language: meta.language, // sub | dub — hub audio lane
+              audio: meta.label, // Castellano / Latino / Catalán / Sub ES
+              langCode: meta.langCode || '',
             });
           })
           .filter(Boolean);

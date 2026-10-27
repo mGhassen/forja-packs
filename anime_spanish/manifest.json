@@ -4,7 +4,7 @@
   "name": "Anime Spanish Providers",
   "description": "Spanish and Latino anime stream extractors (sub ES + Spanish dub).",
   "author": "ForjaHQ",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "tags": [
     "providers",
     "anime",
@@ -35,6 +35,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -64,6 +72,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -99,6 +115,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -128,6 +152,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -151,8 +183,20 @@
       ],
       "languages": [
         {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -182,6 +226,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {
@@ -211,6 +263,14 @@
         {
           "kind": "dub",
           "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "lat"
+        },
+        {
+          "kind": "dub",
+          "code": "ca"
         }
       ],
       "config": {

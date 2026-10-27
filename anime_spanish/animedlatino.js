@@ -1,7 +1,7 @@
 var SPECS = {
   base: 'https://animedlatino.com',
-  // Whole site is Spanish dub / Latino — always tag dub for the hub filter.
-  forceLang: 'dub',
+  // Whole site is Latino dub — tag dub:lat for the hub filter.
+  forceLang: 'lat',
 };
 
 function extract(ctx) {
