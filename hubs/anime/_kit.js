@@ -1029,12 +1029,14 @@ function hubTmdbEpisodeStillUrl(path) {
 
 function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
   var cfg = hubConfig(ctx, HUB_TMDB_DEFAULTS);
-  if (!(Number(tvId) > 0) || !(Number(season) > 0)) {
+  var sn = Number(season);
+  // Season 0 = TMDB specials (OVA / Special chips).
+  if (!(Number(tvId) > 0) || !isFinite(sn) || sn < 0) {
     return Promise.resolve({});
   }
   var url = hubTmdbBuildUrl(
     cfg,
-    '/tv/' + Number(tvId) + '/season/' + Number(season),
+    '/tv/' + Number(tvId) + '/season/' + sn,
     {},
   );
   if (!url) return Promise.resolve({});
@@ -1123,31 +1125,53 @@ function hubPadMetaVideosToDeclared(meta) {
   return meta;
 }
 
+// Pack chip "Season 4" / "OVA 1" → TMDB season_number (0 = specials).
+// Do not use seasons[].number — that is chain ordinal (OVA shifts TV indices).
+function hubAnimeTmdbSeasonNumber(meta) {
+  var list = Array.isArray(meta.seasons) ? meta.seasons : [];
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i];
+    if (!(row && row.selected)) continue;
+    var label = String(row.label || '');
+    var m = label.match(/\bSeason\s+(\d+)\b/i);
+    if (m) return Number(m[1]);
+    if (/^OVA\b/i.test(label) || /^Special\b/i.test(label)) return 0;
+  }
+  return 1;
+}
+
 // Details meta only — fill empty pack video thumbs/titles from matched TV season.
+// Anime: AniList owns the episode list (no pad). Still pull TMDB stills for the
+// selected cour's Season N — videos stay 1..Media.episodes with season:1.
 function hubEnrichMetaVideos(ctx, meta, hit) {
   if (!meta || !hit || !hit.id) return Promise.resolve(meta);
   if (String(hit.mediaType || '').toLowerCase() === 'movie') {
     return Promise.resolve(meta);
   }
-  // Anime: AniList owns the episode list. TMDB S1 absolute numbers would invent
-  // E46…E96 for a 12-ep cour and stamp wrong titles/stills.
-  if (hubIsAnimeMeta(meta)) {
-    return Promise.resolve(meta);
+  var anime = hubIsAnimeMeta(meta);
+  if (!anime) {
+    hubPadMetaVideosToDeclared(meta);
   }
-  hubPadMetaVideosToDeclared(meta);
   var videos = Array.isArray(meta.videos) ? meta.videos : [];
   if (!videos.length) return Promise.resolve(meta);
 
-  var seasonSet = {};
-  for (var i = 0; i < videos.length; i++) {
-    var v = videos[i];
-    if (!v || typeof v !== 'object') continue;
-    var season = Number(v.season) > 0 ? Number(v.season) : 1;
-    seasonSet[season] = true;
+  var seasonNums;
+  var animeTmdbSeason = 1;
+  if (anime) {
+    animeTmdbSeason = hubAnimeTmdbSeasonNumber(meta);
+    seasonNums = [animeTmdbSeason];
+  } else {
+    var seasonSet = {};
+    for (var i = 0; i < videos.length; i++) {
+      var v = videos[i];
+      if (!v || typeof v !== 'object') continue;
+      var season = Number(v.season) > 0 ? Number(v.season) : 1;
+      seasonSet[season] = true;
+    }
+    seasonNums = Object.keys(seasonSet).map(Number).filter(function (n) {
+      return n > 0;
+    });
   }
-  var seasonNums = Object.keys(seasonSet).map(Number).filter(function (n) {
-    return n > 0;
-  });
   if (!seasonNums.length) return Promise.resolve(meta);
 
   return Promise.all(
@@ -1162,7 +1186,11 @@ function hubEnrichMetaVideos(ctx, meta, hit) {
     for (var vi = 0; vi < videos.length; vi++) {
       var vid = videos[vi];
       if (!vid || typeof vid !== 'object') continue;
-      var s = Number(vid.season) > 0 ? Number(vid.season) : 1;
+      var s = anime
+        ? animeTmdbSeason
+        : Number(vid.season) > 0
+          ? Number(vid.season)
+          : 1;
       var ep = Number(vid.episode) > 0 ? Number(vid.episode) : vi + 1;
       var extras = (epBySeason[s] || {})[ep];
       if (!extras) continue;
