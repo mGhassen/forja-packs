@@ -460,10 +460,12 @@ function anilistTrimSeasonsCache(map) {
   for (var i = 0; i < drop; i++) delete map[keys[i]];
 }
 
+// Chronological key. Missing / TBA dates sort last — never before aired cours.
 function anilistStartKey(node) {
   var d = node && node.startDate;
-  if (!d || typeof d !== 'object') return 0;
+  if (!d || typeof d !== 'object') return 99999999;
   var y = Number(d.year) || 0;
+  if (!(y > 0)) return 99999999;
   var m = Number(d.month) || 0;
   var day = Number(d.day) || 0;
   return y * 10000 + m * 100 + day;
@@ -611,6 +613,10 @@ function anilistGetSeasons(ctx, cfg, anilistId) {
       var ka = anilistStartKey(a);
       var kb = anilistStartKey(b);
       if (ka !== kb) return ka - kb;
+      // Same date / both TBA: prefer "2nd Season" title numbers; untitled last.
+      var sa = anilistParseSeasonFromTitle(a) || 9999;
+      var sb = anilistParseSeasonFromTitle(b) || 9999;
+      if (sa !== sb) return sa - sb;
       return Number(a.id) - Number(b.id);
     });
     if (!seasons.length) seasons = [seed];
