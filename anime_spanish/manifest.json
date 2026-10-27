@@ -1,0 +1,440 @@
+{
+  "schema": 1,
+  "id": "forjahq-anime-spanish",
+  "name": "Anime Spanish Providers",
+  "description": "Spanish and Latino anime stream extractors (sub ES + Spanish dub).",
+  "author": "ForjaHQ",
+  "version": "1.0.11",
+  "tags": [
+    "providers",
+    "anime",
+    "spanish",
+    "latino"
+  ],
+  "plugins": [
+    {
+      "id": "latanime",
+      "name": "Latanime",
+      "entry": "latanime.js",
+      "prelude": "_common.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://latanime.org"
+      }
+    },
+    {
+      "id": "animeyt",
+      "name": "AnimeYT",
+      "entry": "animeyt.js",
+      "prelude": "_common.js,_hex_cms.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://vvw.animeyt.one",
+        "mirrors": [
+          "https://vvw.animeyt.one",
+          "https://animeyt.one",
+          "https://animeytx.org",
+          "https://animeyt.cc"
+        ]
+      }
+    },
+    {
+      "id": "otakustv",
+      "name": "OtakusTV",
+      "entry": "otakustv.js",
+      "prelude": "_common.js,_hex_cms.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://www.otakustv.net"
+      }
+    },
+    {
+      "id": "veranimes",
+      "name": "VerAnimes",
+      "entry": "veranimes.js",
+      "prelude": "_common.js,_hex_cms.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://wwv.veranimes.net"
+      }
+    },
+    {
+      "id": "animedlatino",
+      "name": "AnimedLatino",
+      "entry": "animedlatino.js",
+      "prelude": "_common.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://animedlatino.com"
+      }
+    },
+    {
+      "id": "animed23",
+      "name": "AnimeD23",
+      "entry": "animed23.js",
+      "prelude": "_common.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://animed23.com"
+      }
+    },
+    {
+      "id": "animev1",
+      "name": "AnimeV1",
+      "entry": "animev1.js",
+      "prelude": "_common.js",
+      "kind": "http",
+      "types": [
+        "anime"
+      ],
+      "ids": [
+        "title"
+      ],
+      "hops": [
+        "*"
+      ],
+      "languages": [
+        {
+          "kind": "sub",
+          "code": "es"
+        },
+        {
+          "kind": "dub",
+          "code": "es"
+        }
+      ],
+      "config": {
+        "base": "https://tvanime.tv",
+        "mirrors": [
+          "https://tvanime.tv",
+          "https://animev1.com"
+        ]
+      }
+    },
+    {
+      "id": "hop-filemoon",
+      "name": "Filemoon",
+      "entry": "hops/filemoon.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "filemoon.sx",
+        "filemoon.to",
+        "filemoon.nl",
+        "filemoon.in",
+        "moonmov.pro",
+        "bysesukior.com",
+        "bysesayeveum.com",
+        "1azayf9w.xyz",
+        "kerapoxy.cc",
+        "furher.in"
+      ]
+    },
+    {
+      "id": "hop-voe",
+      "name": "VOE",
+      "entry": "hops/voe.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "voe.sx",
+        "voe.st",
+        "voeun-block.net",
+        "jilliandescribecompany.com",
+        "voe.bar"
+      ]
+    },
+    {
+      "id": "hop-mp4upload",
+      "name": "Mp4Upload",
+      "entry": "hops/mp4upload.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "mp4upload.com",
+        "mp4upload.org",
+        "www.mp4upload.com"
+      ]
+    },
+    {
+      "id": "hop-uqload",
+      "name": "Uqload",
+      "entry": "hops/uqload.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "uqload.com",
+        "uqload.co",
+        "uqload.io",
+        "uqload.to",
+        "uqload.cx",
+        "uqload.is",
+        "uqload.net"
+      ]
+    },
+    {
+      "id": "hop-mixdrop",
+      "name": "MixDrop",
+      "entry": "hops/mixdrop.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "mixdrop.co",
+        "mixdrop.ag",
+        "mixdrop.sx",
+        "mixdrop.to",
+        "mixdrop.ps",
+        "mxdrop.to",
+        "mxdrop.top",
+        "mdy48tn97.com"
+      ]
+    },
+    {
+      "id": "hop-luluvdo",
+      "name": "Lulu",
+      "entry": "hops/luluvdo.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "luluvdo.com",
+        "lulustream.com",
+        "luluvid.com",
+        "luluvdoo.com"
+      ]
+    },
+    {
+      "id": "hop-doodstream",
+      "name": "Doodstream",
+      "entry": "hops/doodstream.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "dood.li",
+        "dood.ws",
+        "doodstream.com",
+        "dooodster.com",
+        "ds2play.com",
+        "dsvplay.com",
+        "dood.watch",
+        "dood.yt",
+        "dood.re",
+        "dood.la",
+        "dood.to",
+        "dood.pm",
+        "dood.work",
+        "dood.one",
+        "dood.so"
+      ]
+    },
+    {
+      "id": "hop-streamwish",
+      "name": "StreamWish",
+      "entry": "hops/streamwish.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "streamwish.to",
+        "streamwish.com",
+        "ajmidyad.sbs",
+        "wishfast.top",
+        "embedwish.com"
+      ]
+    },
+    {
+      "id": "hop-streamtape",
+      "name": "Streamtape",
+      "entry": "hops/streamtape.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "streamtape.com",
+        "streamtape.net",
+        "streamtape.to",
+        "streamta.pe",
+        "strcloud.link"
+      ]
+    },
+    {
+      "id": "hop-streamsb",
+      "name": "StreamSB",
+      "entry": "hops/streamsb.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "streamsb.net",
+        "sbembed.com",
+        "watchsb.com",
+        "sblongvu.com",
+        "embedsb.com",
+        "sbplay.org",
+        "sbplay2.com",
+        "sbfull.com"
+      ]
+    },
+    {
+      "id": "hop-yourupload",
+      "name": "YourUpload",
+      "entry": "hops/yourupload.js",
+      "kind": "hop",
+      "types": [
+        "anime"
+      ],
+      "hosts": [
+        "yourupload.com",
+        "www.yourupload.com"
+      ]
+    }
+  ],
+  "bundle": [
+    "_common.js",
+    "_hex_cms.js",
+    "latanime.js",
+    "animeyt.js",
+    "otakustv.js",
+    "veranimes.js",
+    "animedlatino.js",
+    "animed23.js",
+    "animev1.js",
+    "hops/filemoon.js",
+    "hops/voe.js",
+    "hops/mp4upload.js",
+    "hops/uqload.js",
+    "hops/mixdrop.js",
+    "hops/luluvdo.js",
+    "hops/doodstream.js",
+    "hops/streamwish.js",
+    "hops/streamtape.js",
+    "hops/streamsb.js",
+    "hops/yourupload.js"
+  ]
+}

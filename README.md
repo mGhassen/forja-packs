@@ -16,6 +16,7 @@ Packs are JavaScript plugins the Forja app installs by manifest URL, caches on d
 | Pack | Manifest | Role |
 |------|----------|------|
 | **Providers** | [`providers/manifest.json`](providers/manifest.json) | VOD / anime / drama scrapers + file-host hops |
+| **Anime Spanish Providers** | [`anime_spanish/manifest.json`](anime_spanish/manifest.json) | Spanish / Latino anime stream extractors |
 | **Live Sports** | [`livesports/manifest.json`](livesports/manifest.json) | Schedule catalogs + stream resolve (`live_sport` capabilities) |
 | **Torrent** | [`torrent/manifest.json`](torrent/manifest.json) | Builtin torrent indexer search |
 | **Home** | [`hubs/home/manifest.json`](hubs/home/manifest.json) | Home catalog hub (TMDB) |
@@ -39,6 +40,7 @@ Web **Community Packs** lists packs published in admin (`plugin_packs`). Registe
 ```
 forja-packs/
 ├── providers/     VOD extractors + hops/
+├── anime_spanish/ Spanish / Latino anime extractors
 ├── torrent/       Torrent indexer search
 ├── livesports/    Live schedule + resolve (+ goat/gasm/sportsembed)
 ├── hubs/          Catalog hub packs (home, anime, iptv, …)

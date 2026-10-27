@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for dir in providers livesports torrent debrid \
+          for dir in providers anime_spanish livesports torrent debrid \
             hubs/home hubs/anime hubs/asian_drama hubs/arabic hubs/aflem \
             hubs/cartoon hubs/kids hubs/shahid hubs/iptv hubs/live_sports \
             hubs/my_list hubs/stremio hubs/downloads; do
