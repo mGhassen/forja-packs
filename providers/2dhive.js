@@ -172,6 +172,7 @@ function extract(ctx) {
               name: '2DHive Megaplay (' + kind.toUpperCase() + ')',
               language: kind === 'dub' ? 'Dub' : 'Sub',
               headers: { 'User-Agent': ua, Referer: megaplay + '/', Origin: megaplay },
+              pngStrip: 'auto',
             },
           ];
         });
