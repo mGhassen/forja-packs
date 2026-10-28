@@ -95,15 +95,19 @@ function extract(ctx) {
       .then(function (json) {
         var file = fileFromGetSources(json);
         if (!file) return [];
-        return [
-          {
-            url: file,
-            name: 'Megaplay [' + name + '] (' + kind.toUpperCase() + ')',
-            language: kind === 'dub' ? 'Dub' : 'Sub',
-            headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
-            pngStrip: 'auto',
-          },
-        ];
+        var row = {
+          url: file,
+          name: 'Megaplay [' + name + '] (' + kind.toUpperCase() + ')',
+          language: kind === 'dub' ? 'Dub' : 'Sub',
+          headers: { 'User-Agent': ua, Referer: origin + '/', Origin: origin },
+          pngStrip: 'auto',
+        };
+        var subs = forjaMegaplayTracksToSubtitles(json.tracks, 'Megaplay', {
+          referer: origin + '/',
+          origin: origin,
+        });
+        if (subs.length) row.subtitles = subs;
+        return [row];
       })
       .catch(function () {
         return [];

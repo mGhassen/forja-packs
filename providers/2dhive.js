@@ -166,15 +166,23 @@ function extract(ctx) {
         }).then(function (json) {
           var file = fileFromGetSources(json);
           if (!file) return [];
-          return [
-            {
-              url: file,
-              name: '2DHive Megaplay (' + kind.toUpperCase() + ')',
-              language: kind === 'dub' ? 'Dub' : 'Sub',
-              headers: { 'User-Agent': ua, Referer: megaplay + '/', Origin: megaplay },
-              pngStrip: 'auto',
+          var row = {
+            url: file,
+            name: '2DHive Megaplay (' + kind.toUpperCase() + ')',
+            language: kind === 'dub' ? 'Dub' : 'Sub',
+            headers: {
+              'User-Agent': ua,
+              Referer: megaplay + '/',
+              Origin: megaplay,
             },
-          ];
+            pngStrip: 'auto',
+          };
+          var subs = forjaMegaplayTracksToSubtitles(json.tracks, '2DHive', {
+            referer: megaplay + '/',
+            origin: megaplay,
+          });
+          if (subs.length) row.subtitles = subs;
+          return [row];
         });
       })
       .catch(function () {

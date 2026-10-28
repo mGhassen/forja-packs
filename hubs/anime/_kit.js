@@ -1069,7 +1069,8 @@ function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
 }
 
 function hubIsGenericEpisodeTitle(title) {
-  return /^Episode\s+\d+$/i.test(String(title || '').trim());
+  // Bare "Episode 12" or AniList "Episode 49 - Demons and Strategies".
+  return /^Episode\s+\d+(\s*[-–:].*)?$/i.test(String(title || '').trim());
 }
 
 function hubIsAnimeMeta(meta) {
@@ -1127,16 +1128,29 @@ function hubPadMetaVideosToDeclared(meta) {
 
 // Pack chip "Season 4" / "OVA 1" → TMDB season_number (0 = specials).
 // Do not use seasons[].number — that is chain ordinal (OVA shifts TV indices).
+function hubAnimeTmdbSeasonFromLabel(label) {
+  var text = String(label || '');
+  var m = text.match(/\bSeason\s+(\d+)\b/i);
+  if (m) return Number(m[1]);
+  m = text.match(/\b(\d+)(?:st|nd|rd|th)\s+Season\b/i);
+  if (m) return Number(m[1]);
+  if (/^OVA\b/i.test(text) || /^Special\b/i.test(text)) return 0;
+  return -1;
+}
+
 function hubAnimeTmdbSeasonNumber(meta) {
   var list = Array.isArray(meta.seasons) ? meta.seasons : [];
   for (var i = 0; i < list.length; i++) {
     var row = list[i];
     if (!(row && row.selected)) continue;
-    var label = String(row.label || '');
-    var m = label.match(/\bSeason\s+(\d+)\b/i);
-    if (m) return Number(m[1]);
-    if (/^OVA\b/i.test(label) || /^Special\b/i.test(label)) return 0;
+    var fromChip = hubAnimeTmdbSeasonFromLabel(row.label);
+    if (fromChip >= 0) return fromChip;
   }
+  // Enrich often gets meta without seasons[] — parse AniList Media title.
+  var fromTitle = hubAnimeTmdbSeasonFromLabel(
+    meta && (meta.name || meta.title || ''),
+  );
+  if (fromTitle >= 0) return fromTitle;
   return 1;
 }
 

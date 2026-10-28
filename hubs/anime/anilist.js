@@ -295,7 +295,6 @@ function anilistVideosFromMedia(m) {
   var stream = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
   var total = Number(m.episodes) || 0;
   var known = {};
-  var maxParsed = 0;
   var parsed = 0;
   var i;
   for (i = 0; i < stream.length; i++) {
@@ -303,7 +302,6 @@ function anilistVideosFromMedia(m) {
     var num = anilistParseEpisodeNumber(ep.title);
     if (!(num > 0) || num !== Math.floor(num)) continue; // skip 48.5 digressions
     parsed++;
-    if (num > maxParsed) maxParsed = num;
     known[num] = {
       title: String(ep.title || '').trim(),
       thumbnail: anilistAbsUrl(ep.thumbnail || ''),
@@ -320,22 +318,20 @@ function anilistVideosFromMedia(m) {
         thumbnail: anilistAbsUrl(raw.thumbnail || ''),
         abs: fb,
       };
-      if (fb > maxParsed) maxParsed = fb;
     }
   }
-  // AniList often stamps franchise-absolute titles ("Episode 72") on a 24-ep
-  // cour. Remap into 1..total — never pad the picker to the absolute max.
-  var offset = 0;
-  if (total > 0 && maxParsed > total) {
-    offset = maxParsed - total;
-  }
+  // AniList often reuses one franchise-recent streaming window (e.g. Slime
+  // S1..S3 all return "Episode 49"…"Episode 72") on every Media. Gluing
+  // last-N onto 1..total then puts S3 titles on Season 1. Only keep rows
+  // whose abs number already fits this Media; otherwise leave titles empty
+  // for TMDB enrich (never invent a trailing-window offset).
   var byRel = {};
   Object.keys(known).forEach(function (key) {
     var row = known[key];
-    var rel = Number(row.abs) - offset;
-    if (!(rel >= 1)) return;
-    if (total > 0 && rel > total) return;
-    byRel[rel] = row;
+    var abs = Number(row.abs);
+    if (!(abs >= 1)) return;
+    if (total > 0 && abs > total) return;
+    byRel[abs] = row;
   });
 
   var maxAir = 0;
@@ -1269,7 +1265,11 @@ function anilistDetails(ctx, cfg, params) {
         },
       };
       var seasonsPayload = anilistSeasonsPayload(seasons, id);
-      if (seasonsPayload) payload.seasons = seasonsPayload;
+      if (seasonsPayload) {
+        payload.seasons = seasonsPayload;
+        // Companion enrich reads meta.seasons[].selected → TMDB Season N.
+        meta.seasons = seasonsPayload;
+      }
       var rails = {};
       if (related.length) {
         rails.related = { title: 'Related', items: related };
