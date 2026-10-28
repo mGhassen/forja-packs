@@ -23,13 +23,26 @@ function myListLayout() {
           enter: 'kind',
           restore: 'kind',
           restoreMode: 'remembered',
-          pageBack: ['grid', 'status', 'kind'],
+          pageBack: ['grid', 'status', 'kind', 'chrome'],
         },
         widgets: [
           kitTabsCards('page', { expand: true }, [
+            kitTopBar('chrome', {
+              focusDown: 'kind',
+              actions: [
+                {
+                  id: 'search',
+                  label: 'Search',
+                  action: 'eventSearch',
+                  trailing: true,
+                  placeholder: 'Search my list…',
+                },
+              ],
+            }),
             kitMenu('kind', MY_LIST_KIND_ITEMS, {
               toggle: true,
               focusDown: 'status',
+              focusUp: 'chrome',
             }),
             kitTabs('status', MY_LIST_STATUS_TABS, {
               default: 'plantowatch',
