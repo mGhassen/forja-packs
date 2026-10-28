@@ -60,11 +60,17 @@ function hubOk(action, data, cache) {
   return [env];
 }
 
-function hubItems(action, items, cache, paging) {
+function hubItems(action, items, cache, paging, extra) {
   var data = { items: items || [] };
   if (paging && typeof paging === 'object') {
     if (Number(paging.pageSize) > 0) data.pageSize = Number(paging.pageSize);
     if (typeof paging.hasMore === 'boolean') data.hasMore = paging.hasMore;
+  }
+  if (extra && typeof extra === 'object') {
+    for (var k in extra) {
+      if (!Object.prototype.hasOwnProperty.call(extra, k)) continue;
+      if (extra[k] != null) data[k] = extra[k];
+    }
   }
   return hubOk(action, data, cache);
 }
@@ -774,12 +780,7 @@ function kitList(id, opts) {
   return Object.assign({ type: 'kit.list', id: id }, o);
 }
 
-function kitTopBar(id, opts) {
-  var o = opts && typeof opts === 'object' ? opts : {};
-  return Object.assign({ type: 'kit.topBar', id: id }, o);
-}
-
-/** Optional topBar + kind menu? + status tabs + cards grid. children: [topBar?, menu?, tabs, cards]. */
+/** Kind menu? + status tabs + cards grid (My List geometry). children: [menu?, tabs, cards]. */
 function kitTabsCards(id, opts, children) {
   var o = opts && typeof opts === 'object' ? opts : {};
   return Object.assign(

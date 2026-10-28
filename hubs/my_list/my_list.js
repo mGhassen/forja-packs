@@ -411,6 +411,55 @@ function myListShapeRow(row) {
   return out;
 }
 
+var MY_LIST_STATUSES = [
+  'plantowatch',
+  'watching',
+  'hold',
+  'completed',
+  'dropped',
+];
+
+function myListQueryMatch(row, q) {
+  if (!q) return true;
+  var needle = String(q).toLowerCase();
+  if (!needle) return true;
+  var title = String(
+    (row && (row.title || row.name)) || '',
+  ).toLowerCase();
+  if (title.indexOf(needle) >= 0) return true;
+  var year = String(
+    (row && (row.releaseDate || row.releaseInfo || row.year)) || '',
+  ).toLowerCase();
+  return year.indexOf(needle) >= 0;
+}
+
+function myListLocalForStatus(allLocal, status) {
+  var out = [];
+  for (var i = 0; i < allLocal.length; i++) {
+    var e = allLocal[i];
+    var st =
+      e && e.listStatus != null ? String(e.listStatus) : 'plantowatch';
+    if (st === status) out.push(e);
+  }
+  return out;
+}
+
+function myListMergeStatus(allLocal, status, hiddenKeys, simklRaw) {
+  var localForStatus = myListLocalForStatus(allLocal, status);
+  if (!Array.isArray(simklRaw)) {
+    return localForStatus;
+  }
+  var cards = [];
+  for (var i = 0; i < simklRaw.length; i++) {
+    var card = simklCardItem(simklRaw[i]);
+    if (!card) continue;
+    card.listStatus = status;
+    cards.push(card);
+  }
+  var filtered = filterSimklByLocal(cards, allLocal, status, hiddenKeys);
+  return mergeLocalHubs(filtered, localForStatus);
+}
+
 function myListLoadFeed(ctx, params) {
   var host = ctx && ctx.host;
   var store = (host && host.store) || (host && host.bookmarks);
@@ -422,6 +471,8 @@ function myListLoadFeed(ctx, params) {
     (params && (params.status || params.listStatus)) || 'plantowatch';
   status = String(status);
   var hiddenKeys = (params && params.hiddenKeys) || [];
+  var q =
+    params && params.q != null ? String(params.q).trim() : '';
 
   // Pack opts in: host runs saved list mode when Settings auto-sync is on
   // (throttled), then refreshes the Simkl library cache before we merge.
@@ -435,13 +486,7 @@ function myListLoadFeed(ctx, params) {
   return ready.then(function () {
     return Promise.resolve(store.list({})).then(function (allLocal) {
     if (!Array.isArray(allLocal)) allLocal = [];
-    var localForStatus = [];
-    for (var i = 0; i < allLocal.length; i++) {
-      var e = allLocal[i];
-      var st =
-        e && e.listStatus != null ? String(e.listStatus) : 'plantowatch';
-      if (st === status) localForStatus.push(e);
-    }
+    var localForStatus = myListLocalForStatus(allLocal, status);
 
     function myListTrackerLinked(row) {
       if (!row) return false;
@@ -474,11 +519,12 @@ function myListLoadFeed(ctx, params) {
       return !!(open && String(open.surface || '') === 'anime');
     }
 
-    function finish(merged, simklOn) {
+    function finish(merged, simklOn, statusCounts) {
       var shaped = [];
       for (var i = 0; i < merged.length; i++) {
         var row = myListShapeRow(merged[i]);
         if (!row) continue;
+        if (q && !myListQueryMatch(row, q)) continue;
         if (row.rating == null && row.voteAverage != null) {
           row.rating = Number(row.voteAverage);
         }
@@ -517,38 +563,83 @@ function myListLoadFeed(ctx, params) {
             delete item.paint;
             out.push(hubPaintPoster(item));
           }
-          return out;
+          return { items: out, statusCounts: statusCounts || null };
         },
       );
     }
 
+    function countStatusHits(merged) {
+      var n = 0;
+      for (var i = 0; i < merged.length; i++) {
+        var row = myListShapeRow(merged[i]);
+        if (!row) continue;
+        if (myListQueryMatch(row, q)) n++;
+      }
+      return n;
+    }
+
+    function withStatusCounts(merged, simklOn, buildCounts) {
+      if (!q || typeof buildCounts !== 'function') {
+        return finish(merged, simklOn, null);
+      }
+      return Promise.resolve(buildCounts()).then(function (counts) {
+        return finish(merged, simklOn, counts);
+      });
+    }
+
     if (!simkl || typeof simkl.isLoggedIn !== 'function') {
-      return finish(localForStatus, false);
+      return withStatusCounts(localForStatus, false, function () {
+        var counts = {};
+        for (var s = 0; s < MY_LIST_STATUSES.length; s++) {
+          var st = MY_LIST_STATUSES[s];
+          counts[st] = countStatusHits(myListLocalForStatus(allLocal, st));
+        }
+        return counts;
+      });
     }
 
     return Promise.resolve(simkl.isLoggedIn()).then(function (loggedIn) {
       if (!loggedIn || typeof simkl.watchlist !== 'function') {
-        return finish(localForStatus, false);
-      }
-      return Promise.resolve(simkl.watchlist({ status: status })).then(
-        function (raw) {
-          if (!Array.isArray(raw)) return finish(localForStatus, true);
-          var cards = [];
-          for (var i = 0; i < raw.length; i++) {
-            var card = simklCardItem(raw[i]);
-            if (!card) continue;
-            card.listStatus = status;
-            cards.push(card);
+        return withStatusCounts(localForStatus, false, function () {
+          var counts = {};
+          for (var s = 0; s < MY_LIST_STATUSES.length; s++) {
+            var st = MY_LIST_STATUSES[s];
+            counts[st] = countStatusHits(myListLocalForStatus(allLocal, st));
           }
-          var filtered = filterSimklByLocal(
-            cards,
-            allLocal,
-            status,
-            hiddenKeys,
-          );
-          return finish(mergeLocalHubs(filtered, localForStatus), true);
-        },
-      );
+          return counts;
+        });
+      }
+
+      function loadStatus(st) {
+        return Promise.resolve(simkl.watchlist({ status: st })).then(
+          function (raw) {
+            return myListMergeStatus(
+              allLocal,
+              st,
+              hiddenKeys,
+              Array.isArray(raw) ? raw : [],
+            );
+          },
+        );
+      }
+
+      return loadStatus(status).then(function (merged) {
+        return withStatusCounts(merged, true, function () {
+          return Promise.all(
+            MY_LIST_STATUSES.map(function (st) {
+              return loadStatus(st).then(function (rows) {
+                return { id: st, n: countStatusHits(rows) };
+              });
+            }),
+          ).then(function (rows) {
+            var counts = {};
+            for (var i = 0; i < rows.length; i++) {
+              counts[rows[i].id] = rows[i].n;
+            }
+            return counts;
+          });
+        });
+      });
     });
     });
   });
@@ -561,9 +652,18 @@ function extract(ctx) {
     return hubOk('layout', myListLayout(), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'feed' || action === 'rail') {
-    return myListLoadFeed(ctx, params).then(function (items) {
+    return myListLoadFeed(ctx, params).then(function (result) {
+      var items = Array.isArray(result)
+        ? result
+        : result && Array.isArray(result.items)
+          ? result.items
+          : [];
+      var extra = null;
+      if (result && result.statusCounts && typeof result.statusCounts === 'object') {
+        extra = { statusCounts: result.statusCounts };
+      }
       // Short TTL — list is local+Simkl; long cache skipped auto-sync on open.
-      return hubItems(action, items, { maxAge: 30, swr: 120 });
+      return hubItems(action, items, { maxAge: 30, swr: 120 }, null, extra);
     });
   }
   return hubFail(

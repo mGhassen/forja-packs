@@ -133,6 +133,8 @@ function iptvLayout() {
                 kindMenu: 'cats',
                 catalogMenu: 'catalog',
                 sortMenu: 'sort',
+                // Opt into chrome Cards / EPG (host remaps only with viewMenu).
+                viewMenu: 'view',
                 pageSize: 48,
                 // Movies/Series posters — denser than hub rail defaults (190/32).
                 cardWidth: 140,
