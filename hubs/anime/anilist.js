@@ -197,7 +197,7 @@ function anilistMeta(m, preferred) {
     open: {
       surface: 'anime',
       id: String(m.id),
-      // Host: open.torrentEp → search Title 05 (not SxxExx).
+      // Host: open.torrentEp → short title + SxxExx (chip season) + Title 05.
       torrentEp: true,
       extract: {
         resolveType: 'anime',
