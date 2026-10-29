@@ -3,7 +3,7 @@
 
 var ANILIST_DEFAULTS = {
   graphql: 'https://graphql.anilist.co',
-  // Offline AniList catalog — raced when graphql.anilist.co is down/hanging.
+  // Offline AniList catalog — tried only after graphql.anilist.co fails.
   graphqlMirrors: ['https://graphql.aniraku.tech/'],
   perPage: 24,
 };
@@ -943,32 +943,30 @@ function anilistQuery(ctx, cfg, query, variables) {
   };
   var body = JSON.stringify({ query: query, variables: variables || {} });
 
-  return new Promise(function (resolve, reject) {
-    var left = endpoints.length;
-    var lastErr = null;
-    var won = false;
-
-    function onFail(err) {
-      lastErr = err;
-      left -= 1;
-      if (!won && left <= 0) {
-        reject(lastErr || new Error('anilist unreachable'));
-      }
+  // Sequential: primary first, mirrors only after a real miss.
+  // (Parallel race used to log "failover" whenever the mirror was merely faster.)
+  function tryAt(i, primaryFailed) {
+    if (i >= endpoints.length) {
+      return Promise.reject(new Error('anilist unreachable'));
     }
+    var url = endpoints[i];
+    return anilistFetchOnce(ctx, url, headers, body).then(
+      function (hit) {
+        if (primaryFailed) {
+          console.warn('[anilist] failover → ' + hit.url);
+        }
+        return hit.data;
+      },
+      function (err) {
+        if (i + 1 >= endpoints.length) {
+          return Promise.reject(err || new Error('anilist unreachable'));
+        }
+        return tryAt(i + 1, primaryFailed || url === primary);
+      },
+    );
+  }
 
-    function onWin(hit) {
-      if (won) return;
-      won = true;
-      if (hit.url && hit.url !== primary) {
-        console.warn('[anilist] failover → ' + hit.url);
-      }
-      resolve(hit.data);
-    }
-
-    for (var i = 0; i < endpoints.length; i++) {
-      anilistFetchOnce(ctx, endpoints[i], headers, body).then(onWin, onFail);
-    }
-  });
+  return tryAt(0, false);
 }
 
 function anilistRailItemsFromList(railId, list, preferred) {
