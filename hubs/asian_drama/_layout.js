@@ -27,6 +27,23 @@ function kisskhLayout() {
               title: 'Spotlight',
               rail: 'spotlight',
               bleed: 'latest',
+              actions: [
+                {
+                  // Phone: labeled Play first; TV/desktop keep View details first.
+                  id: 'play',
+                  label: 'Play',
+                  icon: 'play',
+                  tone: 'primary',
+                  profiles: ['mobile'],
+                },
+                {
+                  id: 'details',
+                  label: 'View details',
+                  icon: 'info',
+                  tone: 'secondary',
+                },
+                { id: 'follow' },
+              ],
             },
             'rail',
             { rail: 'spotlight' },

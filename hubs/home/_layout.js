@@ -2,7 +2,7 @@
 
 function tmdbLayout() {
   // Visual D-pad chain (host skips missing/empty via kit-edge miss):
-  // featured → popular → continue_watching? → mood-chips → mood-results?
+  // featured → continue_watching? → popular → mood-chips → mood-results?
   // → because-shuffle? → because (poster rail) → new_releases
   // → genre_0 → genre_1 → genre_2
   // Empty Continue / empty Because (no seeds) / no shuffle / empty mood
@@ -71,6 +71,14 @@ function tmdbLayout() {
               slideCap: 5,
               actions: [
                 {
+                  // Phone: labeled Play first; TV/desktop keep View details first.
+                  id: 'play',
+                  label: 'Play',
+                  icon: 'play',
+                  tone: 'primary',
+                  profiles: ['mobile'],
+                },
+                {
                   id: 'details',
                   label: 'View details',
                   icon: 'info',
@@ -91,8 +99,16 @@ function tmdbLayout() {
             // First catalog row ↑ → View details (host hero-details / focusHero).
             // Gallery ↑ still reaches the top menu; menu ↓ lands on View details.
             focusUp: 'hero-details',
-            focusDown: 'popular',
+            // Empty Continue → host kit-edge miss → popular.
+            focusDown: 'continue_watching',
           }, 'rail', { rail: 'featured' }),
+          {
+            type: 'continue',
+            id: 'continue_watching',
+            mergeHomeWatchHistory: true,
+            focusUp: 'featured',
+            focusDown: 'popular',
+          },
           hubWithLoad(
             {
               type: 'ranked',
@@ -101,20 +117,13 @@ function tmdbLayout() {
               rail: 'popular',
               style: 'numbered',
               maxPages: 2,
-              focusUp: 'featured',
-              // Empty Continue → host kit-edge miss → mood-chips.
-              focusDown: 'continue_watching',
+              // Empty Continue → host kit-edge miss → featured.
+              focusUp: 'continue_watching',
+              focusDown: 'mood-chips',
             },
             'rail',
             { rail: 'popular' },
           ),
-          {
-            type: 'continue',
-            id: 'continue_watching',
-            mergeHomeWatchHistory: true,
-            focusUp: 'popular',
-            focusDown: 'mood-chips',
-          },
           hubWithLoad(
             {
               type: 'mood',
@@ -122,8 +131,7 @@ function tmdbLayout() {
               title: "What's your mood?",
               options: TMDB_MOODS,
               // Host maps these onto mood-chips (not widget id `moods`).
-              // Empty Continue → host kit-edge miss → popular.
-              focusUp: 'continue_watching',
+              focusUp: 'popular',
               // Because poster rail. Host ↓ lands on because-shuffle first when
               // canShuffle; empty Because → miss walk → new_releases.
               focusDown: 'because',
