@@ -4,7 +4,15 @@
 
 var KISSKH_DEFAULTS = {
   base: 'https://kisskh.co',
-  mirrors: ['https://kisskh.co'],
+  mirrors: [
+    'https://kisskh.co',
+    'https://kisskh.nl',
+    'https://kisskh.ovh',
+    'https://kisskh.la',
+    'https://kisskh.do',
+    'https://kisskh.is',
+    'https://kisskh.id',
+  ],
 };
 
 // Paths match crates/kisskh home_hero + home_rails.
