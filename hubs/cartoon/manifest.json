@@ -5,6 +5,11 @@
   "description": "DimaToon Arabic cartoon / anime hub (كرتون).",
   "author": "ForjaHQ",
   "version": "1.0.23",
+  "i18n": {
+    "fr": {
+      "Arabic dubbed cartoons from DimaToon": "Dessins animés arabes doublés de DimaToon"
+    }
+  },
   "tags": [
     "cartoon",
     "arabic"

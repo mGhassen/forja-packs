@@ -6,6 +6,19 @@
   "author": "ForjaHQ",
   "version": "2.0.55",
   "prelude": "_wire.js",
+  "i18n": {
+    "fr": {
+      "BZH-Sport schedule, 24/7 channels, and stream resolve": "Programme BZH-Sport, chaînes 24h/24 et résolution des flux",
+      "Live Soccer TV schedule + broadcast channel hints": "Programme Live Soccer TV et chaînes de diffusion suggérées",
+      "LiveOnSat TV schedule + broadcast channel hints": "Programme LiveOnSat TV et chaînes de diffusion suggérées",
+      "ppv.st schedule and stream resolve": "Programme ppv.st et résolution des flux",
+      "streamed.st schedule and stream resolve": "Programme streamed.st et résolution des flux",
+      "streamfree.top schedule and stream resolve": "Programme streamfree.top et résolution des flux",
+      "streamic.live schedule and stream resolve": "Programme streamic.live et résolution des flux",
+      "timst.top schedule and stream resolve": "Programme timst.top et résolution des flux",
+      "watchfooty.st schedule and stream resolve": "Programme watchfooty.st et résolution des flux"
+    }
+  },
   "tags": [
     "sports",
     "live"

@@ -5,6 +5,11 @@
   "description": "Browse catalogs from your installed Stremio addons.",
   "author": "ForjaHQ",
   "version": "1.0.4",
+  "i18n": {
+    "fr": {
+      "Empty hub — installed VOD Stremio addon catalogs become the rows": "Hub vide — les catalogues VOD des addons Stremio installés forment les lignes"
+    }
+  },
   "tags": [
     "stremio",
     "catalog",

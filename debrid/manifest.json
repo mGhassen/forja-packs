@@ -6,6 +6,16 @@
   "author": "ForjaHQ",
   "version": "1.0.0",
   "prelude": "_debrid_common.js",
+  "i18n": {
+    "fr": {
+      "API key": "Clé API",
+      "From alldebrid.com/apikeys": "Depuis alldebrid.com/apikeys",
+      "From debrid-link.com/webapp/apikey": "Depuis debrid-link.com/webapp/apikey",
+      "From premiumize.me": "Depuis premiumize.me",
+      "From real-debrid.com/apitoken": "Depuis real-debrid.com/apitoken",
+      "From torbox.app": "Depuis torbox.app"
+    }
+  },
   "tags": ["debrid", "torrent"],
   "plugins": [
     {

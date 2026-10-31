@@ -5,6 +5,11 @@
   "description": "Arabic series, films and TV shows from Brstej.",
   "author": "ForjaHQ",
   "version": "1.0.31",
+  "i18n": {
+    "fr": {
+      "Arabic Aflem & Musalsalat": "Aflem et Musalsalat arabes"
+    }
+  },
   "tags": [
     "aflem",
     "arabic"

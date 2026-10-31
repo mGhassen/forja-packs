@@ -4,7 +4,25 @@
   "name": "ForjaHQ Anime",
   "description": "AniList-powered anime hub with search and details.",
   "author": "ForjaHQ",
-  "version": "1.0.67",
+  "version": "1.0.68",
+  "i18n": {
+    "fr": {
+      "AniList anime hub": "Hub anime AniList",
+      "Anime title language": "Langue des titres d'anime",
+      "Cards": "Cartes",
+      "Cards with stills, or numbered chips in a grid": "Cartes avec images, ou pastilles numérotées en grille",
+      "Display": "Affichage",
+      "Empty = all providers. Filters which Forja plugins run on Play and Sources.": "Vide = tous les fournisseurs. Filtre les plugins Forja lancés à la lecture et dans les sources.",
+      "English": "Anglais",
+      "Episode list": "Liste des épisodes",
+      "Native": "Langue d'origine",
+      "Number chips": "Pastilles numérotées",
+      "Stream languages": "Langues des flux",
+      "TMDB Enrich": "Enrichissement TMDB",
+      "TMDB match enrich for Anime metas (companion to AniList)": "Enrichissement TMDB des fiches d'anime (complément d'AniList)",
+      "Title language in the Anime hub, details, and player. Default is Romaji. Stream matching still tries romaji, then English, native, and synonyms.": "Langue des titres dans le hub Anime, les détails et le lecteur. Romaji par défaut. La recherche de flux essaie toujours le romaji, puis l'anglais, la langue d'origine et les synonymes."
+    }
+  },
   "tags": [
     "anime"
   ],

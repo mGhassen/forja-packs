@@ -5,6 +5,21 @@
   "description": "Personal watchlists: local bookmarks and Simkl sync.",
   "author": "ForjaHQ",
   "version": "1.2.29",
+  "i18n": {
+    "fr": {
+      "Asian Drama": "Drames asiatiques",
+      "Default hub for Asian Drama rows when nothing is saved on the bookmark": "Hub par défaut des lignes de drames asiatiques quand rien n'est enregistré dans le signet",
+      "Default hub for anime rows when nothing is saved on the bookmark": "Hub par défaut des lignes d'anime quand rien n'est enregistré dans le signet",
+      "Default hub for film rows when nothing is saved on the bookmark": "Hub par défaut des lignes de films quand rien n'est enregistré dans le signet",
+      "Default hub for series rows when nothing is saved on the bookmark": "Hub par défaut des lignes de séries quand rien n'est enregistré dans le signet",
+      "My List": "Ma liste",
+      "My List TMDB enrich": "Enrichissement TMDB de Ma liste",
+      "Open hubs": "Ouvrir avec",
+      "Personal watchlists — local bookmarks and Simkl sync": "Listes de suivi personnelles — signets locaux et synchronisation Simkl",
+      "Series": "Séries",
+      "TMDB hydrate for My List legacy rows (companion to my-list-hub)": "Enrichissement TMDB des anciennes lignes de Ma liste (complément du hub Ma liste)"
+    }
+  },
   "tags": [
     "lists"
   ],

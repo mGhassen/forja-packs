@@ -5,6 +5,12 @@
   "description": "Films, series, anime, and dramas saved on this device.",
   "author": "ForjaHQ",
   "version": "1.0.5",
+  "i18n": {
+    "fr": {
+      "Downloads": "Téléchargements",
+      "Saved films, series, anime, and dramas": "Films, séries, anime et drames enregistrés"
+    }
+  },
   "tags": ["downloads"],
   "plugins": [
     {

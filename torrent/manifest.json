@@ -6,6 +6,13 @@
   "author": "ForjaHQ",
   "version": "1.0.11",
   "prelude": "_torrent_common.js",
+  "i18n": {
+    "fr": {
+      "Torrent downloads": "Téléchargements de torrents",
+      "Torrents in the engine with progress, peers and speed.": "Torrents dans le moteur, avec progression, pairs et vitesse.",
+      "Torrents in the local engine: stop, resume on the next play, delete.": "Torrents dans le moteur local : arrêter, reprendre à la prochaine lecture, supprimer."
+    }
+  },
   "tags": [
     "torrent"
   ],

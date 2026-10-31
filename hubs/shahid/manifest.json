@@ -5,6 +5,12 @@
   "description": "Shahid movies and series.",
   "author": "ForjaHQ",
   "version": "1.1.17",
+  "i18n": {
+    "fr": {
+      "Shahid movies and series": "Films et séries Shahid",
+      "Sign in to play premium titles": "Connectez-vous pour lire les titres premium"
+    }
+  },
   "tags": [
     "arabic",
     "shahid"

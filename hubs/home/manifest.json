@@ -4,7 +4,20 @@
   "name": "ForjaHQ Home",
   "description": "TMDB movie and TV catalog for the Home tab.",
   "author": "ForjaHQ",
-  "version": "1.0.75",
+  "version": "1.0.76",
+  "i18n": {
+    "fr": {
+      "Cards": "Cartes",
+      "Cards with stills, or numbered chips in a grid": "Cartes avec images, ou pastilles numérotées en grille",
+      "Details": "Détails",
+      "Empty = all providers. Filters which Forja plugins run on Play and Sources.": "Vide = tous les fournisseurs. Filtre les plugins Forja lancés à la lecture et dans les sources.",
+      "Episode list": "Liste des épisodes",
+      "Home": "Accueil",
+      "Number chips": "Pastilles numérotées",
+      "Stream languages": "Langues des flux",
+      "TMDB movie / TV hub": "Hub films et séries TMDB"
+    }
+  },
   "tags": [
     "home",
     "movies",

@@ -5,6 +5,22 @@
   "description": "Live sports schedule and streams.",
   "author": "ForjaHQ",
   "version": "1.0.67",
+  "i18n": {
+    "fr": {
+      "Combine the same game across catalogs into one card. Off keeps every catalog row separate.": "Regroupe le même match de plusieurs catalogues en une seule carte. Désactivé, chaque ligne de catalogue reste séparée.",
+      "Detail page": "Page de détails",
+      "Enable Forja Live": "Activer Forja Live",
+      "Enable Forja Sports": "Activer Forja Sports",
+      "Live sports schedule and streams.": "Programme et flux du sport en direct.",
+      "Match IPTV portal channels on Live TV": "Associer les chaînes des portails IPTV dans Live TV",
+      "Merge matching events": "Fusionner les événements identiques",
+      "Open matches in": "Ouvrir les matchs dans",
+      "Setup": "Configuration",
+      "Show the Forja Live server in Live Sports": "Afficher le serveur Forja Live dans Live Sports",
+      "Side panel": "Panneau latéral",
+      "Side panel beside the schedule, or a full detail page": "Panneau latéral à côté du programme, ou page de détails complète"
+    }
+  },
   "tags": [
     "sports",
     "live"
