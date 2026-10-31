@@ -657,8 +657,8 @@ async function resolveEhgEmbed(ctx, embedUrl, cfg) {
     headers: {
       'User-Agent': ua(),
       Accept: 'text/html,application/xhtml+xml',
-      Referer: String((cfg && cfg.origin) || 'https://timst.top').replace(/\/$/, '') + '/',
-      Origin: String((cfg && cfg.origin) || 'https://timst.top').replace(/\/$/, ''),
+      Referer: String((cfg && cfg.origin) || 'https://tim-streams.com').replace(/\/$/, '') + '/',
+      Origin: String((cfg && cfg.origin) || 'https://tim-streams.com').replace(/\/$/, ''),
     },
   });
   if (!pageRes || !pageRes.ok) return null;

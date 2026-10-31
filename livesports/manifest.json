@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.49",
+  "version": "2.0.50",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -121,7 +121,7 @@
     {
       "id": "timstreams",
       "name": "TimStreams",
-      "description": "timst.top schedule and stream resolve",
+      "description": "tim-streams.com schedule and stream resolve",
       "entry": "timstreams.js",
       "types": [
         "live_sport"
@@ -141,10 +141,11 @@
         "resolve": "live-timstreams"
       },
       "config": {
-        "origin": "https://timst.top",
-        "api": "https://timst.top/api/live-upcoming",
-        "channelsApi": "https://timst.top/api/channels",
-        "replaysApi": "https://timst.top/api/replays",
+        "origins": [
+          "https://tim-streams.com",
+          "https://timstreams.co.rw"
+        ],
+        "origin": "https://tim-streams.com",
         "sportsChannelGenre": 2,
         "embedOrigin": "https://embed.st"
       }

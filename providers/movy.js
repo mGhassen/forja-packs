@@ -1,6 +1,6 @@
 var SPECS = {
   api: 'https://api.wecollege.net',
-  origin: 'https://www.movy.bz',
+  origin: 'https://www.movy.sx',
   servers: [
     { endpoint: 'miami', name: 'Miami', note: 'Original audio (Up to 4K)' },
     { endpoint: 'seattle', name: 'Seattle', note: 'Original audio' },
