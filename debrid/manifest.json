@@ -4,7 +4,7 @@
   "name": "ForjaHQ Debrid",
   "description": "Resolve magnets to direct links via Real-Debrid, TorBox, AllDebrid, Premiumize, or Debrid-Link.",
   "author": "ForjaHQ",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "prelude": "_debrid_common.js",
   "i18n": {
     "fr": {
