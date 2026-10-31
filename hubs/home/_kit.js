@@ -62,7 +62,7 @@ function hubMatchRequest(ctx, req) {
 // so a missing locale or a missing entry shows the English text unchanged.
 var HUB_I18N = {
   fr: {
-    "What's your mood?": "Quelle est votre humeur ?",
+    "What's your mood?": "Quelle est votre humeur ?",
     "New Releases": "Nouveautés",
     "Featured This Month": "Sélection du mois",
     "Popular": "Populaires",
