@@ -67,7 +67,7 @@ function iptvCleanMediaTitle(raw) {
   return { title: s, year: year, season: season, episode: episode };
 }
 
-function iptvEpisodeVideos(raw) {
+function iptvEpisodeVideos(raw, cfg) {
   if (!Array.isArray(raw)) return [];
   var out = [];
   for (var i = 0; i < raw.length; i++) {
@@ -84,7 +84,7 @@ function iptvEpisodeVideos(raw) {
     var thumb = String(e.image || e.thumbnail || e.movie_image || '').trim();
     var title =
       String(e.title || e.name || '').trim() ||
-      'Episode ' + (episode > 0 ? episode : i + 1);
+      hubTextFmt(cfg, 'Episode {n}', { n: episode > 0 ? episode : i + 1 });
     var row = {
       id: id,
       title: title,
@@ -133,7 +133,7 @@ async function iptvFetchSeriesEpisodesHttp(ctx, portal, seriesId) {
   var episodes = json.episodes;
   var out = [];
   if (Array.isArray(episodes)) {
-    return iptvEpisodeVideos(episodes);
+    return iptvEpisodeVideos(episodes, hubConfig(ctx, {}));
   }
   if (episodes && typeof episodes === 'object') {
     Object.keys(episodes).forEach(function (seasonKey) {
@@ -157,7 +157,7 @@ async function iptvFetchSeriesEpisodesHttp(ctx, portal, seriesId) {
       }
     });
   }
-  return iptvEpisodeVideos(out);
+  return iptvEpisodeVideos(out, hubConfig(ctx, {}));
 }
 
 /** Series episodes via engine (Xtream/Stalker) or Xtream HTTP — pack owns meta.videos. */
@@ -179,7 +179,10 @@ async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
         timeout_secs: 45,
       });
       if (res && res.ok !== false && !res.error) {
-        var fromEngine = iptvEpisodeVideos(res.episodes || res.videos || []);
+        var fromEngine = iptvEpisodeVideos(
+          res.episodes || res.videos || [],
+          hubConfig(ctx, {}),
+        );
         if (fromEngine.length) return fromEngine;
       }
     } catch (e) {
@@ -212,7 +215,7 @@ async function iptvVodDetails(ctx, params) {
   var type = isMovie ? 'movie' : 'tv';
   var rawName =
     String(params.streamName || params.name || params.title || '').trim() ||
-    'Unknown';
+    hubText(cfg, 'Unknown');
   var cleaned = iptvCleanMediaTitle(rawName);
   var name = cleaned.title || rawName;
   var icon = String(params.icon || params.poster || '').trim();
@@ -222,7 +225,11 @@ async function iptvVodDetails(ctx, params) {
       ? String(cleaned.year)
       : String(params.releaseInfo || '').trim();
 
-  var videos = iptvEpisodeVideos(params.portalEpisodes || params.episodes);
+  var cfg = hubConfig(ctx, {});
+  var videos = iptvEpisodeVideos(
+    params.portalEpisodes || params.episodes,
+    cfg,
+  );
   if (!isMovie && !videos.length) {
     var portal = await iptvFindPortalByKey(ctx, portalKey);
     if (portal) {

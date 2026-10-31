@@ -1,6 +1,6 @@
 // Anime hub page layout — widgets tree for action:'layout'.
 
-function anilistLayout() {
+function anilistLayout(cfg) {
   function rail(id, title, extra) {
     return hubWithLoad(
       Object.assign(
@@ -34,7 +34,7 @@ function anilistLayout() {
             {
               type: 'hero',
               id: 'spotlight',
-              title: 'Spotlight',
+              title: hubText(cfg, 'Spotlight'),
               rail: 'spotlight',
               bleed: 'trending',
             },
@@ -51,8 +51,8 @@ function anilistLayout() {
             {
               type: 'mood',
               id: 'moods',
-              title: 'Pick your vibe',
-              options: ANILIST_MOODS,
+              title: hubText(cfg, 'Pick your vibe'),
+              options: anilistMoodsFor(cfg),
               // Host maps these onto mood-chips (not widget id `moods`).
               // Empty Continue → host kit-edge miss → trending.
               focusUp: 'continue_watching',
@@ -61,18 +61,18 @@ function anilistLayout() {
             'rail',
             { rail: 'trending' },
           ),
-          rail('trending', 'Trending Now', {
+          rail('trending', hubText(cfg, 'Trending Now'), {
             hideWhenBleed: true,
             // First catalog row ↑ → View details (not top menu).
             focusUp: 'hero-details',
             focusDown: 'continue_watching',
           }),
-          rail('this_season', 'This Season', {
+          rail('this_season', hubText(cfg, 'This Season'), {
             // ↑ mood posters first, then chips (empty results → miss).
             focusUp: 'mood-results',
             focusDown: 'top_airing',
           }),
-          rail('top_airing', 'Top Airing', {
+          rail('top_airing', hubText(cfg, 'Top Airing'), {
             focusUp: 'this_season',
             focusDown: 'top_10',
           }),
@@ -80,7 +80,7 @@ function anilistLayout() {
             {
               type: 'ranked',
               id: 'top_10',
-              title: 'Top 10 Today',
+              title: hubText(cfg, 'Top 10 Today'),
               rail: 'top_10',
               style: 'numbered',
               pageSize: 10,
@@ -90,23 +90,23 @@ function anilistLayout() {
             'rail',
             { rail: 'top_10' },
           ),
-          rail('popular', 'Most Popular', {
+          rail('popular', hubText(cfg, 'Most Popular'), {
             focusUp: 'top_10',
             focusDown: 'latest_episodes',
           }),
-          rail('latest_episodes', 'Recently Aired', {
+          rail('latest_episodes', hubText(cfg, 'Recently Aired'), {
             focusUp: 'popular',
             focusDown: 'top_rated',
           }),
-          rail('top_rated', 'Top Rated', {
+          rail('top_rated', hubText(cfg, 'Top Rated'), {
             focusUp: 'latest_episodes',
             focusDown: 'most_favorited',
           }),
-          rail('most_favorited', 'Most Favorited', {
+          rail('most_favorited', hubText(cfg, 'Most Favorited'), {
             focusUp: 'top_rated',
             focusDown: 'latest_completed',
           }),
-          rail('latest_completed', 'Recently Completed', {
+          rail('latest_completed', hubText(cfg, 'Recently Completed'), {
             focusUp: 'most_favorited',
           }),
         ],

@@ -48,6 +48,86 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "Live": "En direct",
+    "Movies": "Films",
+    "Series": "Séries",
+    "View": "Affichage",
+    "Cards": "Cartes",
+    "Search": "Rechercher",
+    "Sort": "Trier",
+    "Name A–Z": "Nom A–Z",
+    "Name Z–A": "Nom Z–A",
+    "Portals": "Portails",
+    "Search channels or categories…": "Rechercher des chaînes ou des catégories…",
+    "Choose a portal": "Choisir un portail",
+    "Select a portal to browse Live TV, Movies, and Series.": "Sélectionnez un portail pour parcourir la TV en direct, les films et les séries.",
+    "Loading channels": "Chargement des chaînes",
+    "Fetching categories and channels from your portal…": "Récupération des catégories et des chaînes depuis votre portail…",
+    "Loading movies": "Chargement des films",
+    "Fetching categories and movies from your portal…": "Récupération des catégories et des films depuis votre portail…",
+    "Loading series": "Chargement des séries",
+    "Fetching categories and series from your portal…": "Récupération des catégories et des séries depuis votre portail…",
+    "Select a provider to browse Live TV, Movies, and Series.": "Sélectionnez un fournisseur pour parcourir la TV en direct, les films et les séries.",
+    "Open portal": "Ouvrir le portail",
+    "Favorites": "Favoris",
+    "Already watched": "Déjà regardé",
+    "No favorites": "Aucun favori",
+    "Star a live channel to keep it here.": "Ajoutez une chaîne en direct aux favoris pour la retrouver ici.",
+    "Nothing watched yet": "Rien de regardé pour l'instant",
+    "Channels you play on Live land here (last 30).": "Les chaînes que vous lisez en direct apparaissent ici (30 dernières).",
+    "No movies": "Aucun film",
+    "No series": "Aucune série",
+    "No channels": "Aucune chaîne",
+    "Nothing in this category.": "Rien dans cette catégorie.",
+    "Username / MAC": "Nom d'utilisateur / MAC",
+    "Password (blank = keep)": "Mot de passe (vide = conserver)",
+    "Password": "Mot de passe",
+    "Label": "Libellé",
+    "Add portal": "Ajouter un portail",
+    "Add": "Ajouter",
+    "Cancel": "Annuler",
+    "Portal added": "Portail ajouté",
+    "Portal URL and credentials.": "URL du portail et identifiants.",
+    "Edit portal": "Modifier le portail",
+    "Save": "Enregistrer",
+    "Portal updated": "Portail mis à jour",
+    "Import portal": "Importer un portail",
+    "Import": "Importer",
+    "Portal imported": "Portail importé",
+    "Paste an 8-character share code (XXXX-XXXX) or F1. token.": "Collez un code de partage à 8 caractères (XXXX-XXXX) ou un jeton F1.",
+    "Share code": "Code de partage",
+    "Label (optional)": "Libellé (facultatif)",
+    "Search portals…": "Rechercher des portails…",
+    "No portals yet": "Aucun portail pour l'instant",
+    "Add a portal or import a share code to browse channels.": "Ajoutez un portail ou importez un code de partage pour parcourir les chaînes.",
+    "Scrape": "Collecter",
+    "Deal": "Piocher",
+    "Edit": "Modifier",
+    "Delete": "Supprimer",
+    "Copy share code": "Copier le code de partage",
+    "url required": "URL requise",
+    "MAC (username) required": "Adresse MAC (nom d'utilisateur) requise",
+    "url, username, password required": "URL, nom d'utilisateur et mot de passe requis",
+    "Failed to download playlist": "Échec du téléchargement de la playlist",
+    "Playlist body empty": "La playlist est vide",
+    "Unknown": "Inconnu",
+    "Episode {n}": "Épisode {n}",
+    "More Like This": "Titres similaires",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 
 // Pack owns upcoming / premiereLabel — host only reads these fields.
 
@@ -1076,7 +1156,7 @@ async function iptvFetchM3u(ctx, portal, section) {
   if (!res || !res.ok) {
     return iptvEmptyCatalog({
       code: 'M3U_FETCH_FAILED',
-      message: 'Failed to download playlist',
+      message: hubText(hubConfig(ctx, {}), 'Failed to download playlist'),
     });
   }
   var content =
@@ -1088,7 +1168,7 @@ async function iptvFetchM3u(ctx, portal, section) {
   if (!content) {
     return iptvEmptyCatalog({
       code: 'M3U_EMPTY',
-      message: 'Playlist body empty',
+      message: hubText(hubConfig(ctx, {}), 'Playlist body empty'),
     });
   }
 
@@ -1376,16 +1456,16 @@ function iptvPortalFromParams(p) {
   return portal;
 }
 
-function iptvPortalValidate(portal) {
+function iptvPortalValidate(portal, cfg) {
   var platform = iptvPlatformOf(portal);
-  if (!portal.url) return 'url required';
+  if (!portal.url) return hubText(cfg, 'url required');
   if (platform === 'm3u') return '';
   if (platform === 'stalker') {
-    if (!portal.username) return 'MAC (username) required';
+    if (!portal.username) return hubText(cfg, 'MAC (username) required');
     return '';
   }
   if (!portal.username || !portal.password) {
-    return 'url, username, password required';
+    return hubText(cfg, 'url, username, password required');
   }
   return '';
 }
@@ -1461,62 +1541,67 @@ async function iptvResolveActive(ctx) {
   return null;
 }
 
-function iptvPortalFormFields(opts) {
+function iptvPortalFormFields(cfg, opts) {
   var o = opts || {};
   var editing = !!o.editing;
   return [
     { id: 'url', label: 'URL', type: 'text', required: !editing },
-    { id: 'username', label: 'Username / MAC', type: 'text' },
+    { id: 'username', label: hubText(cfg, 'Username / MAC'), type: 'text' },
     {
       id: 'password',
-      label: editing ? 'Password (blank = keep)' : 'Password',
+      label: editing
+        ? hubText(cfg, 'Password (blank = keep)')
+        : hubText(cfg, 'Password'),
       type: 'password',
       required: !editing,
     },
-    { id: 'label', label: 'Label', type: 'text' },
+    { id: 'label', label: hubText(cfg, 'Label'), type: 'text' },
   ];
 }
 
-function iptvPortalAddForm() {
+function iptvPortalAddForm(cfg) {
   return {
-    title: 'Add portal',
-    submitLabel: 'Add',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Add portal'),
+    submitLabel: hubText(cfg, 'Add'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'addPortal',
-    toastOk: 'Portal added',
-    description: 'Portal URL and credentials.',
-    fields: iptvPortalFormFields({ editing: false }),
+    toastOk: hubText(cfg, 'Portal added'),
+    description: hubText(cfg, 'Portal URL and credentials.'),
+    fields: iptvPortalFormFields(cfg, { editing: false }),
   };
 }
 
-function iptvPortalEditForm() {
+function iptvPortalEditForm(cfg) {
   return {
-    title: 'Edit portal',
-    submitLabel: 'Save',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Edit portal'),
+    submitLabel: hubText(cfg, 'Save'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'editPortal',
-    toastOk: 'Portal updated',
-    fields: iptvPortalFormFields({ editing: true }),
+    toastOk: hubText(cfg, 'Portal updated'),
+    fields: iptvPortalFormFields(cfg, { editing: true }),
   };
 }
 
-function iptvPortalImportForm() {
+function iptvPortalImportForm(cfg) {
   return {
-    title: 'Import portal',
-    submitLabel: 'Import',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Import portal'),
+    submitLabel: hubText(cfg, 'Import'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'importPortal',
-    toastOk: 'Portal imported',
-    description: 'Paste an 8-character share code (XXXX-XXXX) or F1. token.',
+    toastOk: hubText(cfg, 'Portal imported'),
+    description: hubText(
+      cfg,
+      'Paste an 8-character share code (XXXX-XXXX) or F1. token.',
+    ),
     fields: [
       {
         id: 'token',
-        label: 'Share code',
+        label: hubText(cfg, 'Share code'),
         type: 'text',
         required: true,
         hint: 'XXXX-XXXX',
       },
-      { id: 'label', label: 'Label (optional)', type: 'text' },
+      { id: 'label', label: hubText(cfg, 'Label (optional)'), type: 'text' },
     ],
   };
 }
@@ -1557,50 +1642,57 @@ function iptvPortalListItem(portal, activeKey) {
 }
 
 /** Side-panel layout token — foundation paints portalList from items. */
-function iptvPortalsPanelLayout() {
+function iptvPortalsPanelLayout(cfg) {
   return {
     widgets: [
       {
         type: 'portalList',
         id: 'portals',
         source: 'listPortals',
-        title: 'Portals',
+        title: hubText(cfg, 'Portals'),
         width: 380,
-        searchPlaceholder: 'Search portals…',
-        emptyTitle: 'No portals yet',
-        emptyDescription:
+        searchPlaceholder: hubText(cfg, 'Search portals…'),
+        emptyTitle: hubText(cfg, 'No portals yet'),
+        emptyDescription: hubText(
+          cfg,
           'Add a portal or import a share code to browse channels.',
+        ),
         actions: [
           {
             id: 'scrape',
-            label: 'Scrape',
+            label: hubText(cfg, 'Scrape'),
             icon: 'travel_explore',
             action: 'scrape',
           },
-          { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
+          {
+            id: 'deal',
+            label: hubText(cfg, 'Deal'),
+            icon: 'casino',
+            action: 'dealPortals',
+          },
           {
             id: 'import',
-            label: 'Import',
+            label: hubText(cfg, 'Import'),
             icon: 'file_download',
             action: 'importPortal',
-            form: iptvPortalImportForm(),
+            form: iptvPortalImportForm(cfg),
           },
           {
             id: 'add',
-            label: 'Add',
+            label: hubText(cfg, 'Add'),
             icon: 'add',
             action: 'addPortal',
-            form: iptvPortalAddForm(),
+            form: iptvPortalAddForm(cfg),
           },
         ],
         itemActions: {
           edit: {
-            label: 'Edit',
+            label: hubText(cfg, 'Edit'),
             action: 'editPortal',
-            form: iptvPortalEditForm(),
+            form: iptvPortalEditForm(cfg),
           },
-          remove: { label: 'Delete', action: 'removePortal' },
-          share: { label: 'Copy share code', action: 'shareEncode' },
+          remove: { label: hubText(cfg, 'Delete'), action: 'removePortal' },
+          share: { label: hubText(cfg, 'Copy share code'), action: 'shareEncode' },
         },
       },
     ],
@@ -1619,13 +1711,13 @@ async function iptvListPortals(ctx) {
     active: active,
     portals: portals.map(iptvPortalPublic),
     items: items,
-    layout: iptvPortalsPanelLayout(),
+    layout: iptvPortalsPanelLayout(hubConfig(ctx, {})),
   });
 }
 
 async function iptvAddPortal(ctx, params) {
   var portal = iptvPortalFromParams(params);
-  var err = iptvPortalValidate(portal);
+  var err = iptvPortalValidate(portal, hubConfig(ctx, {}));
   if (err) return hubFail('addPortal', 'INVALID', err);
   await iptvUpsertPortalRow(ctx, portal, { select: true });
   return hubOk('addPortal', { portal: iptvPortalPublic(portal) });
@@ -1654,7 +1746,7 @@ async function iptvImportPortal(ctx, params) {
     userAgent: row.userAgent || row.user_agent,
     label: label || row.username || row.url,
   });
-  var err = iptvPortalValidate(portal);
+  var err = iptvPortalValidate(portal, hubConfig(ctx, {}));
   if (err) return hubFail('importPortal', 'INVALID', err);
   await iptvUpsertPortalRow(ctx, portal, { select: true });
   return hubOk('importPortal', { portal: iptvPortalPublic(portal) });
@@ -1684,7 +1776,7 @@ async function iptvEditPortal(ctx, params) {
       platform: p.platform != null ? p.platform : cur.platform,
     }),
   );
-  var err = iptvPortalValidate(next);
+  var err = iptvPortalValidate(next, hubConfig(ctx, {}));
   if (err) return hubFail('editPortal', 'INVALID', err);
 
   // Preserve key identity when url/user change: replace old row.
@@ -1923,7 +2015,7 @@ function iptvCleanMediaTitle(raw) {
   return { title: s, year: year, season: season, episode: episode };
 }
 
-function iptvEpisodeVideos(raw) {
+function iptvEpisodeVideos(raw, cfg) {
   if (!Array.isArray(raw)) return [];
   var out = [];
   for (var i = 0; i < raw.length; i++) {
@@ -1940,7 +2032,7 @@ function iptvEpisodeVideos(raw) {
     var thumb = String(e.image || e.thumbnail || e.movie_image || '').trim();
     var title =
       String(e.title || e.name || '').trim() ||
-      'Episode ' + (episode > 0 ? episode : i + 1);
+      hubTextFmt(cfg, 'Episode {n}', { n: episode > 0 ? episode : i + 1 });
     var row = {
       id: id,
       title: title,
@@ -1989,7 +2081,7 @@ async function iptvFetchSeriesEpisodesHttp(ctx, portal, seriesId) {
   var episodes = json.episodes;
   var out = [];
   if (Array.isArray(episodes)) {
-    return iptvEpisodeVideos(episodes);
+    return iptvEpisodeVideos(episodes, hubConfig(ctx, {}));
   }
   if (episodes && typeof episodes === 'object') {
     Object.keys(episodes).forEach(function (seasonKey) {
@@ -2013,7 +2105,7 @@ async function iptvFetchSeriesEpisodesHttp(ctx, portal, seriesId) {
       }
     });
   }
-  return iptvEpisodeVideos(out);
+  return iptvEpisodeVideos(out, hubConfig(ctx, {}));
 }
 
 /** Series episodes via engine (Xtream/Stalker) or Xtream HTTP — pack owns meta.videos. */
@@ -2035,7 +2127,10 @@ async function iptvFetchSeriesEpisodes(ctx, portal, seriesId) {
         timeout_secs: 45,
       });
       if (res && res.ok !== false && !res.error) {
-        var fromEngine = iptvEpisodeVideos(res.episodes || res.videos || []);
+        var fromEngine = iptvEpisodeVideos(
+          res.episodes || res.videos || [],
+          hubConfig(ctx, {}),
+        );
         if (fromEngine.length) return fromEngine;
       }
     } catch (e) {
@@ -2068,7 +2163,7 @@ async function iptvVodDetails(ctx, params) {
   var type = isMovie ? 'movie' : 'tv';
   var rawName =
     String(params.streamName || params.name || params.title || '').trim() ||
-    'Unknown';
+    hubText(cfg, 'Unknown');
   var cleaned = iptvCleanMediaTitle(rawName);
   var name = cleaned.title || rawName;
   var icon = String(params.icon || params.poster || '').trim();
@@ -2078,7 +2173,11 @@ async function iptvVodDetails(ctx, params) {
       ? String(cleaned.year)
       : String(params.releaseInfo || '').trim();
 
-  var videos = iptvEpisodeVideos(params.portalEpisodes || params.episodes);
+  var cfg = hubConfig(ctx, {});
+  var videos = iptvEpisodeVideos(
+    params.portalEpisodes || params.episodes,
+    cfg,
+  );
   if (!isMovie && !videos.length) {
     var portal = await iptvFindPortalByKey(ctx, portalKey);
     if (portal) {

@@ -62,7 +62,7 @@ var BRSTEJ_CATEGORY_OPTIONS = [
   brstejCategory('series_2021', 'مسلسلات 2021', 'rmdan31-2021', 'series'),
 ];
 
-function brstejFilters() {
+function brstejFilters(cfg) {
   return {
     menus: [
       {
@@ -72,14 +72,14 @@ function brstejFilters() {
       },
       {
         id: 'series',
-        label: 'Series',
+        label: hubText(cfg, 'Series'),
         filter: { op: 'eq', field: 'type', value: 'series' },
       },
     ],
     fields: [
       {
         field: 'cat',
-        label: 'Category',
+        label: hubText(cfg, 'Category'),
         // Series sections first, then films (rails interleave them).
         options: BRSTEJ_CATEGORY_OPTIONS.filter(function (o) {
           return o.kind === 'series';
@@ -1176,7 +1176,7 @@ function brstejParseSerieHtml(ctx, html, base) {
   if (!out.videos.length) brstejAppendPdsSeasons($, base, out);
   brstejFillVideoThumbs(out.videos, out.poster);
   if (out.videos.length) {
-    var epsBit = out.videos.length + ' eps';
+    var epsBit = hubTextFmt(hubConfig(ctx, BRSTEJ_DEFAULTS), '{n} eps', { n: out.videos.length });
     if (!out.releaseInfo) {
       out.releaseInfo = out.year ? out.year + ' • ' + epsBit : epsBit;
     } else if (out.releaseInfo.indexOf('eps') < 0) {
@@ -1344,7 +1344,7 @@ function extract(ctx) {
     return hubOk('layout', brstejLayout(), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
-    return hubOk('filters', brstejFilters(), { maxAge: 86400 });
+    return hubOk('filters', brstejFilters(cfg), { maxAge: 86400 });
   }
   if (action === 'feed') {
     return brstejFeed(ctx, cfg, params);

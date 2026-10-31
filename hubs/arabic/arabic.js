@@ -91,7 +91,7 @@ function arabicCategoryOptions() {
   });
 }
 
-function arabicFilters() {
+function arabicFilters(cfg) {
   return {
     menus: [
       {
@@ -101,12 +101,12 @@ function arabicFilters() {
       },
       {
         id: 'series',
-        label: 'Series',
+        label: hubText(cfg, 'Series'),
         filter: { op: 'eq', field: 'type', value: 'series' },
       },
     ],
     fields: [
-      { field: 'cat', label: 'Category', options: arabicCategoryOptions() },
+      { field: 'cat', label: hubText(cfg, 'Category'), options: arabicCategoryOptions() },
     ],
   };
 }
@@ -1075,10 +1075,10 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (action === 'layout') {
-    return hubOk('layout', arabicLayout(), { maxAge: 3600, swr: 86400 });
+    return hubOk('layout', arabicLayout(cfg), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
-    return hubOk('filters', arabicFilters(), { maxAge: 86400 });
+    return hubOk('filters', arabicFilters(cfg), { maxAge: 86400 });
   }
   if (action === 'feed') {
     return arabicFeed(ctx, cfg, params).catch(function (e) {

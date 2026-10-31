@@ -48,6 +48,25 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "Series": "Séries",
+    "Asian Drama": "Drames asiatiques",
+    "Nothing downloaded yet": "Rien de téléchargé pour l'instant",
+    "Save a film or episode from Sources and it shows up here.": "Enregistrez un film ou un épisode depuis Sources et il apparaîtra ici.",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 function hubOk(action, data, cache) {
   var env = {
     ok: true,

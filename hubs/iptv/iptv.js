@@ -205,6 +205,7 @@ function iptvFeedQueryMatch(meta, q) {
 }
 
 async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, params) {
+  var cfg = hubConfig(ctx, {});
   var cats = iptvCatNameMap(catalog.categories);
   var streams = catalog.streams || [];
   var filterCat = String(
@@ -217,7 +218,10 @@ async function iptvFeedFromCatalog(ctx, portal, section, catalog, prefs, q, para
   var items = [];
 
   if (section === 'live' && (filterCat === FAV || filterCat === WATCHED)) {
-    var label = filterCat === FAV ? 'Favorites' : 'Already watched';
+    var label =
+      filterCat === FAV
+        ? hubText(cfg, 'Favorites')
+        : hubText(cfg, 'Already watched');
     for (var i = 0; i < streams.length; i++) {
       var s = streams[i];
       if (!s) continue;
@@ -393,6 +397,7 @@ function iptvFeedKinds(catalog, items) {
 }
 
 async function iptvFeed(ctx) {
+  var cfg = hubConfig(ctx, {});
   var params = hubParams(ctx);
   var section = iptvSection(params);
   if (section === 'channels') {
@@ -404,11 +409,13 @@ async function iptvFeed(ctx) {
     var env = hubItems('feed', [])[0];
     env.data.kinds = [];
     env.data.coverBody = true;
-    env.data.emptyTitle = 'Choose a portal';
-    env.data.emptyDescription =
-      'Select a provider to browse Live TV, Movies, and Series.';
+    env.data.emptyTitle = hubText(cfg, 'Choose a portal');
+    env.data.emptyDescription = hubText(
+      cfg,
+      'Select a provider to browse Live TV, Movies, and Series.',
+    );
     env.data.emptyAction = {
-      label: 'Open portal',
+      label: hubText(cfg, 'Open portal'),
       action: 'portals',
     };
     return [env];
@@ -497,22 +504,26 @@ async function iptvFeed(ctx) {
     }
     // Portal active — never leave layout "Choose a portal".
     if (section === 'live' && filterCat === FAV) {
-      env.data.emptyTitle = 'No favorites';
-      env.data.emptyDescription =
-        'Star a live channel to keep it here.';
+      env.data.emptyTitle = hubText(cfg, 'No favorites');
+      env.data.emptyDescription = hubText(
+        cfg,
+        'Star a live channel to keep it here.',
+      );
     } else if (section === 'live' && filterCat === WATCHED) {
-      env.data.emptyTitle = 'Nothing watched yet';
-      env.data.emptyDescription =
-        'Channels you play on Live land here (last 30).';
+      env.data.emptyTitle = hubText(cfg, 'Nothing watched yet');
+      env.data.emptyDescription = hubText(
+        cfg,
+        'Channels you play on Live land here (last 30).',
+      );
     } else if (section === 'movies') {
-      env.data.emptyTitle = 'No movies';
-      env.data.emptyDescription = 'Nothing in this category.';
+      env.data.emptyTitle = hubText(cfg, 'No movies');
+      env.data.emptyDescription = hubText(cfg, 'Nothing in this category.');
     } else if (section === 'series') {
-      env.data.emptyTitle = 'No series';
-      env.data.emptyDescription = 'Nothing in this category.';
+      env.data.emptyTitle = hubText(cfg, 'No series');
+      env.data.emptyDescription = hubText(cfg, 'Nothing in this category.');
     } else {
-      env.data.emptyTitle = 'No channels';
-      env.data.emptyDescription = 'Nothing in this category.';
+      env.data.emptyTitle = hubText(cfg, 'No channels');
+      env.data.emptyDescription = hubText(cfg, 'Nothing in this category.');
     }
     return [env];
   } catch (e) {
@@ -641,7 +652,7 @@ async function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
   if (action === 'layout') {
-    return hubOk('layout', iptvLayout());
+    return hubOk('layout', iptvLayout(hubConfig(ctx, {})));
   }
   if (action === 'feed') {
     return await iptvFeed(ctx);

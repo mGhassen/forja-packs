@@ -81,10 +81,11 @@ async function stremioCatalogItems(ctx, railKey, skip) {
 async function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
+  var cfg = hubConfig(ctx, {});
 
   if (action === 'layout') {
     var catalogs = await stremioListCatalogs(ctx);
-    return hubOk('layout', stremioLayoutFromCatalogs(catalogs), {
+    return hubOk('layout', stremioLayoutFromCatalogs(catalogs, cfg), {
       maxAge: 120,
       swr: 600,
     });
@@ -92,7 +93,7 @@ async function extract(ctx) {
 
   if (action === 'filters') {
     var filterCatalogs = await stremioListCatalogs(ctx);
-    return hubOk('filters', stremioFiltersFromCatalogs(filterCatalogs), {
+    return hubOk('filters', stremioFiltersFromCatalogs(filterCatalogs, cfg), {
       maxAge: 120,
       swr: 600,
     });

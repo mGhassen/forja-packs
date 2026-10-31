@@ -202,9 +202,9 @@ function liveSportsShapeRow(row) {
 }
 
 /** IPTV-sized channel tile for the TV shelf (24/7). */
-function liveSportsShapeTvChannel(row) {
+function liveSportsShapeTvChannel(row, cfg) {
   if (!row || typeof row !== 'object') return row;
-  var title = String(row.title || row.name || '').trim() || 'Channel';
+  var title = String(row.title || row.name || '').trim() || hubText(cfg, 'Channel');
   var image = liveSportsAbsUrl(
     row.poster || row.posterPath || row.homeBadge || row.awayBadge || '',
   );
@@ -327,7 +327,7 @@ function liveSportsLoadFeed(ctx, params) {
         ) {
           continue;
         }
-        shaped = liveSportsShapeTvChannel(shaped);
+        shaped = liveSportsShapeTvChannel(shaped, hubConfig(ctx, {}));
       } else if (always) {
         continue;
       }
@@ -468,7 +468,10 @@ function extract(ctx) {
   var params = hubParams(ctx);
   if (action === 'layout') {
     // Short TTL — layout owns cardKind/open; long SWR left TV on film posters.
-    return hubOk('layout', liveSportsLayout(), { maxAge: 30, swr: 120 });
+    return hubOk('layout', liveSportsLayout(hubConfig(ctx, {})), {
+      maxAge: 30,
+      swr: 120,
+    });
   }
   if (action === 'feed' || action === 'rail') {
     return liveSportsLoadFeed(ctx, params).then(function (items) {

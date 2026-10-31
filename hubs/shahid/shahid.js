@@ -179,29 +179,32 @@ function authStatus(ctx) {
   });
 }
 
-function authBegin() {
+function authBegin(ctx) {
+  var cfg = hubConfig(ctx, SHAHID_DEFAULTS);
   // System browser + forja:// session handoff (bookmarklet). Already logged-in OK.
   return hubOk('auth_begin', {
     flow: 'browser',
     url: 'https://shahid.mbc.net/en',
-    title: 'Sign in to Shahid',
-    hint:
+    title: hubText(cfg, 'Sign in to Shahid'),
+    hint: hubText(
+      cfg,
       'Opens Shahid in your browser. Already signed in is fine — Copy connect script, paste in that tab’s console (⌘⌥J), Enter.',
+    ),
     methods: [
       {
         id: 'email',
-        label: 'Email + password',
+        label: hubText(cfg, 'Email + password'),
         fields: [
-          { id: 'email', type: 'text', label: 'Email' },
-          { id: 'password', type: 'password', label: 'Password' },
+          { id: 'email', type: 'text', label: hubText(cfg, 'Email') },
+          { id: 'password', type: 'password', label: hubText(cfg, 'Password') },
         ],
       },
       {
         id: 'phone',
-        label: 'Phone + password',
+        label: hubText(cfg, 'Phone + password'),
         fields: [
-          { id: 'phone', type: 'phone', label: 'Phone' },
-          { id: 'password', type: 'password', label: 'Password' },
+          { id: 'phone', type: 'phone', label: hubText(cfg, 'Phone') },
+          { id: 'password', type: 'password', label: hubText(cfg, 'Password') },
         ],
       },
     ],
@@ -225,7 +228,7 @@ function authLoginFromSession(ctx, sessionId, labelHint) {
             var msg =
               (j && j.message) ||
               (j && j.faults && j.faults[0] && j.faults[0].userMessage) ||
-              'Session invalid';
+              hubText(cfg, 'Session invalid');
             throw new Error(String(msg));
           }
           return j;
@@ -235,7 +238,7 @@ function authLoginFromSession(ctx, sessionId, labelHint) {
         var user = (j && j.user) || j || {};
         var sid = String(user.sessionId || sessionId || '').trim();
         if (!sid) {
-          return hubFail('auth_login', 'AUTH_REQUIRED', 'no session returned');
+          return hubFail('auth_login', 'AUTH_REQUIRED', hubText(cfg, 'no session returned'));
         }
         _shahidSessionId = sid;
         _shahidJwt = jwt || '';
@@ -259,7 +262,7 @@ function authLoginFromSession(ctx, sessionId, labelHint) {
       .catch(function () {
         // Profile GET can 401 on some regions; cookie token is still the session.
         if (sessionId.length < 8) {
-          return hubFail('auth_login', 'AUTH_REQUIRED', 'Session invalid');
+          return hubFail('auth_login', 'AUTH_REQUIRED', hubText(cfg, 'Session invalid'));
         }
         _shahidSessionId = sessionId;
         _shahidJwt = jwt || '';
@@ -286,7 +289,7 @@ function authLogin(ctx) {
     ).trim();
     if (!sessionId) {
       return Promise.resolve(
-        hubFail('auth_login', 'AUTH_REQUIRED', 'session token required'),
+        hubFail('auth_login', 'AUTH_REQUIRED', hubText(cfg, 'session token required')),
       );
     }
     return authLoginFromSession(
@@ -301,7 +304,7 @@ function authLogin(ctx) {
   var loginId = method === 'phone' ? phone : email;
   if (!loginId || !password) {
     return Promise.resolve(
-      hubFail('auth_login', 'AUTH_REQUIRED', 'email/phone and password required'),
+      hubFail('auth_login', 'AUTH_REQUIRED', hubText(cfg, 'email/phone and password required')),
     );
   }
   return getJwt(ctx).then(function (jwt) {
@@ -333,7 +336,7 @@ function authLogin(ctx) {
             var msg =
               (j && j.message) ||
               (j && j.faults && j.faults[0] && j.faults[0].userMessage) ||
-              'Login failed';
+              hubText(cfg, 'Login failed');
             throw new Error(String(msg));
           }
           return j;
@@ -343,7 +346,7 @@ function authLogin(ctx) {
         var user = (j && j.user) || {};
         var sessionId = String(user.sessionId || '').trim();
         if (!sessionId) {
-          return hubFail('auth_login', 'AUTH_REQUIRED', 'no session returned');
+          return hubFail('auth_login', 'AUTH_REQUIRED', hubText(cfg, 'no session returned'));
         }
         _shahidSessionId = sessionId;
         _shahidJwt = jwt || '';
@@ -578,7 +581,8 @@ function rail(ctx) {
 }
 
 
-function filters() {
+function filters(ctx) {
+  var cfg = hubConfig(ctx, SHAHID_DEFAULTS);
   var options = [];
   var keys = Object.keys(SHAHID_RAILS);
   for (var i = 0; i < keys.length; i++) {
@@ -598,7 +602,7 @@ function filters() {
     menus: [
       {
         id: 'series',
-        label: 'Series',
+        label: hubText(cfg, 'Series'),
         filter: { op: 'eq', field: 'kind', value: 'series' },
         hideTypeFilterRails: true,
       },
@@ -609,7 +613,7 @@ function filters() {
         hideTypeFilterRails: true,
       },
     ],
-    fields: [{ field: 'rail', label: 'Category', options: options }],
+    fields: [{ field: 'rail', label: hubText(cfg, 'Category'), options: options }],
   });
 }
 
@@ -677,7 +681,7 @@ function details(ctx) {
           meta.videos = [
             {
               id: 'shahid:' + id,
-              title: title || 'Play',
+              title: title || hubText(cfg, 'Play'),
               season: 0,
               episode: 1,
             },
@@ -715,8 +719,9 @@ function details(ctx) {
                 title:
                   p.title ||
                   p.episodeTitle ||
-                  'Episode ' +
-                  (Number(p.number || p.episodeNumber) || i + 1),
+                  hubTextFmt(cfg, 'Episode {n}', {
+                    n: Number(p.number || p.episodeNumber) || i + 1,
+                  }),
                 season: Number(p.seasonNumber) || 1,
                 episode: Number(p.number || p.episodeNumber) || i + 1,
                 thumbnail: formatImg(
@@ -743,10 +748,10 @@ function handle(ctx) {
   if (action === 'feed') return feed(ctx);
   if (action === 'rail') return rail(ctx);
   if (action === 'search') return shahidSearch(ctx);
-  if (action === 'filters') return Promise.resolve(filters());
+  if (action === 'filters') return Promise.resolve(filters(ctx));
   if (action === 'details') return details(ctx);
   if (action === 'auth_status') return Promise.resolve(authStatus(ctx));
-  if (action === 'auth_begin') return Promise.resolve(authBegin());
+  if (action === 'auth_begin') return Promise.resolve(authBegin(ctx));
   if (action === 'auth_login') return authLogin(ctx);
   if (action === 'auth_logout') return Promise.resolve(authLogout());
   return Promise.resolve(

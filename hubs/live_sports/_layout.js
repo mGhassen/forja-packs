@@ -70,7 +70,7 @@ function liveSportsKindIcons() {
   };
 }
 
-function liveSportsShelfAction() {
+function liveSportsShelfAction(cfg) {
   return {
     id: 'section',
     label: 'Section',
@@ -95,31 +95,31 @@ function liveSportsShelfAction() {
   };
 }
 
-function liveSportsCatalogActions() {
+function liveSportsCatalogActions(cfg) {
   return [
-    liveSportsShelfAction(),
+    liveSportsShelfAction(cfg),
     {
       id: 'catalog',
-      label: 'Catalog',
+      label: hubText(cfg, 'Catalog'),
       icon: 'filter',
       dynamicCatalogs: true,
       default: 'all',
       deps: ['stremio'],
-      items: [{ id: 'all', label: 'All' }],
+      items: [{ id: 'all', label: hubText(cfg, 'All') }],
     },
     {
       id: 'horizon',
-      label: 'Schedule',
+      label: hubText(cfg, 'Schedule'),
       icon: 'schedule',
       dynamicSchedule: true,
       default: 'airing|1h',
       showWhen: { section: 'sports' },
       items: [
-        { id: 'airing|1h', label: 'Airing' },
-        { id: 'upcoming|1h', label: 'Next · 1h' },
-        { id: 'upcoming|3h', label: 'Next · 3h' },
-        { id: 'upcoming|6h', label: 'Next · 6h' },
-        { id: 'upcoming|24h', label: 'Next · 24h' },
+        { id: 'airing|1h', label: hubText(cfg, 'Airing') },
+        { id: 'upcoming|1h', label: hubText(cfg, 'Next · 1h') },
+        { id: 'upcoming|3h', label: hubText(cfg, 'Next · 3h') },
+        { id: 'upcoming|6h', label: hubText(cfg, 'Next · 6h') },
+        { id: 'upcoming|24h', label: hubText(cfg, 'Next · 24h') },
         { id: 'both|1h', label: '1h' },
         { id: 'both|3h', label: '3h' },
         { id: 'both|6h', label: '6h' },
@@ -128,41 +128,41 @@ function liveSportsCatalogActions() {
     },
     {
       id: 'refresh',
-      label: 'Refresh',
+      label: hubText(cfg, 'Refresh'),
       icon: 'refresh',
       action: 'refresh',
     },
     {
       id: 'search',
-      label: 'Search',
+      label: hubText(cfg, 'Search'),
       action: 'eventSearch',
       trailing: true,
-      placeholder: 'Team, match, sport…',
+      placeholder: hubText(cfg, 'Team, match, sport…'),
       showWhen: { section: 'sports' },
     },
     {
       id: 'search_tv',
-      label: 'Search',
+      label: hubText(cfg, 'Search'),
       action: 'eventSearch',
       trailing: true,
-      placeholder: 'Channel…',
+      placeholder: hubText(cfg, 'Channel…'),
       showWhen: { section: 'tv' },
     },
     {
       id: 'view',
-      label: 'View',
+      label: hubText(cfg, 'View'),
       style: 'group',
       trailing: true,
       default: 'list',
       showWhen: { section: 'sports' },
       items: [
-        { id: 'list', label: 'List', icon: 'list' },
-        { id: 'cards', label: 'Cards', icon: 'cards' },
+        { id: 'list', label: hubText(cfg, 'List'), icon: 'list' },
+        { id: 'cards', label: hubText(cfg, 'Cards'), icon: 'cards' },
       ],
     },
     {
       id: 'portals',
-      label: 'Portals',
+      label: hubText(cfg, 'Portals'),
       action: 'portals',
       hoistSource: 'live_schedule',
       trailing: true,
@@ -172,7 +172,7 @@ function liveSportsCatalogActions() {
   ];
 }
 
-function liveSportsLayout() {
+function liveSportsLayout(cfg) {
   return {
     pages: {
       live_sports: {
@@ -186,13 +186,13 @@ function liveSportsLayout() {
           kitTopBody('page', { expand: true }, [
             kitTopBar('chrome', {
               focusDown: 'kind',
-              actions: liveSportsCatalogActions(),
+              actions: liveSportsCatalogActions(cfg),
             }),
             kitCategoryBar('kind', {
               source: 'live_schedule',
               dynamic: true,
               default: 'all',
-              items: [{ id: 'all', label: 'All', icon: 'grid' }],
+              items: [{ id: 'all', label: hubText(cfg, 'All'), icon: 'grid' }],
               kindIcons: liveSportsKindIcons(),
               focusUp: 'chrome',
               focusDown: 'schedule',
@@ -212,10 +212,10 @@ function liveSportsLayout() {
                 panelTab: 'providers',
                 showWhen: { section: 'sports' },
                 panelTabs: [
-                  { id: 'providers', label: 'Providers', icon: 'dns' },
+                  { id: 'providers', label: hubText(cfg, 'Providers'), icon: 'dns' },
                   {
                     id: 'live_tv',
-                    label: 'Live TV',
+                    label: hubText(cfg, 'Live TV'),
                     icon: 'tv',
                     browse: true,
                     action: 'liveTv',
@@ -223,11 +223,16 @@ function liveSportsLayout() {
                 ],
                 focusUp: 'kind',
                 focusRight: 'sources-kind',
-                loadingTitle: 'Loading schedule',
-                loadingDetail:
+                loadingTitle: hubText(cfg, 'Loading schedule'),
+                loadingDetail: hubText(
+                  cfg,
                   'Fetching matches from your live sports catalogs…',
-                emptyTitle: 'No matches in this schedule',
-                emptyDescription: 'Try another catalog, horizon, or sport filter.',
+                ),
+                emptyTitle: hubText(cfg, 'No matches in this schedule'),
+                emptyDescription: hubText(
+                  cfg,
+                  'Try another catalog, horizon, or sport filter.',
+                ),
               }),
               'feed',
               { progressiveCatalogs: true },
@@ -242,10 +247,16 @@ function liveSportsLayout() {
                 sectionMenu: 'section',
                 showWhen: { section: 'tv' },
                 focusUp: 'chrome',
-                loadingTitle: 'Loading channels',
-                loadingDetail: 'Fetching 24/7 channels from your live catalogs…',
-                emptyTitle: 'No TV channels',
-                emptyDescription: 'No 24/7 channels in your live catalogs.',
+                loadingTitle: hubText(cfg, 'Loading channels'),
+                loadingDetail: hubText(
+                  cfg,
+                  'Fetching 24/7 channels from your live catalogs…',
+                ),
+                emptyTitle: hubText(cfg, 'No TV channels'),
+                emptyDescription: hubText(
+                  cfg,
+                  'No 24/7 channels in your live catalogs.',
+                ),
               }),
               'feed',
               { progressiveCatalogs: true },

@@ -32,7 +32,7 @@ function downloadsLoadFeed(ctx) {
 function extract(ctx) {
   var action = hubAction(ctx);
   if (action === 'layout') {
-    return hubOk('layout', downloadsLayout(), { maxAge: 3600, swr: 86400 });
+    return hubOk('layout', downloadsLayout(hubConfig(ctx, {})), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'feed' || action === 'rail') {
     return downloadsLoadFeed(ctx).then(function (items) {

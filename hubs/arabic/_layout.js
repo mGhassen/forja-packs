@@ -3,7 +3,7 @@
 // hub covers the whole site. Films / Series menus hide rails via
 // showWhenType; a chosen Category empties the other section rails.
 
-function arabicLayout() {
+function arabicLayout(cfg) {
   var rails = [];
   for (var i = 0; i < ARABIC_SECTIONS.length; i++) {
     var s = ARABIC_SECTIONS[i];
@@ -39,7 +39,7 @@ function arabicLayout() {
       {
         type: 'hero',
         id: 'spotlight',
-        title: 'رائج · Spotlight',
+        title: hubText(cfg, 'رائج · Spotlight'),
         rail: 'trending',
         bleed: 'latest',
       },

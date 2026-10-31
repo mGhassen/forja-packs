@@ -3,7 +3,7 @@
 // Compact (host width < shellNavCompactMaxWidth): collapsed shelf, rail search,
 // hide view/sort/top-bar search. Wide desktop keeps the full chrome.
 
-function iptvCatalogActions() {
+function iptvCatalogActions(cfg) {
   return [
     {
       id: 'catalog',
@@ -16,19 +16,19 @@ function iptvCatalogActions() {
       items: [
         {
           id: 'live',
-          label: 'Live',
+          label: hubText(cfg, 'Live'),
           icon: 'live_tv',
           colors: ['#EF4444', '#7C2D12'],
         },
         {
           id: 'movies',
-          label: 'Movies',
+          label: hubText(cfg, 'Movies'),
           icon: 'movie',
           colors: ['#EC4899', '#8B5CF6'],
         },
         {
           id: 'series',
-          label: 'Series',
+          label: hubText(cfg, 'Series'),
           icon: 'video_library',
           colors: ['#1CE783', '#13AA2E'],
         },
@@ -36,7 +36,7 @@ function iptvCatalogActions() {
     },
     {
       id: 'view',
-      label: 'View',
+      label: hubText(cfg, 'View'),
       style: 'group',
       hideWhenCompact: true,
       // Cards / EPG is desktop Live chrome — hide on leanback TV.
@@ -45,21 +45,21 @@ function iptvCatalogActions() {
       showWhen: { catalog: 'live' },
       default: 'cards',
       items: [
-        { id: 'cards', label: 'Cards', icon: 'cards' },
+        { id: 'cards', label: hubText(cfg, 'Cards'), icon: 'cards' },
         { id: 'guide', label: 'EPG', icon: 'guide' },
       ],
     },
     {
       id: 'search',
-      label: 'Search',
+      label: hubText(cfg, 'Search'),
       action: 'eventSearch',
       trailing: true,
       hideWhenCompact: true,
-      placeholder: 'Search channels or categories…',
+      placeholder: hubText(cfg, 'Search channels or categories…'),
     },
     {
       id: 'sort',
-      label: 'Sort',
+      label: hubText(cfg, 'Sort'),
       icon: 'filter',
       style: 'icon',
       trailing: true,
@@ -67,13 +67,13 @@ function iptvCatalogActions() {
       default: 'playlist',
       items: [
         { id: 'playlist', label: 'Playlist' },
-        { id: 'nameAsc', label: 'Name A–Z' },
-        { id: 'nameDesc', label: 'Name Z–A' },
+        { id: 'nameAsc', label: hubText(cfg, 'Name A–Z') },
+        { id: 'nameDesc', label: hubText(cfg, 'Name Z–A') },
       ],
     },
     {
       id: 'portals',
-      label: 'Portals',
+      label: hubText(cfg, 'Portals'),
       action: 'portals',
       hoistSource: 'iptv',
       trailing: true,
@@ -82,7 +82,7 @@ function iptvCatalogActions() {
   ];
 }
 
-function iptvLayout() {
+function iptvLayout(cfg) {
   return {
     pages: {
       iptv: {
@@ -97,7 +97,7 @@ function iptvLayout() {
           kitColumnsHeader('page', { expand: true }, [
             kitTopBar('chrome', {
               focusDown: 'cats',
-              actions: iptvCatalogActions(),
+              actions: iptvCatalogActions(cfg),
             }),
             kitCategoryBar('cats', {
               dynamic: true,
@@ -112,7 +112,7 @@ function iptvLayout() {
                 action: 'eventSearch',
                 open: true,
                 compactOnly: true,
-                placeholder: 'Search channels or categories…',
+                placeholder: hubText(cfg, 'Search channels or categories…'),
               },
               features: {
                 pin: true,
@@ -139,22 +139,32 @@ function iptvLayout() {
                 // Movies/Series posters — denser than hub rail defaults (190/32).
                 cardWidth: 140,
                 gap: 10,
-                emptyTitle: 'Choose a portal',
-                emptyDescription:
+                emptyTitle: hubText(cfg, 'Choose a portal'),
+                emptyDescription: hubText(
+                  cfg,
                   'Select a portal to browse Live TV, Movies, and Series.',
+                ),
                 loading: {
                   live: {
-                    title: 'Loading channels',
-                    detail:
+                    title: hubText(cfg, 'Loading channels'),
+                    detail: hubText(
+                      cfg,
                       'Fetching categories and channels from your portal…',
+                    ),
                   },
                   movies: {
-                    title: 'Loading movies',
-                    detail: 'Fetching categories and movies from your portal…',
+                    title: hubText(cfg, 'Loading movies'),
+                    detail: hubText(
+                      cfg,
+                      'Fetching categories and movies from your portal…',
+                    ),
                   },
                   series: {
-                    title: 'Loading series',
-                    detail: 'Fetching categories and series from your portal…',
+                    title: hubText(cfg, 'Loading series'),
+                    detail: hubText(
+                      cfg,
+                      'Fetching categories and series from your portal…',
+                    ),
                   },
                 },
               }),

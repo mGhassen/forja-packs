@@ -207,7 +207,7 @@ function kisskhDetails(ctx, cfg, params) {
           id: String(ep.id),
           episode: num,
           season: 1,
-          title: 'Episode ' + num,
+          title: hubTextFmt(cfg, 'Episode {n}', { n: num }),
         };
         if (airRaw) {
           entry.airDate = airRaw;
@@ -263,23 +263,23 @@ function kisskhCountryFilter(value) {
   return { op: 'eq', field: 'country', value: String(value) };
 }
 
-function kisskhCategoryOptions() {
+function kisskhCategoryOptions(cfg) {
   return [
     {
       id: 'chinese',
-      label: 'Chinese',
+      label: hubText(cfg, 'Chinese'),
       value: '1',
       filter: kisskhCountryFilter('1'),
     },
     {
       id: 'korea',
-      label: 'South Korea',
+      label: hubText(cfg, 'South Korea'),
       value: '2',
       filter: kisskhCountryFilter('2'),
     },
     {
       id: 'japan',
-      label: 'Japan',
+      label: hubText(cfg, 'Japan'),
       value: '3',
       filter: kisskhCountryFilter('3'),
     },
@@ -291,13 +291,13 @@ function kisskhCategoryOptions() {
     },
     {
       id: 'thailand',
-      label: 'Thailand',
+      label: hubText(cfg, 'Thailand'),
       value: '5',
       filter: kisskhCountryFilter('5'),
     },
     {
       id: 'taiwan',
-      label: 'Taiwan',
+      label: hubText(cfg, 'Taiwan'),
       value: '7',
       filter: kisskhCountryFilter('7'),
     },
@@ -309,14 +309,14 @@ function kisskhCategoryOptions() {
     },
     {
       id: 'indonesia',
-      label: 'Indonesia',
+      label: hubText(cfg, 'Indonesia'),
       value: '9',
       filter: kisskhCountryFilter('9'),
     },
   ];
 }
 
-function kisskhFilters() {
+function kisskhFilters(cfg) {
   return {
     menus: [
       {
@@ -327,7 +327,7 @@ function kisskhFilters() {
       },
       {
         id: 'series',
-        label: 'Series',
+        label: hubText(cfg, 'Series'),
         filter: { op: 'eq', field: 'type', value: '1' },
         hideTypeFilterRails: true,
       },
@@ -335,8 +335,8 @@ function kisskhFilters() {
     fields: [
       {
         field: 'country',
-        label: 'Country',
-        options: kisskhCategoryOptions(),
+        label: hubText(cfg, 'Country'),
+        options: kisskhCategoryOptions(cfg),
       },
     ],
   };
@@ -417,10 +417,10 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (action === 'layout') {
-    return hubOk('layout', kisskhLayout(), { maxAge: 3600, swr: 86400 });
+    return hubOk('layout', kisskhLayout(cfg), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
-    return hubOk('filters', kisskhFilters(), { maxAge: 86400 });
+    return hubOk('filters', kisskhFilters(cfg), { maxAge: 86400 });
   }
   if (action === 'feed') {
     return kisskhFeed(ctx, cfg, params).catch(function (e) {

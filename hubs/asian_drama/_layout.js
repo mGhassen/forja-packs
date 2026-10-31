@@ -1,6 +1,6 @@
 // Asian Drama hub page layout — widgets tree for action:'layout'.
 
-function kisskhLayout() {
+function kisskhLayout(cfg) {
   return {
     pages: {
       asian_drama: {
@@ -27,7 +27,7 @@ function kisskhLayout() {
             {
               type: 'hero',
               id: 'spotlight',
-              title: 'Spotlight',
+              title: hubText(cfg, 'Spotlight'),
               rail: 'spotlight',
               bleed: 'latest',
             },
@@ -43,7 +43,7 @@ function kisskhLayout() {
           hubWithLoad({
             type: 'rail',
             id: 'latest',
-            title: 'Latest Update',
+            title: hubText(cfg, 'Latest Update'),
             rail: 'latest',
             hideWhenBleed: true,
             aspect: 'landscape',
@@ -54,7 +54,7 @@ function kisskhLayout() {
           hubWithLoad({
             type: 'rail',
             id: 'trending',
-            title: 'Trending',
+            title: hubText(cfg, 'Trending'),
             rail: 'trending',
             aspect: 'landscape',
             focusUp: 'continue_watching',
@@ -64,7 +64,7 @@ function kisskhLayout() {
             {
               type: 'ranked',
               id: 'popular',
-              title: 'Popular',
+              title: hubText(cfg, 'Popular'),
               rail: 'most_viewed',
               aspect: 'landscape',
               focusUp: 'trending',
@@ -76,7 +76,7 @@ function kisskhLayout() {
           hubWithLoad({
             type: 'rail',
             id: 'upcoming',
-            title: 'Upcoming',
+            title: hubText(cfg, 'Upcoming'),
             rail: 'upcoming',
             aspect: 'landscape',
             focusUp: 'popular',

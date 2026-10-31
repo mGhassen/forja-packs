@@ -108,16 +108,16 @@ function iptvPortalFromParams(p) {
   return portal;
 }
 
-function iptvPortalValidate(portal) {
+function iptvPortalValidate(portal, cfg) {
   var platform = iptvPlatformOf(portal);
-  if (!portal.url) return 'url required';
+  if (!portal.url) return hubText(cfg, 'url required');
   if (platform === 'm3u') return '';
   if (platform === 'stalker') {
-    if (!portal.username) return 'MAC (username) required';
+    if (!portal.username) return hubText(cfg, 'MAC (username) required');
     return '';
   }
   if (!portal.username || !portal.password) {
-    return 'url, username, password required';
+    return hubText(cfg, 'url, username, password required');
   }
   return '';
 }
@@ -193,62 +193,67 @@ async function iptvResolveActive(ctx) {
   return null;
 }
 
-function iptvPortalFormFields(opts) {
+function iptvPortalFormFields(cfg, opts) {
   var o = opts || {};
   var editing = !!o.editing;
   return [
     { id: 'url', label: 'URL', type: 'text', required: !editing },
-    { id: 'username', label: 'Username / MAC', type: 'text' },
+    { id: 'username', label: hubText(cfg, 'Username / MAC'), type: 'text' },
     {
       id: 'password',
-      label: editing ? 'Password (blank = keep)' : 'Password',
+      label: editing
+        ? hubText(cfg, 'Password (blank = keep)')
+        : hubText(cfg, 'Password'),
       type: 'password',
       required: !editing,
     },
-    { id: 'label', label: 'Label', type: 'text' },
+    { id: 'label', label: hubText(cfg, 'Label'), type: 'text' },
   ];
 }
 
-function iptvPortalAddForm() {
+function iptvPortalAddForm(cfg) {
   return {
-    title: 'Add portal',
-    submitLabel: 'Add',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Add portal'),
+    submitLabel: hubText(cfg, 'Add'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'addPortal',
-    toastOk: 'Portal added',
-    description: 'Portal URL and credentials.',
-    fields: iptvPortalFormFields({ editing: false }),
+    toastOk: hubText(cfg, 'Portal added'),
+    description: hubText(cfg, 'Portal URL and credentials.'),
+    fields: iptvPortalFormFields(cfg, { editing: false }),
   };
 }
 
-function iptvPortalEditForm() {
+function iptvPortalEditForm(cfg) {
   return {
-    title: 'Edit portal',
-    submitLabel: 'Save',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Edit portal'),
+    submitLabel: hubText(cfg, 'Save'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'editPortal',
-    toastOk: 'Portal updated',
-    fields: iptvPortalFormFields({ editing: true }),
+    toastOk: hubText(cfg, 'Portal updated'),
+    fields: iptvPortalFormFields(cfg, { editing: true }),
   };
 }
 
-function iptvPortalImportForm() {
+function iptvPortalImportForm(cfg) {
   return {
-    title: 'Import portal',
-    submitLabel: 'Import',
-    cancelLabel: 'Cancel',
+    title: hubText(cfg, 'Import portal'),
+    submitLabel: hubText(cfg, 'Import'),
+    cancelLabel: hubText(cfg, 'Cancel'),
     action: 'importPortal',
-    toastOk: 'Portal imported',
-    description: 'Paste an 8-character share code (XXXX-XXXX) or F1. token.',
+    toastOk: hubText(cfg, 'Portal imported'),
+    description: hubText(
+      cfg,
+      'Paste an 8-character share code (XXXX-XXXX) or F1. token.',
+    ),
     fields: [
       {
         id: 'token',
-        label: 'Share code',
+        label: hubText(cfg, 'Share code'),
         type: 'text',
         required: true,
         hint: 'XXXX-XXXX',
       },
-      { id: 'label', label: 'Label (optional)', type: 'text' },
+      { id: 'label', label: hubText(cfg, 'Label (optional)'), type: 'text' },
     ],
   };
 }
@@ -293,50 +298,57 @@ function iptvPortalListItem(portal, activeKey) {
 }
 
 /** Side-panel layout token — foundation paints portalList from items. */
-function iptvPortalsPanelLayout() {
+function iptvPortalsPanelLayout(cfg) {
   return {
     widgets: [
       {
         type: 'portalList',
         id: 'portals',
         source: 'listPortals',
-        title: 'Portals',
+        title: hubText(cfg, 'Portals'),
         width: 380,
-        searchPlaceholder: 'Search portals…',
-        emptyTitle: 'No portals yet',
-        emptyDescription:
+        searchPlaceholder: hubText(cfg, 'Search portals…'),
+        emptyTitle: hubText(cfg, 'No portals yet'),
+        emptyDescription: hubText(
+          cfg,
           'Add a portal or import a share code to browse channels.',
+        ),
         actions: [
           {
             id: 'scrape',
-            label: 'Scrape',
+            label: hubText(cfg, 'Scrape'),
             icon: 'travel_explore',
             action: 'scrape',
           },
-          { id: 'deal', label: 'Deal', icon: 'casino', action: 'dealPortals' },
+          {
+            id: 'deal',
+            label: hubText(cfg, 'Deal'),
+            icon: 'casino',
+            action: 'dealPortals',
+          },
           {
             id: 'import',
-            label: 'Import',
+            label: hubText(cfg, 'Import'),
             icon: 'file_download',
             action: 'importPortal',
-            form: iptvPortalImportForm(),
+            form: iptvPortalImportForm(cfg),
           },
           {
             id: 'add',
-            label: 'Add',
+            label: hubText(cfg, 'Add'),
             icon: 'add',
             action: 'addPortal',
-            form: iptvPortalAddForm(),
+            form: iptvPortalAddForm(cfg),
           },
         ],
         itemActions: {
           edit: {
-            label: 'Edit',
+            label: hubText(cfg, 'Edit'),
             action: 'editPortal',
-            form: iptvPortalEditForm(),
+            form: iptvPortalEditForm(cfg),
           },
-          remove: { label: 'Delete', action: 'removePortal' },
-          share: { label: 'Copy share code', action: 'shareEncode' },
+          remove: { label: hubText(cfg, 'Delete'), action: 'removePortal' },
+          share: { label: hubText(cfg, 'Copy share code'), action: 'shareEncode' },
         },
       },
     ],
@@ -355,13 +367,13 @@ async function iptvListPortals(ctx) {
     active: active,
     portals: portals.map(iptvPortalPublic),
     items: items,
-    layout: iptvPortalsPanelLayout(),
+    layout: iptvPortalsPanelLayout(hubConfig(ctx, {})),
   });
 }
 
 async function iptvAddPortal(ctx, params) {
   var portal = iptvPortalFromParams(params);
-  var err = iptvPortalValidate(portal);
+  var err = iptvPortalValidate(portal, hubConfig(ctx, {}));
   if (err) return hubFail('addPortal', 'INVALID', err);
   await iptvUpsertPortalRow(ctx, portal, { select: true });
   return hubOk('addPortal', { portal: iptvPortalPublic(portal) });
@@ -390,7 +402,7 @@ async function iptvImportPortal(ctx, params) {
     userAgent: row.userAgent || row.user_agent,
     label: label,
   });
-  var err = iptvPortalValidate(portal);
+  var err = iptvPortalValidate(portal, hubConfig(ctx, {}));
   if (err) return hubFail('importPortal', 'INVALID', err);
   await iptvUpsertPortalRow(ctx, portal, { select: true });
   return hubOk('importPortal', { portal: iptvPortalPublic(portal) });
@@ -420,7 +432,7 @@ async function iptvEditPortal(ctx, params) {
       platform: p.platform != null ? p.platform : cur.platform,
     }),
   );
-  var err = iptvPortalValidate(next);
+  var err = iptvPortalValidate(next, hubConfig(ctx, {}));
   if (err) return hubFail('editPortal', 'INVALID', err);
 
   // Preserve key identity when url/user change: replace old row.

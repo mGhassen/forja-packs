@@ -56,12 +56,12 @@ function cartoonCategoryOptions() {
   });
 }
 
-function cartoonFilters() {
+function cartoonFilters(cfg) {
   return {
     fields: [
       {
         field: 'letter',
-        label: 'Letter',
+        label: hubText(cfg, 'Letter'),
         options: cartoonCategoryOptions(),
       },
     ],
@@ -823,7 +823,7 @@ function extract(ctx) {
     return hubOk('layout', cartoonLayout(), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
-    return hubOk('filters', cartoonFilters(), { maxAge: 86400 });
+    return hubOk('filters', cartoonFilters(cfg), { maxAge: 86400 });
   }
   if (action === 'feed') {
     return cartoonFeed(ctx, cfg, params).catch(function (e) {

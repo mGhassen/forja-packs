@@ -2,13 +2,13 @@
 // Hero + bleed reuse the first catalog (no invented spotlight/featured ids).
 // Type menus (pack `filters`) hide rails via showWhenType / showOnlyWhenType.
 
-function stremioCatalogTitle(c) {
+function stremioCatalogTitle(c, cfg) {
   var addonName = String((c && c.addonName) || '').trim();
   var catalogName = String((c && (c.catalogName || c.catalogId)) || '').trim();
   if (addonName && catalogName && addonName !== catalogName) {
     return addonName + ' · ' + catalogName;
   }
-  return catalogName || addonName || 'Catalog';
+  return catalogName || addonName || hubText(cfg, 'Catalog');
 }
 
 /** Normalize Stremio catalog type for chrome menus + showWhenType. */
@@ -22,7 +22,7 @@ function stremioLayoutType(raw) {
   return '';
 }
 
-function stremioLayoutFromCatalogs(catalogs) {
+function stremioLayoutFromCatalogs(catalogs, cfg) {
   var list = Array.isArray(catalogs) ? catalogs : [];
   var railMeta = [];
   for (var i = 0; i < list.length; i++) {
@@ -33,7 +33,7 @@ function stremioLayoutFromCatalogs(catalogs) {
     railMeta.push({
       cat: c,
       railId: railId,
-      title: stremioCatalogTitle(c),
+      title: stremioCatalogTitle(c, cfg),
       layoutType: layoutType,
     });
   }
@@ -96,7 +96,7 @@ function stremioLayoutFromCatalogs(catalogs) {
           actions: [
             {
               id: 'details',
-              label: 'View details',
+              label: hubText(cfg, 'View details'),
               icon: 'info',
               tone: 'secondary',
             },
@@ -151,7 +151,7 @@ function stremioLayoutFromCatalogs(catalogs) {
 }
 
 /** Pack chrome menus from the union of VOD catalog types (movie / series / anime). */
-function stremioFiltersFromCatalogs(catalogs) {
+function stremioFiltersFromCatalogs(catalogs, cfg) {
   var list = Array.isArray(catalogs) ? catalogs : [];
   var seen = {};
   for (var i = 0; i < list.length; i++) {
@@ -160,8 +160,8 @@ function stremioFiltersFromCatalogs(catalogs) {
     if (t) seen[t] = true;
   }
   var order = [
-    { id: 'movie', label: 'Movies', value: 'movie' },
-    { id: 'series', label: 'Series', value: 'series' },
+    { id: 'movie', label: hubText(cfg, 'Movies'), value: 'movie' },
+    { id: 'series', label: hubText(cfg, 'Series'), value: 'series' },
     { id: 'anime', label: 'Anime', value: 'anime' },
   ];
   var menus = [];

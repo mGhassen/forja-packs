@@ -48,6 +48,49 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "Catalog": "Catalogue",
+    "All": "Tous",
+    "Schedule": "Programme",
+    "Airing": "En cours",
+    "Next · 1h": "À venir · 1h",
+    "Next · 3h": "À venir · 3h",
+    "Next · 6h": "À venir · 6h",
+    "Next · 24h": "À venir · 24h",
+    "Refresh": "Actualiser",
+    "Search": "Rechercher",
+    "Team, match, sport…": "Équipe, match, sport…",
+    "Channel…": "Chaîne…",
+    "View": "Affichage",
+    "List": "Liste",
+    "Cards": "Cartes",
+    "Portals": "Portails",
+    "Providers": "Fournisseurs",
+    "Live TV": "TV en direct",
+    "Loading schedule": "Chargement du programme",
+    "Fetching matches from your live sports catalogs…": "Récupération des matchs depuis vos catalogues de sports en direct…",
+    "No matches in this schedule": "Aucun match dans ce programme",
+    "Try another catalog, horizon, or sport filter.": "Essayez un autre catalogue, une autre période ou un autre sport.",
+    "Loading channels": "Chargement des chaînes",
+    "Fetching 24/7 channels from your live catalogs…": "Récupération des chaînes 24/7 depuis vos catalogues en direct…",
+    "No TV channels": "Aucune chaîne TV",
+    "No 24/7 channels in your live catalogs.": "Aucune chaîne 24/7 dans vos catalogues en direct.",
+    "Loading {name}… {index}/{total}": "Chargement de {name}… {index}/{total}",
+    "Channel": "Chaîne",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 function hubOk(action, data, cache) {
   var env = {
     ok: true,

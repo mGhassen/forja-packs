@@ -1,21 +1,25 @@
 // My List hub page layout — widgets tree for action:'layout'.
 
-var MY_LIST_KIND_ITEMS = [
-  { id: 'movie', label: 'Film' },
-  { id: 'tv', label: 'Series' },
-  { id: 'anime', label: 'Anime' },
-  { id: 'asian_drama', label: 'Asian Drama' },
-];
+function myListKindItems(cfg) {
+  return [
+    { id: 'movie', label: hubText(cfg, 'Film') },
+    { id: 'tv', label: hubText(cfg, 'Series') },
+    { id: 'anime', label: hubText(cfg, 'Anime') },
+    { id: 'asian_drama', label: hubText(cfg, 'Asian Drama') },
+  ];
+}
 
-var MY_LIST_STATUS_TABS = [
-  { id: 'plantowatch', label: 'Plan to Watch' },
-  { id: 'watching', label: 'Watching' },
-  { id: 'hold', label: 'On Hold' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'dropped', label: 'Dropped' },
-];
+function myListStatusTabs(cfg) {
+  return [
+    { id: 'plantowatch', label: hubText(cfg, 'Plan to Watch') },
+    { id: 'watching', label: hubText(cfg, 'Watching') },
+    { id: 'hold', label: hubText(cfg, 'On Hold') },
+    { id: 'completed', label: hubText(cfg, 'Completed') },
+    { id: 'dropped', label: hubText(cfg, 'Dropped') },
+  ];
+}
 
-function myListLayout() {
+function myListLayout(cfg) {
   return {
     pages: {
       my_list: {
@@ -27,15 +31,15 @@ function myListLayout() {
         },
         widgets: [
           kitTabsCards('page', { expand: true }, [
-            kitMenu('kind', MY_LIST_KIND_ITEMS, {
+            kitMenu('kind', myListKindItems(cfg), {
               toggle: true,
               focusDown: 'status',
               search: {
                 action: 'eventSearch',
-                placeholder: 'Search my list…',
+                placeholder: hubText(cfg, 'Search my list…'),
               },
             }),
-            kitTabs('status', MY_LIST_STATUS_TABS, {
+            kitTabs('status', myListStatusTabs(cfg), {
               default: 'plantowatch',
               focusUp: 'kind',
               focusDown: 'grid',
@@ -50,9 +54,11 @@ function myListLayout() {
                 // default 100px film posters, denser titles.
                 cardWidth: 170,
                 titleFontSize: 12,
-                emptyTitle: 'Nothing in this list yet',
-                emptyDescription:
+                emptyTitle: hubText(cfg, 'Nothing in this list yet'),
+                emptyDescription: hubText(
+                  cfg,
                   'Open a title and tap + to set a watch status.',
+                ),
               }),
               'feed',
               {},

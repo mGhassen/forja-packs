@@ -52,7 +52,7 @@ function extract(ctx) {
       .then(function (items) {
         return hubOk(
           'enrich',
-          hubIptvEnrichDetailsPayload(items[0] || params.meta),
+          hubIptvEnrichDetailsPayload(items[0] || params.meta, cfg),
           { maxAge: 900, swr: 3600 },
         );
       })

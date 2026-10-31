@@ -156,11 +156,11 @@ function anilistTmdbSearchTitle(m) {
   return english || romaji || anilistTitle(m.title, 'romaji');
 }
 
-function anilistCardMeta(m) {
+function anilistCardMeta(m, cfg) {
   // Year • N eps — no format type (TV / ONA / FILM); that lived on the badge.
   var parts = [];
   if (m.seasonYear) parts.push(String(m.seasonYear));
-  if (m.episodes) parts.push(String(m.episodes) + ' eps');
+  if (m.episodes) parts.push(hubTextFmt(cfg, '{n} eps', { n: m.episodes }));
   return parts.join(' • ');
 }
 
@@ -172,7 +172,7 @@ function anilistAbsUrl(raw) {
   return u;
 }
 
-function anilistMeta(m, preferred) {
+function anilistMeta(m, preferred, cfg) {
   if (!m || !m.id) return null;
   var name = anilistTitle(m.title, preferred);
   if (!name) return null;
@@ -191,7 +191,7 @@ function anilistMeta(m, preferred) {
     // Prefer AniList banner for hero; cover fallback matches old bannerOrCover.
     background: banner || poster,
     description: hubStripHtml(m.description),
-    releaseInfo: anilistCardMeta(m),
+    releaseInfo: anilistCardMeta(m, cfg),
     genres: Array.isArray(m.genres) ? m.genres : [],
     ids: ids,
     open: {
@@ -290,7 +290,7 @@ function anilistParseEpisodeNumber(title) {
   return n > 0 ? n : 0;
 }
 
-function anilistVideosFromMedia(m) {
+function anilistVideosFromMedia(m, cfg) {
   var isoByEp = anilistAiringIsoByEpisode(m);
   var stream = Array.isArray(m.streamingEpisodes) ? m.streamingEpisodes : [];
   var total = Number(m.episodes) || 0;
@@ -369,7 +369,7 @@ function anilistVideosFromMedia(m) {
       id: String(j),
       episode: j,
       season: 1,
-      title: row.title || 'Episode ' + j,
+      title: row.title || hubTextFmt(cfg, 'Episode {n}', { n: j }),
     };
     if (row.thumbnail) entry.thumbnail = row.thumbnail;
     videos.push(anilistApplyAir(entry, m, isoByEp));
@@ -422,28 +422,28 @@ function anilistStaffFromMedia(m) {
   return out;
 }
 
-function anilistRelationLabel(type) {
+function anilistRelationLabel(type, cfg) {
   switch (String(type || '')) {
     case 'SIDE_STORY':
-      return 'Side Story';
+      return hubText(cfg, 'Side Story');
     case 'SUMMARY':
-      return 'Summary';
+      return hubText(cfg, 'Summary');
     case 'ALTERNATIVE':
       return 'Alternative';
     case 'SPIN_OFF':
       return 'Spin-off';
     case 'SEQUEL':
-      return 'Sequel';
+      return hubText(cfg, 'Sequel');
     case 'PREQUEL':
-      return 'Prequel';
+      return hubText(cfg, 'Prequel');
     case 'PARENT':
-      return 'Parent';
+      return hubText(cfg, 'Parent');
     case 'COMPILATION':
       return 'Compilation';
     case 'CONTAINS':
-      return 'Contains';
+      return hubText(cfg, 'Contains');
     case 'OTHER':
-      return 'Other';
+      return hubText(cfg, 'Other');
     default:
       return String(type || '').replace(/_/g, ' ');
   }
@@ -762,7 +762,7 @@ function anilistSeasonChainIdSet(seasons) {
   return set;
 }
 
-function anilistRelatedFromMedia(m, preferred, excludeIds) {
+function anilistRelatedFromMedia(m, preferred, excludeIds, cfg) {
   var edges =
     m &&
       m.relations &&
@@ -795,10 +795,10 @@ function anilistRelatedFromMedia(m, preferred, excludeIds) {
     var id = Number(node.id);
     if (!(id > 0) || seen[id] || exclude[id]) continue;
     seen[id] = true;
-    var meta = anilistMeta(node, preferred);
+    var meta = anilistMeta(node, preferred, cfg);
     if (!meta) continue;
     // Host paints badge; format chips are stripped — relation label stays.
-    meta.badge = anilistRelationLabel(type);
+    meta.badge = anilistRelationLabel(type, cfg);
     meta._relationRank = typeRank[type] != null ? typeRank[type] : 99;
     out.push(meta);
   }
@@ -812,7 +812,7 @@ function anilistRelatedFromMedia(m, preferred, excludeIds) {
   return out;
 }
 
-function anilistRecommendationsFromMedia(m, preferred) {
+function anilistRecommendationsFromMedia(m, preferred, cfg) {
   var nodes =
     m &&
       m.recommendations &&
@@ -830,7 +830,7 @@ function anilistRecommendationsFromMedia(m, preferred) {
     var id = Number(node.id);
     if (!(id > 0) || seen[id]) continue;
     seen[id] = true;
-    var meta = anilistMeta(node, preferred);
+    var meta = anilistMeta(node, preferred, cfg);
     if (!meta) continue;
     out.push(meta);
   }
@@ -969,10 +969,10 @@ function anilistQuery(ctx, cfg, query, variables) {
   return tryAt(0, false);
 }
 
-function anilistRailItemsFromList(railId, list, preferred) {
+function anilistRailItemsFromList(railId, list, preferred, cfg) {
   var out = [];
   for (var i = 0; i < list.length; i++) {
-    var meta = anilistMeta(list[i], preferred);
+    var meta = anilistMeta(list[i], preferred, cfg);
     if (!meta) continue;
     if (railId === 'spotlight') {
       var st = String(meta.status || '').toUpperCase();
@@ -982,7 +982,7 @@ function anilistRailItemsFromList(railId, list, preferred) {
   }
   if (railId === 'spotlight' && !out.length) {
     for (var j = 0; j < list.length; j++) {
-      var m2 = anilistMeta(list[j], preferred);
+      var m2 = anilistMeta(list[j], preferred, cfg);
       if (m2) out.push(m2);
     }
   }
@@ -991,7 +991,7 @@ function anilistRailItemsFromList(railId, list, preferred) {
   return out;
 }
 
-function anilistAiringItemsFromSchedules(schedules, params, limit, preferred) {
+function anilistAiringItemsFromSchedules(schedules, params, limit, preferred, cfg) {
   var genre = hubFilterValue(params && params.filter, 'genre');
   var format = hubFilterValue(params && params.filter, 'format');
   var formatNot = hubFilterValue(params && params.filter, 'format_not');
@@ -1020,11 +1020,11 @@ function anilistAiringItemsFromSchedules(schedules, params, limit, preferred) {
       if (!hit) continue;
     }
     seen[m.id] = true;
-    var meta = anilistMeta(m, preferred);
+    var meta = anilistMeta(m, preferred, cfg);
     if (!meta) continue;
     var ep = Number(row.episode);
     if (ep > 0) {
-      meta.releaseInfo = (meta.releaseInfo ? meta.releaseInfo + ' • ' : '') + 'Ep ' + ep;
+      meta.releaseInfo = (meta.releaseInfo ? meta.releaseInfo + ' • ' : '') + hubTextFmt(cfg, 'Ep {n}', { n: ep });
     }
     out.push(meta);
     if (Number(limit) > 0 && out.length >= Number(limit)) break;
@@ -1124,12 +1124,14 @@ function anilistFeed(ctx, cfg, params) {
             params,
             perPage,
             preferred,
+            cfg,
           );
         } else {
           rails[railId] = anilistRailItemsFromList(
             railId,
             page.media || [],
             preferred,
+            cfg,
           );
         }
       }
@@ -1189,6 +1191,7 @@ function anilistPage(ctx, cfg, params) {
         params,
         perPage,
         preferred,
+        cfg,
       );
     });
   }
@@ -1224,7 +1227,7 @@ function anilistPage(ctx, cfg, params) {
 
   return anilistQuery(ctx, cfg, query, variables).then(function (data) {
     var list = (data.Page && data.Page.media) || [];
-    return anilistRailItemsFromList(railId, list, preferred);
+    return anilistRailItemsFromList(railId, list, preferred, cfg);
   });
 }
 
@@ -1242,19 +1245,19 @@ function anilistDetails(ctx, cfg, params) {
     ' } }';
   return anilistQuery(ctx, cfg, query, { id: id }).then(function (data) {
     var media = data.Media;
-    var meta = anilistMeta(media, preferred);
+    var meta = anilistMeta(media, preferred, cfg);
     if (!meta) return hubFail('details', 'NOT_FOUND', 'anime ' + id + ' not found');
-    var videos = anilistVideosFromMedia(media);
+    var videos = anilistVideosFromMedia(media, cfg);
     if (videos.length) meta.videos = videos;
     var characters = anilistCharactersFromMedia(media);
     if (characters.length) meta.cast = characters;
     var staff = anilistStaffFromMedia(media);
     if (staff.length) meta.crew = staff;
-    var recommendations = anilistRecommendationsFromMedia(media, preferred);
+    var recommendations = anilistRecommendationsFromMedia(media, preferred, cfg);
 
     return anilistGetSeasons(ctx, cfg, id).then(function (seasons) {
       var chainIds = anilistSeasonChainIdSet(seasons);
-      var related = anilistRelatedFromMedia(media, preferred, chainIds);
+      var related = anilistRelatedFromMedia(media, preferred, chainIds, cfg);
       var payload = {
         meta: meta,
         layout: {
@@ -1270,11 +1273,11 @@ function anilistDetails(ctx, cfg, params) {
       }
       var rails = {};
       if (related.length) {
-        rails.related = { title: 'Related', items: related };
+        rails.related = { title: hubText(cfg, 'Related'), items: related };
       }
       if (recommendations.length) {
         rails.recommendations = {
-          title: 'More Like This',
+          title: hubText(cfg, 'More Like This'),
           items: recommendations,
         };
       }
@@ -1284,8 +1287,15 @@ function anilistDetails(ctx, cfg, params) {
   });
 }
 
-function anilistCategoryOptions() {
+// Mood chips / genre options with the label in the app language (genre value stays English).
+function anilistMoodsFor(cfg) {
   return ANILIST_MOODS.map(function (m) {
+    return Object.assign({}, m, { label: hubText(cfg, m.label) });
+  });
+}
+
+function anilistCategoryOptions(cfg) {
+  return anilistMoodsFor(cfg).map(function (m) {
     return {
       id: m.id,
       label: m.label,
@@ -1301,7 +1311,7 @@ function extract(ctx) {
   var params = hubParams(ctx);
 
   if (action === 'layout') {
-    return hubOk('layout', anilistLayout(), { maxAge: 3600, swr: 86400 });
+    return hubOk('layout', anilistLayout(cfg), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
     return hubOk('filters', {
@@ -1313,11 +1323,11 @@ function extract(ctx) {
         },
         {
           id: 'series',
-          label: 'Series',
+          label: hubText(cfg, 'Series'),
           filter: { op: 'eq', field: 'format_not', value: 'MOVIE' },
         },
       ],
-      fields: [{ field: 'genre', label: 'Genre', options: anilistCategoryOptions() }],
+      fields: [{ field: 'genre', label: hubText(cfg, 'Genre'), options: anilistCategoryOptions(cfg) }],
       play: [
         {
           id: 'languages',

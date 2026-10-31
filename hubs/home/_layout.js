@@ -1,6 +1,6 @@
 // Home hub page layout — widgets tree for action:'layout'.
 
-function tmdbLayout() {
+function tmdbLayout(cfg) {
   // Visual D-pad chain (host skips missing/empty via kit-edge miss):
   // featured → popular → continue_watching? → mood-chips → mood-results?
   // → because-shuffle? → because (poster rail) → new_releases
@@ -28,7 +28,7 @@ function tmdbLayout() {
         {
           type: 'rail',
           id: id,
-          title: g.label,
+          title: hubText(cfg, g.label),
           rail: 'genre',
           params: { genreRow: g.id },
         },
@@ -67,7 +67,7 @@ function tmdbLayout() {
             {
               type: 'hero',
               id: 'spotlight',
-              title: 'Spotlight',
+              title: hubText(cfg, 'Spotlight'),
               rail: 'spotlight',
               // Hero ↓ → Featured bleed (host resolveFocusEdge on bleed id).
               bleed: 'featured',
@@ -75,7 +75,7 @@ function tmdbLayout() {
               actions: [
                 {
                   id: 'details',
-                  label: 'View details',
+                  label: hubText(cfg, 'View details'),
                   icon: 'info',
                   tone: 'secondary',
                 },
@@ -88,7 +88,7 @@ function tmdbLayout() {
           hubWithLoad({
             type: 'rail',
             id: 'featured',
-            title: 'Featured This Month',
+            title: hubText(cfg, 'Featured This Month'),
             rail: 'featured',
             hideWhenBleed: true,
             // First catalog row ↑ → View details (host hero-details / focusHero).
@@ -100,7 +100,7 @@ function tmdbLayout() {
             {
               type: 'ranked',
               id: 'popular',
-              title: 'Popular',
+              title: hubText(cfg, 'Popular'),
               rail: 'popular',
               style: 'numbered',
               maxPages: 2,
@@ -122,8 +122,8 @@ function tmdbLayout() {
             {
               type: 'mood',
               id: 'moods',
-              title: "What's your mood?",
-              options: TMDB_MOODS,
+              title: hubText(cfg, "What's your mood?"),
+              options: tmdbMoodOptions(cfg),
               // Host maps these onto mood-chips (not widget id `moods`).
               // Empty Continue → host kit-edge miss → popular.
               focusUp: 'continue_watching',
@@ -156,7 +156,7 @@ function tmdbLayout() {
               {
                 type: 'rail',
                 id: 'new_releases',
-                title: 'New Releases',
+                title: hubText(cfg, 'New Releases'),
                 rail: 'new_releases',
                 // ↑ Because poster rail (not shuffle). Empty → miss → mood.
                 focusUp: 'because',
