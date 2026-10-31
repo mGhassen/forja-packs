@@ -941,6 +941,8 @@ function isDaddyLiveHost(host) {
     h.endsWith('.dlhd.sx') ||
     h === 'dlhd.st' ||
     h.endsWith('.dlhd.st') ||
+    h === 'dlhd.dad' ||
+    h.endsWith('.dlhd.dad') ||
     h === 'dlstreams.st' ||
     h.endsWith('.dlstreams.st') ||
     h === 'dlstreams.top' ||
@@ -965,6 +967,7 @@ function isDaddyLiveUrl(url) {
     var path = u.pathname.toLowerCase();
     return (
       path.indexOf('/stream/stream-') >= 0 ||
+      path.indexOf('/embed/stream-') >= 0 ||
       path.indexOf('/cast/stream-') >= 0 ||
       path.indexOf('/player/stream-') >= 0 ||
       path.indexOf('/daddy.php') >= 0 ||
@@ -1023,8 +1026,13 @@ function isVideocdnUrl(url) {
   try {
     var u = new URL(String(url || '').trim());
     var host = u.host.toLowerCase();
-    if (host.indexOf('videocdn') < 0) return false;
-    return u.pathname.toLowerCase().indexOf('/shopping') >= 0;
+    var path = u.pathname.toLowerCase();
+    if (path.indexOf('/shopping') < 0) return false;
+    // Strumyk / Streamic clones: cdnv-cdn.icu, vcdn-*.website, classic videocdn.
+    if (host.indexOf('videocdn') >= 0) return true;
+    if (host.indexOf('cdnv-cdn') >= 0) return true;
+    if (host.indexOf('vcdn-') === 0 || host.indexOf('vcdn.') === 0) return true;
+    return false;
   } catch (_) {
     return false;
   }

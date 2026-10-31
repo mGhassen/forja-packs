@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.50",
+  "version": "2.0.54",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -222,6 +222,34 @@
       }
     },
     {
+      "id": "strumyk",
+      "name": "Strumyk",
+      "description": "strumyk.ca schedule and multi-language stream resolve",
+      "entry": "strumyk.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "config": {
+        "matchIdPrefix": "sk_",
+        "origins": [
+          "https://strumyk.ca",
+          "https://strumyk.cv"
+        ],
+        "origin": "https://strumyk.ca",
+        "embedOrigin": "https://embed.st"
+      }
+    },
+    {
       "id": "bzhsport",
       "name": "BZH-Sport",
       "description": "BZH-Sport schedule, 24/7 channels, and stream resolve",
@@ -314,6 +342,7 @@
     "timstreams.js",
     "watchfooty.js",
     "streamic.js",
+    "strumyk.js",
     "bzhsport.js",
     "liveonsat.js",
     "livesoccertv.js",
