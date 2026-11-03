@@ -48,6 +48,67 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// TMDB search in the app language (cfg.uiLocale); English and a missing locale add nothing.
+function hubMatchRequest(ctx, req) {
+  var l = String((ctx && ctx.config && ctx.config.uiLocale) || '').trim();
+  if (!l || !req || typeof req !== 'object') return req;
+  var out = {};
+  for (var k in req) if (Object.prototype.hasOwnProperty.call(req, k)) out[k] = req[k];
+  out.language = l;
+  return out;
+}
+
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "What's your mood?": "Quelle est votre humeur ?",
+    "New Releases": "Nouveautés",
+    "Featured This Month": "Sélection du mois",
+    "Popular": "Populaires",
+    "Spotlight": "À la une",
+    "View details": "Voir les détails",
+    "Mind-Bending": "Déroutants",
+    "Feel-Good": "Feel-good",
+    "Dark Thrillers": "Thrillers sombres",
+    "Horror": "Horreur",
+    "Animated": "Animation",
+    "Drama": "Drame",
+    "Adventure": "Aventure",
+    "Comedy": "Comédie",
+    "Documentary": "Documentaire",
+    "Family": "Famille",
+    "Fantasy": "Fantastique",
+    "Game Show": "Jeu télévisé",
+    "Music": "Musique",
+    "Mystery": "Mystère",
+    "Sci-Fi": "Science-fiction",
+    "War": "Guerre",
+    "History": "Histoire",
+    "TV Movie": "Téléfilm",
+    "Action & Adventure": "Action et aventure",
+    "Kids": "Enfants",
+    "News": "Actualités",
+    "Reality": "Téléréalité",
+    "Sci-Fi & Fantasy": "Science-fiction et fantastique",
+    "Soap": "Feuilleton",
+    "Talk": "Talk-show",
+    "War & Politics": "Guerre et politique",
+    "Because you watched": "Parce que vous avez regardé",
+    "Episode": "Épisode",
+    "More Like This": "Titres similaires",
+    "TV Shows": "Séries",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 
 // Pack owns upcoming / premiereLabel — host only reads these fields.
 
@@ -456,7 +517,7 @@ function hubTmdbMatch(ctx, query) {
   return hubTmdbMatchFetch(ctx, query).then(function (hit) {
     if (hit && hit.id) return hit;
     if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-      return Promise.resolve(ctx.host.tmdb.match(query))
+      return Promise.resolve(ctx.host.tmdb.match(hubMatchRequest(ctx, query)))
         .then(function (h) {
           return h && h.id ? h : null;
         })

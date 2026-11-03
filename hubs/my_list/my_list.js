@@ -473,6 +473,7 @@ function myListLoadFeed(ctx, params) {
   var hiddenKeys = (params && params.hiddenKeys) || [];
   var q =
     params && params.q != null ? String(params.q).trim() : '';
+  var cfg = hubConfig(ctx, {});
 
   // Pack opts in: host runs saved list mode when Settings auto-sync is on
   // (throttled), then refreshes the Simkl library cache before we merge.
@@ -534,9 +535,9 @@ function myListLoadFeed(ctx, params) {
         // Product chrome for host Open with… sheet (pack owns labels/modes).
         row.openBind = {
           pin: true,
-          trackerLabel: 'Match',
-          trackerTitle: 'Match on Simkl',
-          openLabel: 'Open with',
+          trackerLabel: hubText(cfg, 'Match'),
+          trackerTitle: hubText(cfg, 'Match on Simkl'),
+          openLabel: hubText(cfg, 'Open with'),
           trackerIcon: 'simkl',
         };
         if (simklOn) {
@@ -649,7 +650,7 @@ function extract(ctx) {
   var action = hubAction(ctx);
   var params = hubParams(ctx);
   if (action === 'layout') {
-    return hubOk('layout', myListLayout(), { maxAge: 3600, swr: 86400 });
+    return hubOk('layout', myListLayout(hubConfig(ctx, {})), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'feed' || action === 'rail') {
     return myListLoadFeed(ctx, params).then(function (result) {

@@ -236,7 +236,7 @@ function kidsLetterFilter(value) {
   return { op: 'eq', field: 'letter', value: String(value) };
 }
 
-function kidsFilters() {
+function kidsFilters(cfg) {
   return {
     menus: [
       {
@@ -246,14 +246,14 @@ function kidsFilters() {
       },
       {
         id: 'series',
-        label: 'Series',
+        label: hubText(cfg, 'Series'),
         filter: { op: 'eq', field: 'type', value: 'series' },
       },
     ],
     fields: [
       {
         field: 'letter',
-        label: 'Letter',
+        label: hubText(cfg, 'Letter'),
         options: KIDS_LETTERS.map(function (L) {
           return {
             id: 'letter_' + L.id,
@@ -897,7 +897,7 @@ function extract(ctx) {
     return hubOk('layout', kidsLayout(), { maxAge: 3600, swr: 86400 });
   }
   if (action === 'filters') {
-    return hubOk('filters', kidsFilters(), { maxAge: 86400 });
+    return hubOk('filters', kidsFilters(cfg), { maxAge: 86400 });
   }
   if (action === 'feed') {
     return kidsFeed(ctx, cfg, params).catch(function (e) {

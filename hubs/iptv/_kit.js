@@ -48,6 +48,96 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// TMDB search in the app language (cfg.uiLocale); English and a missing locale add nothing.
+function hubMatchRequest(ctx, req) {
+  var l = String((ctx && ctx.config && ctx.config.uiLocale) || '').trim();
+  if (!l || !req || typeof req !== 'object') return req;
+  var out = {};
+  for (var k in req) if (Object.prototype.hasOwnProperty.call(req, k)) out[k] = req[k];
+  out.language = l;
+  return out;
+}
+
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "Live": "En direct",
+    "Movies": "Films",
+    "Series": "Séries",
+    "View": "Affichage",
+    "Cards": "Cartes",
+    "Search": "Rechercher",
+    "Sort": "Trier",
+    "Name A–Z": "Nom A–Z",
+    "Name Z–A": "Nom Z–A",
+    "Portals": "Portails",
+    "Search channels or categories…": "Rechercher des chaînes ou des catégories…",
+    "Choose a portal": "Choisir un portail",
+    "Select a portal to browse Live TV, Movies, and Series.": "Sélectionnez un portail pour parcourir la TV en direct, les films et les séries.",
+    "Loading channels": "Chargement des chaînes",
+    "Fetching categories and channels from your portal…": "Récupération des catégories et des chaînes depuis votre portail…",
+    "Loading movies": "Chargement des films",
+    "Fetching categories and movies from your portal…": "Récupération des catégories et des films depuis votre portail…",
+    "Loading series": "Chargement des séries",
+    "Fetching categories and series from your portal…": "Récupération des catégories et des séries depuis votre portail…",
+    "Select a provider to browse Live TV, Movies, and Series.": "Sélectionnez un fournisseur pour parcourir la TV en direct, les films et les séries.",
+    "Open portal": "Ouvrir le portail",
+    "Favorites": "Favoris",
+    "Already watched": "Déjà regardé",
+    "No favorites": "Aucun favori",
+    "Star a live channel to keep it here.": "Ajoutez une chaîne en direct aux favoris pour la retrouver ici.",
+    "Nothing watched yet": "Rien de regardé pour l'instant",
+    "Channels you play on Live land here (last 30).": "Les chaînes que vous lisez en direct apparaissent ici (30 dernières).",
+    "No movies": "Aucun film",
+    "No series": "Aucune série",
+    "No channels": "Aucune chaîne",
+    "Nothing in this category.": "Rien dans cette catégorie.",
+    "Username / MAC": "Nom d'utilisateur / MAC",
+    "Password (blank = keep)": "Mot de passe (vide = conserver)",
+    "Password": "Mot de passe",
+    "Label": "Libellé",
+    "Add portal": "Ajouter un portail",
+    "Add": "Ajouter",
+    "Cancel": "Annuler",
+    "Portal added": "Portail ajouté",
+    "Portal URL and credentials.": "URL du portail et identifiants.",
+    "Edit portal": "Modifier le portail",
+    "Save": "Enregistrer",
+    "Portal updated": "Portail mis à jour",
+    "Import portal": "Importer un portail",
+    "Import": "Importer",
+    "Portal imported": "Portail importé",
+    "Paste an 8-character share code (XXXX-XXXX) or F1. token.": "Collez un code de partage à 8 caractères (XXXX-XXXX) ou un jeton F1.",
+    "Share code": "Code de partage",
+    "Label (optional)": "Libellé (facultatif)",
+    "Search portals…": "Rechercher des portails…",
+    "No portals yet": "Aucun portail pour l'instant",
+    "Add a portal or import a share code to browse channels.": "Ajoutez un portail ou importez un code de partage pour parcourir les chaînes.",
+    "Scrape": "Collecter",
+    "Deal": "Piocher",
+    "Edit": "Modifier",
+    "Delete": "Supprimer",
+    "Copy share code": "Copier le code de partage",
+    "url required": "URL requise",
+    "MAC (username) required": "Adresse MAC (nom d'utilisateur) requise",
+    "url, username, password required": "URL, nom d'utilisateur et mot de passe requis",
+    "Failed to download playlist": "Échec du téléchargement de la playlist",
+    "Playlist body empty": "La playlist est vide",
+    "Unknown": "Inconnu",
+    "Episode {n}": "Épisode {n}",
+    "More Like This": "Titres similaires",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 
 // Pack owns upcoming / premiereLabel — host only reads these fields.
 
@@ -488,6 +578,17 @@ var HUB_TMDB_DEFAULTS = {
   apiKey: '',
 };
 
+// TMDB response language: the app language from the host, else TMDB's default (English).
+function hubTmdbLanguage(cfg) {
+  return String((cfg && (cfg.language || cfg.uiLocale)) || '').trim();
+}
+
+// Images to request: app language first, then English and untagged ones.
+function hubTmdbImageLanguages(cfg) {
+  var l = (hubTmdbLanguage(cfg) || 'en').split('-')[0].toLowerCase();
+  return l !== 'en' ? l + ',en,null' : 'en,null';
+}
+
 function hubTmdbBuildUrl(cfg, path, queryObj) {
   var base = String((cfg && cfg.base) || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
   var p = String(path || '');
@@ -497,6 +598,8 @@ function hubTmdbBuildUrl(cfg, path, queryObj) {
   var key = String((cfg && cfg.apiKey) || '').trim();
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) return null;
   if (key) qs.push('api_key=' + encodeURIComponent(key));
+  var lang = hubTmdbLanguage(cfg);
+  if (lang && !(queryObj && queryObj.language)) qs.push('language=' + encodeURIComponent(lang));
   if (queryObj) {
     for (var k in queryObj) {
       if (!Object.prototype.hasOwnProperty.call(queryObj, k)) continue;
@@ -517,7 +620,7 @@ function hubTmdbMatch(ctx, query) {
   return hubTmdbMatchFetch(ctx, normalized).then(function (hit) {
     if (hit && hit.id) return hit;
     if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-      return Promise.resolve(ctx.host.tmdb.match(normalized))
+      return Promise.resolve(ctx.host.tmdb.match(hubMatchRequest(ctx, normalized)))
         .then(function (h) {
           return h && h.id ? h : null;
         })
@@ -967,7 +1070,7 @@ function hubTmdbById(ctx, id, preferType, details) {
 
   function fetchOne(media) {
     var url =
-      base + '/' + media + '/' + tid + '?append_to_response=' + append + (details ? '&include_image_language=en,null' : '') + (key ? '&api_key=' + encodeURIComponent(key) : '');
+      base + '/' + media + '/' + tid + '?append_to_response=' + append + (details ? '&include_image_language=' + hubTmdbImageLanguages(cfg) : '') + (hubTmdbLanguage(cfg) ? '&language=' + encodeURIComponent(hubTmdbLanguage(cfg)) : '') + (key ? '&api_key=' + encodeURIComponent(key) : '');
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -1029,7 +1132,7 @@ function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
 }
 
 function hubIsGenericEpisodeTitle(title) {
-  return /^Episode\s+\d+$/i.test(String(title || '').trim());
+  return /^(Episode|Épisode)\s+\d+$/i.test(String(title || '').trim());
 }
 
 function hubEnrichMetaVideos(ctx, meta, hit) {
@@ -1188,7 +1291,7 @@ function hubEnrichTmdb(ctx, items, limit, opts) {
   });
 }
 
-function hubIptvEnrichDetailsPayload(meta) {
+function hubIptvEnrichDetailsPayload(meta, cfg) {
   var recs =
     meta && Array.isArray(meta.recommendations) ? meta.recommendations.slice() : [];
   if (meta && Array.isArray(meta.recommendations)) {
@@ -1197,7 +1300,7 @@ function hubIptvEnrichDetailsPayload(meta) {
   var data = { meta: meta };
   if (recs.length) {
     data.rails = {
-      recommendations: { title: 'More Like This', items: recs },
+      recommendations: { title: hubText(cfg, 'More Like This'), items: recs },
     };
   }
   return data;

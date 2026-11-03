@@ -1,13 +1,15 @@
 // Downloads hub page — kind menu plus the saved-title grid.
 
-var DOWNLOADS_KIND_ITEMS = [
-  { id: 'movie', label: 'Film' },
-  { id: 'tv', label: 'Series' },
-  { id: 'anime', label: 'Anime' },
-  { id: 'asian_drama', label: 'Asian Drama' },
-];
+function downloadsKindItems(cfg) {
+  return [
+    { id: 'movie', label: hubText(cfg, 'Film') },
+    { id: 'tv', label: hubText(cfg, 'Series') },
+    { id: 'anime', label: hubText(cfg, 'Anime') },
+    { id: 'asian_drama', label: hubText(cfg, 'Asian Drama') },
+  ];
+}
 
-function downloadsLayout() {
+function downloadsLayout(cfg) {
   return {
     pages: {
       downloads: {
@@ -19,7 +21,7 @@ function downloadsLayout() {
         },
         widgets: [
           kitTabsCards('page', { expand: true }, [
-            kitMenu('kind', DOWNLOADS_KIND_ITEMS, {
+            kitMenu('kind', downloadsKindItems(cfg), {
               toggle: true,
               focusDown: 'grid',
             }),
@@ -31,9 +33,11 @@ function downloadsLayout() {
                 panel: 'offline',
                 kindMenu: 'kind',
                 focusUp: 'kind',
-                emptyTitle: 'Nothing downloaded yet',
-                emptyDescription:
+                emptyTitle: hubText(cfg, 'Nothing downloaded yet'),
+                emptyDescription: hubText(
+                  cfg,
                   'Save a film or episode from Sources and it shows up here.',
+                ),
               }),
               'feed',
               {},

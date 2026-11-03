@@ -4,7 +4,19 @@
   "name": "ForjaHQ IPTV",
   "description": "IPTV portals, live channels, movies, and series.",
   "author": "ForjaHQ",
-      "version": "1.5.72",
+      "version": "1.5.73",
+  "i18n": {
+    "fr": {
+      "Cards": "Cartes",
+      "Cards with stills, or numbered chips in a grid": "Cartes avec images, ou pastilles numérotées en grille",
+      "Details": "Détails",
+      "Episode list": "Liste des épisodes",
+      "IPTV TMDB Enrich": "Enrichissement TMDB pour IPTV",
+      "IPTV portals, live channels, movies, and series": "Portails IPTV, chaînes en direct, films et séries",
+      "Number chips": "Pastilles numérotées",
+      "Optional TMDB match enrich for IPTV movie and series details": "Enrichissement TMDB facultatif pour les détails des films et séries IPTV"
+    }
+  },
   "tags": [
     "iptv",
     "live"

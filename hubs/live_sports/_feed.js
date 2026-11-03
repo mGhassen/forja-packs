@@ -927,7 +927,11 @@ function liveSportsAggregateFeed(ctx, params) {
           try {
             onProgress({
               busy: true,
-              label: 'Loading ' + pluginName + '… ' + (index + 1) + '/' + total,
+              label: hubTextFmt(cfg, 'Loading {name}… {index}/{total}', {
+                name: pluginName,
+                index: index + 1,
+                total: total,
+              }),
               index: index,
               total: total,
               pluginId: pluginId,

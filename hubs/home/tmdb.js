@@ -7,9 +7,20 @@ var TMDB_DEFAULTS = {
   base: 'https://tmdb.forjahq.xyz/3',
   imageBase: 'https://tmdb.forjahq.xyz/t/p',
   apiKey: '',
-  language: 'en-US',
+  language: '',
   region: '',
 };
+
+// TMDB response language: a language set in the pack's own settings, else the app language.
+function tmdbLanguage(cfg) {
+  return String((cfg && (cfg.language || cfg.uiLocale)) || 'en-US');
+}
+
+// Images to request: app language first, then English and untagged ones.
+function tmdbImageLanguages(cfg) {
+  var l = tmdbLanguage(cfg).split('-')[0].toLowerCase();
+  return l && l !== 'en' ? l + ',en,null' : 'en,null';
+}
 
 function tmdbNeedsApiKey(cfg) {
   return String(cfg.base || '').indexOf('api.themoviedb.org') >= 0;
@@ -34,6 +45,12 @@ var TMDB_MOODS = [
   { id: 'animated', label: 'Animated', icon: 'brush', accent: '#06B6D4', movieGenres: [16], tvGenres: [16] },
   { id: 'drama', label: 'Drama', icon: 'theaters', accent: '#3B82F6', movieGenres: [18], tvGenres: [18] },
 ];
+
+function tmdbMoodOptions(cfg) {
+  return TMDB_MOODS.map(function (m) {
+    return Object.assign({}, m, { label: hubText(cfg, m.label) });
+  });
+}
 
 // Pack-owned logos under plugins/hubs/home/logos — vertical_filters widget.
 var TMDB_VERTICAL_FILTERS = [
@@ -601,8 +618,8 @@ function tmdbBecause(ctx, cfg, params) {
     var items = tmdbMetas(cfg, json, mediaType, TMDB_HOME_RAIL_CAP);
     var env = hubItems('rail', items, { maxAge: 900, swr: 3600 })[0];
     env.data.heading = title
-      ? 'Because you watched ' + title
-      : 'Because you watched';
+      ? hubText(cfg, 'Because you watched') + ' ' + title
+      : hubText(cfg, 'Because you watched');
     env.data.seedPoster = String(meta.poster || meta.background || '');
     env.data.canShuffle = seeds.length > 1;
     return env;
@@ -623,37 +640,23 @@ function tmdbImage(cfg, path, size) {
 function tmdbPickTitleLogo(cfg, images) {
   var logos = images && Array.isArray(images.logos) ? images.logos : [];
   if (!logos.length) return '';
-  var en = null;
-  var nul = null;
-  var first = null;
-  var enSvg = null;
-  var nulSvg = null;
-  var firstSvg = null;
+  // Preference: app language, English, untagged, anything; every PNG before any SVG (as before).
+  var pref = tmdbLanguage(cfg).split('-')[0].toLowerCase();
+  var best = {};
   for (var i = 0; i < logos.length; i++) {
     var L = logos[i];
     if (!L || !L.file_path) continue;
     var svg = /\.svg$/i.test(String(L.file_path));
     var lang = L.iso_639_1;
-    if (lang === 'en') {
-      if (svg) {
-        if (!enSvg) enSvg = L;
-      } else if (!en) {
-        en = L;
-      }
-    } else if (lang == null || lang === '') {
-      if (svg) {
-        if (!nulSvg) nulSvg = L;
-      } else if (!nul) {
-        nul = L;
-      }
-    }
-    if (svg) {
-      if (!firstSvg) firstSvg = L;
-    } else if (!first) {
-      first = L;
-    }
+    var bucket = lang === pref ? 'pref' : lang === 'en' ? 'en' : lang == null || lang === '' ? 'nul' : 'first';
+    var key = bucket + (svg ? ':svg' : ':png');
+    if (!best[key]) best[key] = L;
+    var any = 'first' + (svg ? ':svg' : ':png');
+    if (!best[any]) best[any] = L;
   }
-  var chosen = en || nul || first || enSvg || nulSvg || firstSvg;
+  var order = ['pref:png', 'en:png', 'nul:png', 'first:png', 'pref:svg', 'en:svg', 'nul:svg', 'first:svg'];
+  var chosen = null;
+  for (var r = 0; r < order.length && !chosen; r++) chosen = best[order[r]] || null;
   return chosen ? tmdbImage(cfg, chosen.file_path, 'w500') : '';
 }
 
@@ -927,13 +930,13 @@ var TMDB_TV_GENRE_NAMES = {
   37: 'Western',
 };
 
-function tmdbGenreNames(type, genreIds) {
+function tmdbGenreNames(cfg, type, genreIds) {
   var map = type === 'tv' ? TMDB_TV_GENRE_NAMES : TMDB_MOVIE_GENRE_NAMES;
   var names = [];
   var ids = Array.isArray(genreIds) ? genreIds : [];
   for (var i = 0; i < ids.length; i++) {
     var label = map[Number(ids[i])];
-    if (label) names.push(label);
+    if (label) names.push(hubText(cfg, label));
   }
   return names;
 }
@@ -970,7 +973,7 @@ function tmdbMeta(cfg, row, forcedType) {
     },
   };
   if (row.vote_average) meta.rating = Number(row.vote_average);
-  var genreNames = tmdbGenreNames(type, row.genre_ids);
+  var genreNames = tmdbGenreNames(cfg, type, row.genre_ids);
   if (genreNames.length) meta.genres = genreNames;
   var logo = tmdbPickTitleLogo(cfg, row.images);
   if (logo) meta.logo = logo;
@@ -984,7 +987,7 @@ function tmdbGet(ctx, cfg, path, query) {
   if (String(cfg.apiKey || '').trim()) {
     qs.push('api_key=' + encodeURIComponent(String(cfg.apiKey).trim()));
   }
-  if (cfg.language) qs.push('language=' + encodeURIComponent(cfg.language));
+  qs.push('language=' + encodeURIComponent(tmdbLanguage(cfg)));
   if (cfg.region) qs.push('region=' + encodeURIComponent(cfg.region));
   var extra = query || {};
   for (var k in extra) {
@@ -1403,7 +1406,7 @@ function tmdbBuildTvVideos(ctx, cfg, tvId, showJson) {
               id: tvId + ':S' + sn + 'E' + epNum,
               season: sn,
               episode: epNum,
-              title: String(ep.name || 'Episode ' + epNum).trim(),
+              title: String(ep.name || hubText(cfg, 'Episode') + ' ' + epNum).trim(),
               thumbnail: ep.still_path
                 ? tmdbImage(cfg, ep.still_path, 'w300')
                 : '',
@@ -1472,7 +1475,7 @@ function tmdbDetails(ctx, cfg, params) {
   var append = 'external_ids,recommendations,images,credits,videos';
   return tmdbGet(ctx, cfg, '/' + type + '/' + id, {
     append_to_response: append,
-    include_image_language: 'en,null',
+    include_image_language: tmdbImageLanguages(cfg),
   }).then(function (json) {
     var meta = tmdbMeta(cfg, json, type);
     if (!meta) return hubFail('details', 'NOT_FOUND', type + ' ' + id);
@@ -1494,7 +1497,7 @@ function tmdbDetails(ctx, cfg, params) {
     var recJson = json.recommendations;
     if (recJson && Array.isArray(recJson.results) && recJson.results.length) {
       rails.recommendations = {
-        title: 'More Like This',
+        title: hubText(cfg, 'More Like This'),
         items: tmdbMetas(cfg, recJson, type, TMDB_HOME_RAIL_CAP),
       };
     } else {
@@ -1503,7 +1506,7 @@ function tmdbDetails(ctx, cfg, params) {
           page: 1,
         }).then(function (rec) {
           rails.recommendations = {
-            title: 'More Like This',
+            title: hubText(cfg, 'More Like This'),
             items: tmdbMetas(cfg, rec, type, TMDB_HOME_RAIL_CAP),
           };
         }),
@@ -2305,11 +2308,11 @@ function tmdbStructuredSearch(ctx, cfg, params) {
   });
 }
 
-function tmdbCategoryOptions() {
+function tmdbCategoryOptions(cfg) {
   return TMDB_GENRE_ROWS.map(function (g) {
     var opt = {
       id: g.id,
-      label: g.label,
+      label: hubText(cfg, g.label),
       movieGenres: g.movieGenres,
       tvGenres: g.tvGenres,
       filter: { op: 'eq', field: 'mood', value: g.id },
@@ -2328,7 +2331,7 @@ function extract(ctx) {
 
   if (action === 'layout') {
     // Short TTL so seeded genre rows rotate; rails keep their own longer cache.
-    return hubOk('layout', tmdbLayout(), { maxAge: 300, swr: 900 });
+    return hubOk('layout', tmdbLayout(cfg), { maxAge: 300, swr: 900 });
   }
   if (action === 'filters') {
     return hubOk('filters', {
@@ -2341,13 +2344,15 @@ function extract(ctx) {
         },
         {
           id: 'series',
-          label: 'TV Shows',
+          label: hubText(cfg, 'TV Shows'),
           filter: { op: 'eq', field: 'type', value: 'tv' },
           hideTypeFilterRails: true,
         },
       ],
-      fields: [{ field: 'genre', label: 'Genre', options: tmdbCategoryOptions() }],
-      genreRows: TMDB_GENRE_ROWS,
+      fields: [{ field: 'genre', label: 'Genre', options: tmdbCategoryOptions(cfg) }],
+      genreRows: TMDB_GENRE_ROWS.map(function (g) {
+        return Object.assign({}, g, { label: hubText(cfg, g.label) });
+      }),
       play: [
         {
           id: 'languages',

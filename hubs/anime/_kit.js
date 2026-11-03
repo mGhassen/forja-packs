@@ -48,6 +48,62 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// TMDB search in the app language (cfg.uiLocale); English and a missing locale add nothing.
+function hubMatchRequest(ctx, req) {
+  var l = String((ctx && ctx.config && ctx.config.uiLocale) || '').trim();
+  if (!l || !req || typeof req !== 'object') return req;
+  var out = {};
+  for (var k in req) if (Object.prototype.hasOwnProperty.call(req, k)) out[k] = req[k];
+  out.language = l;
+  return out;
+}
+
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    'Spotlight': 'À la une',
+    'Pick your vibe': 'Choisissez votre ambiance',
+    'Trending Now': 'Tendances du moment',
+    'This Season': 'Cette saison',
+    'Top Airing': 'Top des diffusions en cours',
+    'Top 10 Today': 'Top 10 du jour',
+    'Most Popular': 'Les plus populaires',
+    'Recently Aired': 'Diffusés récemment',
+    'Top Rated': 'Les mieux notés',
+    'Most Favorited': 'Les plus ajoutés aux favoris',
+    'Recently Completed': 'Terminés récemment',
+    'Comedy': 'Comédie',
+    'Mystery': 'Mystère',
+    'Fantasy': 'Fantastique',
+    'Slice of Life': 'Tranche de vie',
+    'Sci-Fi': 'Science-fiction',
+    'Sports': 'Sport',
+    'Horror': 'Horreur',
+    '{n} eps': '{n} ép.',
+    'Ep {n}': 'Ép. {n}',
+    'Episode {n}': 'Épisode {n}',
+    'Side Story': 'Histoire parallèle',
+    'Summary': 'Résumé',
+    'Sequel': 'Suite',
+    'Prequel': 'Préquelle',
+    'Parent': 'Série principale',
+    'Contains': 'Contient',
+    'Other': 'Autre',
+    'Related': 'Titres liés',
+    'More Like This': 'Titres similaires',
+    'Series': 'Séries',
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 
 // Pack owns upcoming / premiereLabel — host only reads these fields.
 
@@ -436,6 +492,17 @@ var HUB_TMDB_DEFAULTS = {
   apiKey: '',
 };
 
+// TMDB response language: the app language from the host, else TMDB's default (English).
+function hubTmdbLanguage(cfg) {
+  return String((cfg && (cfg.language || cfg.uiLocale)) || '').trim();
+}
+
+// Images to request: app language first, then English and untagged ones.
+function hubTmdbImageLanguages(cfg) {
+  var l = (hubTmdbLanguage(cfg) || 'en').split('-')[0].toLowerCase();
+  return l !== 'en' ? l + ',en,null' : 'en,null';
+}
+
 function hubTmdbBuildUrl(cfg, path, queryObj) {
   var base = String((cfg && cfg.base) || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
   var p = String(path || '');
@@ -445,6 +512,8 @@ function hubTmdbBuildUrl(cfg, path, queryObj) {
   var key = String((cfg && cfg.apiKey) || '').trim();
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) return null;
   if (key) qs.push('api_key=' + encodeURIComponent(key));
+  var lang = hubTmdbLanguage(cfg);
+  if (lang && !(queryObj && queryObj.language)) qs.push('language=' + encodeURIComponent(lang));
   if (queryObj) {
     for (var k in queryObj) {
       if (!Object.prototype.hasOwnProperty.call(queryObj, k)) continue;
@@ -465,7 +534,7 @@ function hubTmdbMatch(ctx, query) {
   return hubTmdbMatchFetch(ctx, normalized).then(function (hit) {
     if (hit && hit.id) return hit;
     if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-      return Promise.resolve(ctx.host.tmdb.match(normalized))
+      return Promise.resolve(ctx.host.tmdb.match(hubMatchRequest(ctx, normalized)))
         .then(function (h) {
           return h && h.id ? h : null;
         })
@@ -1000,7 +1069,7 @@ function hubTmdbById(ctx, id, preferType, details) {
 
   function fetchOne(media) {
     var q = { append_to_response: append };
-    if (details) q.include_image_language = 'en,null';
+    if (details) q.include_image_language = hubTmdbImageLanguages(cfg);
     var url = hubTmdbBuildUrl(cfg, '/' + media + '/' + tid, q);
     if (!url) return Promise.resolve(null);
     return ctx
@@ -1070,7 +1139,7 @@ function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
 
 function hubIsGenericEpisodeTitle(title) {
   // Bare "Episode 12" or AniList "Episode 49 - Demons and Strategies".
-  return /^Episode\s+\d+(\s*[-–:].*)?$/i.test(String(title || '').trim());
+  return /^(?:Episode|Épisode)\s+\d+(\s*[-–:].*)?$/i.test(String(title || '').trim());
 }
 
 function hubIsAnimeMeta(meta) {
@@ -1082,7 +1151,7 @@ function hubIsAnimeMeta(meta) {
 
 // Pad sparse pack videos to the pack's declared total. For anime, that is
 // AniList Media.episodes (one cour) — never TMDB franchise number_of_episodes.
-function hubPadMetaVideosToDeclared(meta) {
+function hubPadMetaVideosToDeclared(meta, cfg) {
   if (!meta || typeof meta !== 'object') return meta;
   var declared = hubIsAnimeMeta(meta)
     ? Number(meta.episodes) || 0
@@ -1118,7 +1187,7 @@ function hubPadMetaVideosToDeclared(meta) {
         id: String(j),
         episode: j,
         season: 1,
-        title: 'Episode ' + j,
+        title: hubTextFmt(cfg, 'Episode {n}', { n: j }),
       });
     }
   }
@@ -1164,7 +1233,7 @@ function hubEnrichMetaVideos(ctx, meta, hit) {
   }
   var anime = hubIsAnimeMeta(meta);
   if (!anime) {
-    hubPadMetaVideosToDeclared(meta);
+    hubPadMetaVideosToDeclared(meta, hubConfig(ctx, {}));
   }
   var videos = Array.isArray(meta.videos) ? meta.videos : [];
   if (!videos.length) return Promise.resolve(meta);

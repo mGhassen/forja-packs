@@ -227,7 +227,7 @@ async function iptvFetchM3u(ctx, portal, section) {
   if (!res || !res.ok) {
     return iptvEmptyCatalog({
       code: 'M3U_FETCH_FAILED',
-      message: 'Failed to download playlist',
+      message: hubText(hubConfig(ctx, {}), 'Failed to download playlist'),
     });
   }
   var content =
@@ -239,7 +239,7 @@ async function iptvFetchM3u(ctx, portal, section) {
   if (!content) {
     return iptvEmptyCatalog({
       code: 'M3U_EMPTY',
-      message: 'Playlist body empty',
+      message: hubText(hubConfig(ctx, {}), 'Playlist body empty'),
     });
   }
 

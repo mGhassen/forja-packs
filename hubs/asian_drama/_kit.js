@@ -48,6 +48,46 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// TMDB search in the app language (cfg.uiLocale); English and a missing locale add nothing.
+function hubMatchRequest(ctx, req) {
+  var l = String((ctx && ctx.config && ctx.config.uiLocale) || '').trim();
+  if (!l || !req || typeof req !== 'object') return req;
+  var out = {};
+  for (var k in req) if (Object.prototype.hasOwnProperty.call(req, k)) out[k] = req[k];
+  out.language = l;
+  return out;
+}
+
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    'Spotlight': 'À la une',
+    'Latest Update': 'Dernières mises à jour',
+    'Trending': 'Tendances',
+    'Popular': 'Populaires',
+    'Upcoming': 'À venir',
+    'Episode {n}': 'Épisode {n}',
+    'More Like This': 'Titres similaires',
+    'Series': 'Séries',
+    'Country': 'Pays',
+    'Chinese': 'Chine',
+    'South Korea': 'Corée du Sud',
+    'Japan': 'Japon',
+    'Thailand': 'Thaïlande',
+    'Taiwan': 'Taïwan',
+    'Indonesia': 'Indonésie',
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 
 // Pack owns upcoming / premiereLabel — host only reads these fields.
 
@@ -443,6 +483,17 @@ var HUB_TMDB_DEFAULTS = {
   apiKey: '',
 };
 
+// TMDB response language: the app language from the host, else TMDB's default (English).
+function hubTmdbLanguage(cfg) {
+  return String((cfg && (cfg.language || cfg.uiLocale)) || '').trim();
+}
+
+// Images to request: app language first, then English and untagged ones.
+function hubTmdbImageLanguages(cfg) {
+  var l = (hubTmdbLanguage(cfg) || 'en').split('-')[0].toLowerCase();
+  return l !== 'en' ? l + ',en,null' : 'en,null';
+}
+
 function hubTmdbBuildUrl(cfg, path, queryObj) {
   var base = String((cfg && cfg.base) || HUB_TMDB_DEFAULTS.base).replace(/\/$/, '');
   var p = String(path || '');
@@ -452,6 +503,8 @@ function hubTmdbBuildUrl(cfg, path, queryObj) {
   var key = String((cfg && cfg.apiKey) || '').trim();
   if (base.indexOf('api.themoviedb.org') >= 0 && !key) return null;
   if (key) qs.push('api_key=' + encodeURIComponent(key));
+  var lang = hubTmdbLanguage(cfg);
+  if (lang && !(queryObj && queryObj.language)) qs.push('language=' + encodeURIComponent(lang));
   if (queryObj) {
     for (var k in queryObj) {
       if (!Object.prototype.hasOwnProperty.call(queryObj, k)) continue;
@@ -472,7 +525,7 @@ function hubTmdbMatch(ctx, query) {
   return hubTmdbMatchFetch(ctx, normalized).then(function (hit) {
     if (hit && hit.id) return hit;
     if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-      return Promise.resolve(ctx.host.tmdb.match(normalized))
+      return Promise.resolve(ctx.host.tmdb.match(hubMatchRequest(ctx, normalized)))
         .then(function (h) {
           return h && h.id ? h : null;
         })
@@ -994,7 +1047,7 @@ function hubTmdbById(ctx, id, preferType, details) {
 
   function fetchOne(media) {
     var url =
-      base + '/' + media + '/' + tid + '?append_to_response=' + append + (details ? '&include_image_language=en,null' : '') + (key ? '&api_key=' + encodeURIComponent(key) : '');
+      base + '/' + media + '/' + tid + '?append_to_response=' + append + (details ? '&include_image_language=' + hubTmdbImageLanguages(cfg) : '') + (hubTmdbLanguage(cfg) ? '&language=' + encodeURIComponent(hubTmdbLanguage(cfg)) : '') + (key ? '&api_key=' + encodeURIComponent(key) : '');
     return ctx
       .fetch(url)
       .then(function (res) {
@@ -1057,7 +1110,7 @@ function hubTmdbSeasonEpisodeMap(ctx, tvId, season) {
 }
 
 function hubIsGenericEpisodeTitle(title) {
-  return /^Episode\s+\d+$/i.test(String(title || '').trim());
+  return /^(?:Episode|Épisode)\s+\d+$/i.test(String(title || '').trim());
 }
 
 // Details meta only — fill empty pack video thumbs/titles from matched TV season.
@@ -1483,7 +1536,7 @@ function hubResolveTmdbRecsToDrama(ctx, meta) {
     var data = { meta: meta };
     if (out.length) {
       data.rails = {
-        recommendations: { title: 'More Like This', items: out },
+        recommendations: { title: hubText(hubConfig(ctx, {}), 'More Like This'), items: out },
       };
     }
     return data;

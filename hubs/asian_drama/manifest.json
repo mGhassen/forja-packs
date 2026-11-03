@@ -4,7 +4,20 @@
   "name": "ForjaHQ Asian Drama",
   "description": "KissKH Asian drama catalog hub.",
   "author": "ForjaHQ",
-  "version": "1.0.44",
+  "version": "1.0.45",
+  "i18n": {
+    "fr": {
+      "Asian Drama": "Drames asiatiques",
+      "Cards": "Cartes",
+      "Cards with stills, or numbered chips in a grid": "Cartes avec images, ou pastilles numérotées en grille",
+      "Details": "Détails",
+      "Episode list": "Liste des épisodes",
+      "KissKH Asian drama hub": "Hub drames asiatiques KissKH",
+      "Number chips": "Pastilles numérotées",
+      "TMDB Enrich": "Enrichissement TMDB",
+      "TMDB match enrich for Asian Drama metas (companion to KissKH)": "Enrichissement TMDB des fiches de drames asiatiques (complément de KissKH)"
+    }
+  },
   "tags": [
     "asian-drama",
     "drama"

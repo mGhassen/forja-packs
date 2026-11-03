@@ -3,7 +3,13 @@
   "id": "forjahq-arabic",
   "name": "ForjaHQ Arabic",
   "description": "Arabic and dubbed series, films, plays and TV shows from Larozaa.",
-  "version": "1.4.20",
+  "version": "1.4.21",
+  "i18n": {
+    "fr": {
+      "Arabic": "Arabe",
+      "Larozaa Arabic movies and TV hub": "Hub films et séries arabes Larozaa"
+    }
+  },
   "tags": [
     "arabic"
   ],

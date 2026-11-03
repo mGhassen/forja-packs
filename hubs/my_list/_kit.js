@@ -48,6 +48,44 @@ function hubConfig(ctx, defaults) {
   return cfg;
 }
 
+// TMDB search in the app language (cfg.uiLocale); English and a missing locale add nothing.
+function hubMatchRequest(ctx, req) {
+  var l = String((ctx && ctx.config && ctx.config.uiLocale) || '').trim();
+  if (!l || !req || typeof req !== 'object') return req;
+  var out = {};
+  for (var k in req) if (Object.prototype.hasOwnProperty.call(req, k)) out[k] = req[k];
+  out.language = l;
+  return out;
+}
+
+// UI text in the app language (cfg.uiLocale, e.g. "fr-FR"). The English text is the key,
+// so a missing locale or a missing entry shows the English text unchanged.
+var HUB_I18N = {
+  fr: {
+    "Series": "Séries",
+    "Asian Drama": "Drames asiatiques",
+    "Plan to Watch": "À regarder",
+    "Watching": "En cours",
+    "On Hold": "En pause",
+    "Completed": "Terminé",
+    "Dropped": "Abandonné",
+    "Search my list…": "Rechercher dans ma liste…",
+    "Nothing in this list yet": "Rien dans cette liste pour l'instant",
+    "Open a title and tap + to set a watch status.": "Ouvrez un titre et appuyez sur + pour définir un statut de visionnage.",
+    "Match": "Associer",
+    "Match on Simkl": "Associer sur Simkl",
+    "Open with": "Ouvrir avec",
+  },
+};
+
+function hubText(cfg, en) {
+  var l = String((cfg && cfg.uiLocale) || '').split('-')[0].toLowerCase();
+  var t = HUB_I18N[l];
+  return (t && Object.prototype.hasOwnProperty.call(t, en) && t[en]) || en;
+}
+
+function hubTextFmt(cfg, en, vars) { var s = hubText(cfg, en); for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k])); return s; }
+
 function hubOk(action, data, cache) {
   var env = {
     ok: true,
@@ -586,7 +624,7 @@ function hubTmdbMatch(ctx, query) {
   return hubTmdbMatchFetch(ctx, query).then(function (hit) {
     if (hit && hit.id) return hit;
     if (ctx && ctx.host && ctx.host.tmdb && typeof ctx.host.tmdb.match === 'function') {
-      return Promise.resolve(ctx.host.tmdb.match(query))
+      return Promise.resolve(ctx.host.tmdb.match(hubMatchRequest(ctx, query)))
         .then(function (h) {
           return h && h.id ? h : null;
         })
