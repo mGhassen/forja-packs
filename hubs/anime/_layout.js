@@ -24,8 +24,11 @@ function anilistLayout() {
         // → this_season → …
         // Empty Continue / empty mood posters: host kit-edge miss walks past.
         // No pageBack: flat catalog — remote Back → nav rail.
-        // enter / restore omitted: hero View details owns first land
-        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
+        // Nav OK / RIGHT → hero View details (not Continue Watching).
+        focus: {
+          enter: 'hero-details',
+          restore: 'hero-details',
+        },
         widgets: [
           hubWithLoad(
             {

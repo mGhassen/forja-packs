@@ -51,8 +51,11 @@ function tmdbLayout() {
         // No pageBack: flat catalog — remote Back leaves the page to the
         // nav rail (same as shell tab-root). Keep pageBack for real panes
         // (IPTV items→cats, My List grid→status→kind).
-        // enter / restore omitted: hero View details owns first land
-        // (TvHeroActions defaultFocus) for nav OK and RIGHT from the rail.
+        // Nav OK / RIGHT → hero View details (not Continue Watching).
+        focus: {
+          enter: 'hero-details',
+          restore: 'hero-details',
+        },
         widgets: [
           {
             type: 'vertical_filters',
