@@ -4,7 +4,7 @@
   "name": "ForjaHQ Live Sports",
   "description": "Live Sports schedule catalogs and stream resolve.",
   "author": "ForjaHQ",
-  "version": "2.0.54",
+  "version": "2.0.55",
   "prelude": "_wire.js",
   "tags": [
     "sports",
@@ -330,6 +330,35 @@
         "catalogTimeoutSec": 90,
         "airingOnlyLive": true
       }
+    },
+    {
+      "id": "freekoora",
+      "name": "Free Koora",
+      "description": "freekoora.online schedule and stream resolve",
+      "entry": "freekoora.js",
+      "types": [
+        "live_sport"
+      ],
+      "kind": "http",
+      "prelude": "_prelude.js",
+      "capabilities": [
+        "catalog",
+        "resolve"
+      ],
+      "defaultCapabilities": {
+        "catalog": true,
+        "resolve": true
+      },
+      "config": {
+        "matchIdPrefix": "fk_",
+        "origin": "https://freekoora.online",
+        "playerOrigin": "https://x1.shotkoora.live",
+        "tzOffsetMin": 120,
+        "schedulePaths": [
+          "/matches-today/",
+          "/matches-tomorrow/"
+        ]
+      }
     }
   ],
   "bundle": [
@@ -346,6 +375,7 @@
     "bzhsport.js",
     "liveonsat.js",
     "livesoccertv.js",
+    "freekoora.js",
     "goat/unlock.mjs",
     "goat/package.json",
     "goat/vendor/lock.wasm",
