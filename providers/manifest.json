@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.82",
+  "version": "1.6.86",
   "tags": [
     "providers",
     "anime",
@@ -1898,6 +1898,20 @@
         "movie",
         "tv"
       ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-byse",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidzy",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
+      ],
       "languages": [
         {
           "kind": "sub",
@@ -1918,6 +1932,18 @@
       "types": [
         "movie",
         "tv"
+      ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
       ],
       "languages": [
         {
@@ -1940,6 +1966,18 @@
         "movie",
         "tv"
       ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
+      ],
       "languages": [
         {
           "kind": "sub",
@@ -1960,6 +1998,18 @@
       "types": [
         "movie",
         "tv"
+      ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
       ],
       "languages": [
         {
@@ -2398,6 +2448,18 @@
       "types": [
         "anime"
       ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
+      ],
       "languages": [
         {
           "kind": "sub",
@@ -2420,6 +2482,18 @@
       ],
       "types": [
         "anime"
+      ],
+      "hops": [
+        "hop-voe",
+        "hop-doodstream",
+        "hop-filemoon",
+        "hop-uqload",
+        "hop-vidoza",
+        "hop-vidmoly",
+        "hop-luluvdo",
+        "hop-streamwish",
+        "hop-mixdrop",
+        "hop-streamtape"
       ],
       "languages": [
         {
@@ -2540,7 +2614,11 @@
         "dood.so",
         "dsvplay.com",
         "doply.net",
-        "playmogo.com"
+        "playmogo.com",
+        "vide0.net",
+        "d000d.com",
+        "d0000d.com",
+        "dooood.com"
       ]
     },
     {
@@ -2582,8 +2660,37 @@
         "moonmov.pro",
         "1azayf9w.xyz",
         "kerapoxy.cc",
-        "furher.in",
-        "kaydendown.lol"
+        "furher.in"
+      ]
+    },
+    {
+      "id": "hop-byse",
+      "name": "Byse",
+      "entry": "hops/byse.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "kind": "hop",
+      "hosts": [
+        "bysebuho.com",
+        "kaydendown.lol",
+        "n1mwq.org",
+        "amrox.org"
+      ]
+    },
+    {
+      "id": "hop-vidzy",
+      "name": "Vidzy",
+      "entry": "hops/vidzy.js",
+      "types": [
+        "movie",
+        "tv"
+      ],
+      "kind": "hop",
+      "hosts": [
+        "vidzy.cc",
+        "fsvid.lol"
       ]
     },
     {
@@ -2926,6 +3033,8 @@
     "hops/doodstream.js",
     "hops/voe.js",
     "hops/filemoon.js",
+    "hops/byse.js",
+    "hops/vidzy.js",
     "hops/streamtape.js",
     "hops/vidmoly.js",
     "hops/vidoza.js",

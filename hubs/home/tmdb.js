@@ -1365,6 +1365,23 @@ function tmdbMetas(cfg, json, forcedType, limit) {
   return out;
 }
 
+// TMDB seasons[].poster_path → absolute URLs keyed by season number.
+// Host paints season cards + swaps hero art on select (not franchise data.seasons).
+function tmdbBuildSeasonPosters(cfg, showJson) {
+  var seasons = Array.isArray(showJson.seasons) ? showJson.seasons : [];
+  var out = {};
+  var i;
+  for (i = 0; i < seasons.length; i++) {
+    var row = seasons[i];
+    if (!row) continue;
+    var sn = Number(row.season_number);
+    if (!(sn >= 1)) continue;
+    var poster = tmdbImage(cfg, row.poster_path, 'w500');
+    if (poster) out[String(sn)] = poster;
+  }
+  return out;
+}
+
 function tmdbBuildTvVideos(ctx, cfg, tvId, showJson) {
   var seasons = Array.isArray(showJson.seasons) ? showJson.seasons : [];
   var seasonNums = [];
@@ -1545,6 +1562,12 @@ function tmdbDetails(ctx, cfg, params) {
         },
       };
       if (Object.keys(rails).length) data.rails = rails;
+      if (type === 'tv') {
+        var seasonPosters = tmdbBuildSeasonPosters(cfg, json);
+        if (Object.keys(seasonPosters).length) {
+          data.seasonPosters = seasonPosters;
+        }
+      }
       return hubOk('details', data, { maxAge: 3600, swr: 86400 });
     });
   });
