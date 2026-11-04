@@ -1,6 +1,19 @@
-// Movix (movix.college): French VF / VOSTFR aggregator keyed by TMDB id. Pack prelude: _fr_anime_embeds.js.
+// Movix (movix.dog): French VF / VOSTFR aggregator keyed by TMDB id. Pack prelude: _fr_anime_embeds.js.
 var SPECS = {
-  apiBase: 'https://api.movix.luxe',
+  apiBase: 'https://api.movix.dog',
+  // Site mirrors all share the same API; first reachable base wins.
+  apiBases: [
+    'https://api.movix.dog',
+    'https://api.movix.men',
+    'https://api.movix.fun',
+    'https://api.movix.show',
+    'https://api.movix.date',
+    'https://api.movix.chat',
+    'https://api.movix.golf',
+    'https://api.movix.cloud',
+    'https://api.movix.cash',
+    'https://api.movix.luxe',
+  ],
   // Movix reads the live Frembed domain from this file; frembedBase is the fallback.
   frembedConfig: 'https://raw.githubusercontent.com/kingofthrone73-dotcom/frembed-config/main/config.json',
   frembedBase: 'https://frembed.bar',
@@ -34,16 +47,20 @@ function movixLangKey(raw) {
 
 function extract(ctx) {
   var cfg = Object.assign({}, SPECS, ctx.config || {});
-  var api = String(cfg.apiBase || '').replace(/\/$/, '');
+  var bases = (Array.isArray(cfg.apiBases) && cfg.apiBases.length ? cfg.apiBases : [cfg.apiBase])
+    .map(function (b) {
+      return String(b || '').replace(/\/$/, '');
+    })
+    .filter(Boolean);
   var tmdb = String(ctx.tmdbId || '').trim();
   var imdb = String(ctx.imdbId || '').trim();
   var isTv = ctx.type === 'tv';
   var season = Number(ctx.season) || 1;
   var episode = Number(ctx.episode) || 1;
-  if (!api || !/^\d+$/.test(tmdb)) return Promise.resolve([]);
+  if (!bases.length || !/^\d+$/.test(tmdb)) return Promise.resolve([]);
 
   // No Origin / Referer: the API only rejects those when they name a non-Movix domain.
-  function getJson(path) {
+  function getJsonOn(api, path) {
     return ctx
       .fetch(api + path, { headers: { 'User-Agent': MOVIX_UA, Accept: 'application/json' } })
       .then(function (r) {
@@ -54,158 +71,179 @@ function extract(ctx) {
       });
   }
 
-  var embeds = [];
-  function addEmbed(source, lang, url, referer) {
-    var key = movixLangKey(lang);
-    var u = String(url || '').trim();
-    if (!key || !/^https?:\/\//i.test(u)) return;
-    if (MOVIX_SKIP_HOSTS.test(frAnimeHost(u))) return;
-    embeds.push({ source: source, lang: key, url: u, referer: referer || api + '/' });
-  }
-  function addLangMap(source, map, pick) {
-    if (!map || typeof map !== 'object') return;
-    Object.keys(map).forEach(function (lang) {
-      var list = map[lang];
-      if (!Array.isArray(list)) return;
-      list.forEach(function (item) {
-        addEmbed(source, lang, typeof item === 'string' ? item : item && item[pick || 'url']);
+  function pickApi(i) {
+    if (i >= bases.length) return Promise.resolve(bases[0] || '');
+    var api = bases[i];
+    return ctx
+      .fetch(api + '/api/tmdb/movie/550', { headers: { 'User-Agent': MOVIX_UA, Accept: 'application/json' } })
+      .then(function (r) {
+        return r && r.status ? api : pickApi(i + 1);
+      })
+      .catch(function () {
+        return pickApi(i + 1);
       });
-    });
   }
 
-  var direct = [];
+  return pickApi(0).then(function (api) {
+    if (!api) return [];
 
-  var jobs = [
-    // Pulse: direct HLS master with French + original audio tracks.
-    getJson(
-      isTv
-        ? '/api/purstream/tv/' + tmdb + '/stream?season=' + season + '&episode=' + episode
-        : '/api/purstream/movie/' + tmdb + '/stream',
-    ).then(function (d) {
-      var sources = d && Array.isArray(d.sources) ? d.sources : [];
-      sources.forEach(function (s) {
-        var url = s && s.url ? String(s.url) : '';
-        if (!/^https?:\/\//i.test(url)) return;
-        var label = String(s.name || '');
-        var quality = (label.match(/\b(2160p|4K|1080p|720p|480p)\b/i) || [])[1] || '';
-        direct.push({
-          url: url,
-          name: 'Movix · Pulse',
-          title: 'MULTI' + (quality ? ' · ' + quality : ''),
-          quality: quality,
-          language: 'French',
-          headers: { 'User-Agent': MOVIX_UA },
+    function getJson(path) {
+      return getJsonOn(api, path);
+    }
+
+    var embeds = [];
+    function addEmbed(source, lang, url, referer) {
+      var key = movixLangKey(lang);
+      var u = String(url || '').trim();
+      if (!key || !/^https?:\/\//i.test(u)) return;
+      if (MOVIX_SKIP_HOSTS.test(frAnimeHost(u))) return;
+      embeds.push({ source: source, lang: key, url: u, referer: referer || api + '/' });
+    }
+    function addLangMap(source, map, pick) {
+      if (!map || typeof map !== 'object') return;
+      Object.keys(map).forEach(function (lang) {
+        var list = map[lang];
+        if (!Array.isArray(list)) return;
+        list.forEach(function (item) {
+          addEmbed(source, lang, typeof item === 'string' ? item : item && item[pick || 'url']);
         });
       });
-    }),
+    }
 
-    getJson(isTv ? '/api/fstream/tv/' + tmdb + '/season/' + season : '/api/fstream/movie/' + tmdb).then(
-      function (d) {
+    var direct = [];
+
+    var jobs = [
+      // Pulse: direct HLS master with French + original audio tracks.
+      getJson(
+        isTv
+          ? '/api/purstream/tv/' + tmdb + '/stream?season=' + season + '&episode=' + episode
+          : '/api/purstream/movie/' + tmdb + '/stream',
+      ).then(function (d) {
+        var sources = d && Array.isArray(d.sources) ? d.sources : [];
+        sources.forEach(function (s) {
+          var url = s && s.url ? String(s.url) : '';
+          if (!/^https?:\/\//i.test(url)) return;
+          var label = String(s.name || '');
+          var quality = (label.match(/\b(2160p|4K|1080p|720p|480p)\b/i) || [])[1] || '';
+          direct.push({
+            url: url,
+            name: 'Movix · Pulse',
+            title: 'MULTI' + (quality ? ' · ' + quality : ''),
+            quality: quality,
+            language: 'French',
+            headers: { 'User-Agent': MOVIX_UA },
+          });
+        });
+      }),
+
+      getJson(isTv ? '/api/fstream/tv/' + tmdb + '/season/' + season : '/api/fstream/movie/' + tmdb).then(
+        function (d) {
+          if (!d || !d.success) return;
+          if (isTv) {
+            var ep = d.episodes && d.episodes[String(episode)];
+            addLangMap('FStream', ep && ep.languages);
+          } else {
+            addLangMap('FStream', d.players);
+          }
+        },
+      ),
+
+      getJson(isTv ? '/api/wiflix/tv/' + tmdb + '/' + season : '/api/wiflix/movie/' + tmdb).then(function (d) {
         if (!d || !d.success) return;
-        if (isTv) {
-          var ep = d.episodes && d.episodes[String(episode)];
-          addLangMap('FStream', ep && ep.languages);
-        } else {
-          addLangMap('FStream', d.players);
-        }
-      },
-    ),
+        addLangMap('Wiflix', isTv ? d.episodes && d.episodes[String(episode)] : d.players);
+      }),
 
-    getJson(isTv ? '/api/wiflix/tv/' + tmdb + '/' + season : '/api/wiflix/movie/' + tmdb).then(function (d) {
-      if (!d || !d.success) return;
-      addLangMap('Wiflix', isTv ? d.episodes && d.episodes[String(episode)] : d.players);
-    }),
+      getJson(
+        isTv ? '/api/cpasmal/tv/' + tmdb + '/' + season + '/' + episode : '/api/cpasmal/movie/' + tmdb,
+      ).then(function (d) {
+        addLangMap('Cpasmal', d && d.links);
+      }),
 
-    getJson(
-      isTv ? '/api/cpasmal/tv/' + tmdb + '/' + season + '/' + episode : '/api/cpasmal/movie/' + tmdb,
-    ).then(function (d) {
-      addLangMap('Cpasmal', d && d.links);
-    }),
-
-    getJson(
-      isTv
-        ? '/api/links/tv/' + tmdb + '?season=' + season + '&episode=' + episode
-        : '/api/links/movie/' + tmdb,
-    ).then(function (d) {
-      var data = d && d.success ? d.data : null;
-      var rows = Array.isArray(data) ? data : data ? [data] : [];
-      rows.forEach(function (row) {
-        if (isTv && row && (Number(row.season_number) !== season || Number(row.episode_number) !== episode)) {
-          return;
-        }
-        (row && Array.isArray(row.links) ? row.links : []).forEach(function (l) {
-          addEmbed('Movix', 'multi', typeof l === 'string' ? l : l && l.url);
+      getJson(
+        isTv
+          ? '/api/links/tv/' + tmdb + '?season=' + season + '&episode=' + episode
+          : '/api/links/movie/' + tmdb,
+      ).then(function (d) {
+        var data = d && d.success ? d.data : null;
+        var rows = Array.isArray(data) ? data : data ? [data] : [];
+        rows.forEach(function (row) {
+          if (isTv && row && (Number(row.season_number) !== season || Number(row.episode_number) !== episode)) {
+            return;
+          }
+          (row && Array.isArray(row.links) ? row.links : []).forEach(function (l) {
+            addEmbed('Movix', 'multi', typeof l === 'string' ? l : l && l.url);
+          });
         });
-      });
-    }),
-  ];
+      }),
+    ];
 
-  // Coflix: the site's MULTI player list.
-  jobs.push(
-    getJson(
-      isTv
-        ? '/api/tmdb/tv/' + tmdb + '?season=' + season + '&episode=' + episode
-        : '/api/tmdb/movie/' + tmdb,
-    ).then(function (d) {
-      var links = d && (isTv ? d.current_episode && d.current_episode.player_links : d.player_links);
-      (Array.isArray(links) ? links : []).forEach(function (l) {
-        if (l) addEmbed('Coflix', l.language || 'vf', l.decoded_url);
-      });
-    }),
-  );
-
-  jobs.push(movixFrembed(ctx, cfg, tmdb, isTv, season, episode, addEmbed, direct));
-
-  if (/^tt\d+$/.test(imdb)) {
+    // Coflix: the site's MULTI player list.
     jobs.push(
       getJson(
         isTv
-          ? '/api/imdb/tv/' + imdb + '?season=' + season + '&episode=' + episode
-          : '/api/imdb/movie/' + imdb,
+          ? '/api/tmdb/tv/' + tmdb + '?season=' + season + '&episode=' + episode
+          : '/api/tmdb/movie/' + tmdb,
       ).then(function (d) {
-        addLangMap('FrenchCloud', d && Array.isArray(d.player_links) ? { vf: d.player_links } : null, 'link');
+        var links = d && (isTv ? d.current_episode && d.current_episode.player_links : d.player_links);
+        (Array.isArray(links) ? links : []).forEach(function (l) {
+          if (l) addEmbed('Coflix', l.language || 'vf', l.decoded_url);
+        });
       }),
     );
-  }
 
-  return Promise.all(jobs)
-    .then(function () {
-      var seen = {};
-      var picked = embeds
-        .filter(function (e) {
-          if (seen[e.url]) return false;
-          seen[e.url] = true;
-          return true;
-        })
-        .slice(0, Number(cfg.maxEmbeds) || SPECS.maxEmbeds);
-      return Promise.all(
-        picked.map(function (e) {
-          return frAnimeResolveEmbed(ctx, e.url, e.referer).then(function (rows) {
-            var meta = MOVIX_LANGS[e.lang];
-            return (rows || []).map(function (r) {
-              var out = Object.assign({}, r, {
-                name: 'Movix · ' + e.source + ' [' + (r.name || frAnimeHostName(e.url)) + ']',
-                title: meta.title + (r.quality ? ' · ' + r.quality : ''),
-              });
-              if (meta.language) out.language = meta.language;
-              else delete out.language;
-              return out;
-            });
-          });
+    jobs.push(movixFrembed(ctx, cfg, tmdb, isTv, season, episode, addEmbed, direct));
+
+    if (/^tt\d+$/.test(imdb)) {
+      jobs.push(
+        getJson(
+          isTv
+            ? '/api/imdb/tv/' + imdb + '?season=' + season + '&episode=' + episode
+            : '/api/imdb/movie/' + imdb,
+        ).then(function (d) {
+          addLangMap('FrenchCloud', d && Array.isArray(d.player_links) ? { vf: d.player_links } : null, 'link');
         }),
       );
-    })
-    .then(function (groups) {
-      var seen = {};
-      return direct.concat([].concat.apply([], groups)).filter(function (r) {
-        if (!r || !r.url || seen[r.url]) return false;
-        seen[r.url] = true;
-        return true;
+    }
+
+    return Promise.all(jobs)
+      .then(function () {
+        var seen = {};
+        var picked = embeds
+          .filter(function (e) {
+            if (seen[e.url]) return false;
+            seen[e.url] = true;
+            return true;
+          })
+          .slice(0, Number(cfg.maxEmbeds) || SPECS.maxEmbeds);
+        return Promise.all(
+          picked.map(function (e) {
+            return frAnimeResolveEmbed(ctx, e.url, e.referer).then(function (rows) {
+              var meta = MOVIX_LANGS[e.lang];
+              return (rows || []).map(function (r) {
+                var out = Object.assign({}, r, {
+                  name: 'Movix · ' + e.source + ' [' + (r.name || frAnimeHostName(e.url)) + ']',
+                  title: meta.title + (r.quality ? ' · ' + r.quality : ''),
+                });
+                if (meta.language) out.language = meta.language;
+                else delete out.language;
+                return out;
+              });
+            });
+          }),
+        );
+      })
+      .then(function (groups) {
+        var seen = {};
+        return direct.concat([].concat.apply([], groups)).filter(function (r) {
+          if (!r || !r.url || seen[r.url]) return false;
+          seen[r.url] = true;
+          return true;
+        });
+      })
+      .catch(function () {
+        return direct;
       });
-    })
-    .catch(function () {
-      return direct;
-    });
+  });
 }
 
 // Frembed: each `linkN[vostfr|vo]` is a /api/stream URL that 302s to the file host.

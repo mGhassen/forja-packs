@@ -4,7 +4,7 @@
   "name": "ForjaHQ Providers",
   "description": "VOD, anime, and drama stream extractors plus file-host hops.",
   "author": "ForjaHQ",
-  "version": "1.6.81",
+  "version": "1.6.82",
   "tags": [
     "providers",
     "anime",
@@ -2538,7 +2538,9 @@
         "dood.work",
         "dood.one",
         "dood.so",
-        "dsvplay.com"
+        "dsvplay.com",
+        "doply.net",
+        "playmogo.com"
       ]
     },
     {
@@ -2559,7 +2561,8 @@
         "reputationsheriffkennethsand.com",
         "fittingcentermondaysunday.com",
         "teresapoliticallearn.com",
-        "jeremyparticipantanything.com"
+        "jeremyparticipantanything.com",
+        "ralphysuccessfull.org"
       ]
     },
     {
@@ -2579,7 +2582,8 @@
         "moonmov.pro",
         "1azayf9w.xyz",
         "kerapoxy.cc",
-        "furher.in"
+        "furher.in",
+        "kaydendown.lol"
       ]
     },
     {
@@ -2725,7 +2729,8 @@
         "uqload.com",
         "uqload.co",
         "uqload.io",
-        "uqload.to"
+        "uqload.to",
+        "uqload.vc"
       ]
     },
     {
